@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-static/
+server/data/
+*.log
+.DS_Store
+# Captures de sites tiers (droits d'auteur) : usage interne uniquement
+research/shots/
+app/public/research/shots/
+.claude-flow/
+**/.claude-flow/

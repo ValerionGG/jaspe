@@ -1,0 +1,12 @@
+{
+  "name": "nxt-agent",
+  "private": true,
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix app install",
+    "api": "npm --prefix server start",
+    "dev": "npm --prefix app run dev -- --port 5317 --host 127.0.0.1",
+    "build": "npm --prefix app run build",
+    "start": "npm run build && npm --prefix server start",
+    "test": "npm --prefix server test"
+  }
+}
