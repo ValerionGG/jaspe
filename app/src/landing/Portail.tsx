@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import {
   House, CalendarBlank, ChatsCircle, CheckSquare, Kanban, Buildings, UsersThree, AddressBook, Handshake, PenNib, ChartLineUp, MapTrifold,
-  ChartBar, Lightning, Target, Lightbulb, BookOpenText, GraduationCap, GearSix, MagnifyingGlass, ArrowUpRight, Sparkle, GithubLogo, ArrowCounterClockwise, Play, Storefront, Crown,
+  ChartBar, Lightning, Target, Lightbulb, BookOpenText, GraduationCap, GearSix, MagnifyingGlass, ArrowUpRight, Sparkle, ArrowCounterClockwise, Play, Storefront, Crown,
 } from '@phosphor-icons/react'
 import { Logo } from './chrome'
 import { ThemeToggle } from '../ui/theme'
@@ -59,7 +59,6 @@ export default function Portail() {
       <header className="relative mx-auto flex max-w-[1400px] items-center justify-between px-5 py-6 md:px-10">
         <Link to="/"><Logo /></Link>
         <div className="flex items-center gap-2">
-          <a href="https://github.com/ValerionGG/nxt-agent" target="_blank" rel="noreferrer" className="hidden items-center gap-2 rounded-full bg-white/[0.04] px-4 py-2 text-[13px] ring-1 ring-white/10 transition hover:bg-white/[0.08] sm:flex"><GithubLogo size={15} /> Code source</a>
           <ThemeToggle />
         </div>
       </header>
