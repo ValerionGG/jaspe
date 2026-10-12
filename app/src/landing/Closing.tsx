@@ -201,10 +201,10 @@ export function Footer() {
       <div className="mx-auto max-w-[1400px]">
         <div className="grid gap-12 border-b border-white/[0.07] pb-16 md:grid-cols-12">
           <div className="md:col-span-4"><Logo /><p className="mt-5 max-w-xs text-[13px] leading-relaxed text-mist">Le copilote proactif des agences et réseaux immobiliers. Conçu sur la Côte d’Azur.</p></div>
-          {[['Produit', ['Parcours vendeur', 'CRM & dossiers', 'Automatisations', 'Console réseau', 'Intégrations']], ['Ressources', ['Méthode D1 → L9', 'Sécurité & RGPD', 'Statut du service', 'Journal des versions']], ['Société', ['À propos', 'Carrières', 'Presse', 'Contact']]].map(([t, l]) => (
-            <div key={t as string} className="md:col-span-2">
+          {([['Produit', [['Parcours vendeur', '#parcours'], ['CRM & dossiers', '/app/dossiers'], ['Automatisations', '#automatisations'], ['Console réseau', '/app/pilotage'], ['Messagerie & WhatsApp', '/app/messages']]], ['Découvrir', [['Portail · tous les accès', '/portail'], ['Offre Essentiel', '/essentiel'], ['CRM Essentiel', '/essentiel/app'], ['Tutoriels', '/app/aide'], ['Étude & benchmark', '/app/etude']]], ['Ressources', [['Tarifs', '#tarifs'], ['Questions fréquentes', '#demo'], ['Feuille de route', '/app/idees'], ['Code source', 'https://github.com/ValerionGG/nxt-agent']]]] as const).map(([t, l]) => (
+            <div key={t} className="md:col-span-2">
               <div className="text-[11px] uppercase tracking-eyebrow text-mist">{t}</div>
-              <ul className="mt-4 space-y-2.5">{(l as string[]).map((x) => <li key={x}><a href="#top" className="text-[14px] text-bone/70 transition hover:text-champagne-300">{x}</a></li>)}</ul>
+              <ul className="mt-4 space-y-2.5">{l.map(([x, h]) => <li key={x}><a href={h} {...(h.startsWith('http') ? { target: '_blank', rel: 'noreferrer' } : {})} className="text-[14px] text-bone/70 transition hover:text-champagne-300">{x}</a></li>)}</ul>
             </div>
           ))}
         </div>

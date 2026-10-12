@@ -25,7 +25,7 @@ export const META: Record<LCode, { name: string; short: string; audience: string
   L5: { name: 'Courrier voisinage', short: 'Voisinage', audience: 'Riverains', inputs: 'Bien + zone + agence' },
   L6: { name: 'Book de services', short: 'Book', audience: 'Vendeur', inputs: 'Besoins D5 + services disponibles + L2–L5, L8, L9' },
   L7: { name: 'Analyse & estimation', short: 'Estimation', audience: 'Vendeur', inputs: 'Données vérifiées D5 + DVF + annonces' },
-  L8: { name: 'Avant / après', short: 'Avant/après', audience: 'Interne', inputs: 'Photos D5 + contraintes du bien' },
+  L8: { name: 'Avant / après', short: 'Projection', audience: 'Interne', inputs: 'Photos D5 + contraintes du bien' },
   L9: { name: 'Dossier copro & diagnostics', short: 'Copro', audience: 'Interne', inputs: 'Pièces déposées au dossier' },
 }
 

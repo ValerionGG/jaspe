@@ -27,20 +27,30 @@ export default function StepDeliverables({ dossier: d, journey, save, openDelive
   const prefs = (journey as Journey & { deliv?: DelivPrefs }).deliv ?? {}
   const st = (c: LCode): DelivState => d.deliverables[c] ?? 'waiting'
   const docOf = (c: LCode) => docs.find((x) => x.id === `${d.id}-${c}`) as StudioDocument | undefined
-  const [open, setOpen] = useState<Record<string, boolean>>(() => Object.fromEntries(L_CODES.map((c) => [c, st(c) !== 'done'])))
+  // Repli par défaut : ouvert tant que le livrable n’est pas prêt ; un clic de l’utilisateur prime ensuite.
+  const [openOverride, setOpen] = useState<Record<string, boolean>>({})
+  const open = Object.fromEntries(L_CODES.map((c) => [c, openOverride[c] ?? st(c) !== 'done'])) as Record<string, boolean>
   const [active, setActive] = useState<LCode>('L1')
   const friezeRef = useRef<HTMLDivElement>(null)
   const [stuck, setStuck] = useState(false)
 
   // Navigation : la barre collante n’apparaît qu’une fois la frise sortie de l’écran ; la section visible est suivie.
   useEffect(() => {
-    const f = friezeRef.current
-    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting && e.boundingClientRect.top < 0), { rootMargin: '-64px 0px 0px 0px' })
-    if (f) io.observe(f)
-    const spy = new IntersectionObserver((es) => { const v = es.filter((e) => e.isIntersecting).sort((x, y) => x.boundingClientRect.top - y.boundingClientRect.top)[0]; if (v) setActive(v.target.id.slice(6) as LCode) }, { rootMargin: '-140px 0px -55% 0px' })
-    L_CODES.forEach((c) => { const el = document.getElementById(`deliv-${c}`); if (el) spy.observe(el) })
-    return () => { io.disconnect(); spy.disconnect() }
+    const onScroll = () => {
+      setStuck((friezeRef.current?.getBoundingClientRect().bottom ?? 1) < 64)
+      const cur = [...L_CODES].reverse().find((c) => (document.getElementById(`deliv-${c}`)?.getBoundingClientRect().top ?? 1e9) < 180)
+      if (cur) setActive(cur)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // Sur mobile, la pastille active reste visible dans la barre défilante.
+  useEffect(() => {
+    const nav = document.querySelector<HTMLElement>('nav[aria-label="Livrables"]'), b = nav?.querySelector<HTMLElement>(`[data-code="${active}"]`)
+    if (nav && b) nav.scrollTo({ left: b.offsetLeft - nav.clientWidth / 2 + b.clientWidth / 2, behavior: 'smooth' })
+  }, [active, stuck])
 
   const jump = (c: LCode) => { setOpen((o) => ({ ...o, [c]: true })); requestAnimationFrame(() => document.getElementById(`deliv-${c}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })) }
   const setPrefs: Ctx['setPrefs'] = (k, v) => save({ deliv: { ...prefs, [k]: v } } as Partial<Journey>)
@@ -61,7 +71,7 @@ export default function StepDeliverables({ dossier: d, journey, save, openDelive
   const validateSafe = () => run('safe', async () => { for (const code of safe) await action('deliverable.validate', { dossierId: d.id, code }) }, `${safe.join(', ')} validé${safe.length > 1 ? 's' : ''}`)
 
   const pills = (compact: boolean) => L_CODES.map((c) => (
-    <button key={c} onClick={() => jump(c)} className={clsx('relative flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px]', compact && active === c ? 'text-bone' : 'text-bone/60 hover:text-bone')}>
+    <button key={c} data-code={c} onClick={() => jump(c)} className={clsx('relative flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px]', compact && active === c ? 'text-bone' : 'text-bone/60 hover:text-bone')}>
       {compact && active === c && <motion.span layoutId="deliv-nav" className="absolute inset-0 rounded-full bg-white/[0.09] ring-1 ring-white/10" transition={{ duration: 0.5, ease: EXPO }} />}
       <span className={clsx('relative h-1.5 w-1.5 rounded-full', DOT[st(c)])} /><span className="num relative">{c}</span>
     </button>
@@ -78,11 +88,11 @@ export default function StepDeliverables({ dossier: d, journey, save, openDelive
               <p className="mt-2 max-w-xl text-[13px] text-bone/55">Préparés depuis la découverte D5, chaque chiffre sourcé et daté. Rien ne sort de l’agence sans votre validation : les envois externes sont consignés tant que les connecteurs ne sont pas configurés.</p>
             </div>
             <div className="grid shrink-0 grid-cols-4 gap-2 rounded-2xl bg-white/[0.02] py-3 text-center ring-1 ring-white/[0.05] sm:gap-4 2xl:bg-transparent 2xl:py-0 2xl:ring-0">
-              {([['done', 'Prêts', 'text-sage'], ['review', 'À valider', 'text-champagne-300'], ['running', 'En cours', 'text-sea'], ['blocked', 'Bloqués', 'text-coral']] as const).map(([k, l, c]) => <div key={k}><div className={clsx('display text-[2.4rem] leading-none', counts[k] ? c : 'text-bone/30')}>{counts[k]}</div><div className="mt-1 text-[10.5px] uppercase tracking-eyebrow text-mist">{l}</div></div>)}
+              {([['done', 'Prêts', 'text-sage'], ['review', 'À valider', 'text-champagne-300'], ['running', 'En cours', 'text-sea'], ['blocked', 'Bloqués', 'text-coral']] as const).map(([k, l, c]) => <div key={k}><div className={clsx('display text-[2.4rem] leading-none', counts[k] ? c : 'text-bone/30')}>{counts[k]}</div><div className="mt-1 whitespace-nowrap text-[9.5px] uppercase tracking-[0.14em] text-mist sm:text-[10.5px] sm:tracking-eyebrow">{l}</div></div>)}
             </div>
           </div>
 
-          <div ref={friezeRef} className="thin-scroll -mx-1 mt-6 overflow-x-auto px-1 pb-1">
+          <div ref={friezeRef} className="thin-scroll -mx-1 mt-6 overflow-x-auto px-1 pb-1 [contain:inline-size]">
             <ol className="relative grid min-w-[620px] grid-cols-9 gap-1">
               <div className="absolute left-4 right-4 top-[19px] h-px bg-white/[0.08]" aria-hidden />
               {L_CODES.map((c, i) => {
@@ -121,7 +131,7 @@ export default function StepDeliverables({ dossier: d, journey, save, openDelive
       <div className="sticky top-[72px] z-20 !mt-0 h-0">
         <AnimatePresence>
           {stuck && (
-            <motion.nav initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.4, ease: EXPO }} aria-label="Livrables" className="glass thin-scroll flex gap-1 overflow-x-auto rounded-full p-1 shadow-float ring-1 ring-white/10">
+            <motion.nav initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.4, ease: EXPO }} aria-label="Livrables" className="glass thin-scroll flex gap-1 overflow-x-auto [contain:inline-size] rounded-full p-1 shadow-float ring-1 ring-white/10">
               {pills(true)}
             </motion.nav>
           )}
@@ -133,7 +143,7 @@ export default function StepDeliverables({ dossier: d, journey, save, openDelive
         const ctx: Ctx = {
           d, p, a, j: journey, doc: docOf(c), state: st(c), prefs, setPrefs, save,
           outbox: outbox.filter((o) => o.dossierId === d.id && o.code === c).sort((x, y) => y.at.localeCompare(x.at))[0],
-          open: !!open[c], toggle: () => setOpen((o) => ({ ...o, [c]: !o[c] })), openDeliverable,
+          open: !!open[c], toggle: () => setOpen((o) => ({ ...o, [c]: !open[c] })), openDeliverable,
         }
         return <Stagger key={c} i={Math.min(i + 1, 5)}><S ctx={ctx} /></Stagger>
       })}

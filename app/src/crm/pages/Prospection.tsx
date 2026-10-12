@@ -22,9 +22,9 @@ const PRINT: Campaign['print'][] = ['BAT à valider', 'Chez l’imprimeur', 'Imp
 const DIST: Campaign['dist'][] = ['Planifiée', 'En cours', 'Distribuée']
 // ponytail: historique antérieur au CRM, en lecture seule ; les nouvelles tournées vivent dans la collection notes
 const HISTORY = [
-  { d: 'Sam. 4 oct.', a: 'a1', s: 's1', streets: 'Rue Vauban, rue Fersen, rue de la Tourraque', boxes: 312, read: 286 },
-  { d: 'Mer. 1 oct.', a: 'a4', s: 's3', streets: 'Chemin de la Garoupe, boulevard du Cap', boxes: 148, read: 139 },
-  { d: 'Sam. 27 sept.', a: 'a3', s: 's4', streets: 'Boulevard Wilson, avenue Saramartel', boxes: 405, read: 371 },
+  { d: 'Sam. 3 oct.', a: 'a1', s: 's1', streets: 'Rue Vauban, rue Fersen, rue de la Tourraque', boxes: 312, read: 286 },
+  { d: 'Jeu. 1 oct.', a: 'a4', s: 's3', streets: 'Chemin de la Garoupe, boulevard du Cap', boxes: 148, read: 139 },
+  { d: 'Sam. 26 sept.', a: 'a3', s: 's4', streets: 'Boulevard Wilson, avenue Saramartel', boxes: 405, read: 371 },
 ]
 const MONTHS = [['mai', 42, 9, 2], ['juin', 51, 12, 3], ['juil.', 38, 8, 2], ['août', 29, 6, 1], ['sept.', 64, 15, 4], ['oct.', 47, 11, 3]] as const
 

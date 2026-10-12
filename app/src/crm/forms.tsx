@@ -56,7 +56,7 @@ export function Modal({ open, onClose, title, kicker, children, width = 560 }: {
             <div className="thin-scroll max-h-[88vh] overflow-y-auto rounded-t-[1.3rem] bg-ink-800 p-6 sm:rounded-[1.3rem] md:p-7">
               <div className="mb-6 flex items-start justify-between gap-4">
                 <div>{kicker && <div className="text-[10.5px] uppercase tracking-eyebrow text-mist">{kicker}</div>}<h2 className="display mt-1 text-3xl">{title}</h2></div>
-                <button onClick={onClose} aria-label="Fermer" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-mist ring-1 ring-white/[0.08] hover:text-bone"><X size={15} /></button>
+                <button type="button" onClick={onClose} aria-label="Fermer" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-mist ring-1 ring-white/[0.08] hover:text-bone"><X size={15} /></button>
               </div>
               {children}
             </div>

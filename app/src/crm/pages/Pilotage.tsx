@@ -288,7 +288,7 @@ function TeamDynamics({ scope }: { scope: Scope }) {
   const offer = async (m: Member, done: boolean) => {
     try {
       if (done) { await tops.remove(`coach-${m.id}`); toast('Proposition de binôme retirée', 'info') }
-      else { await tops.create({ id: `coach-${m.id}`, title: `Coup de main — ${m.name} : ${lc(m.help ?? '')}`, due: 'Lundi', prio: 'normale', kind: 'appeler', ai: true }); toast(`Tâche créée pour accompagner ${m.name.split(' ')[0]}`) }
+      else { await tops.create({ id: `coach-${m.id}`, title: `Coup de main — ${m.name} : ${lc(m.help ?? '')}`, due: 'Lun. 19 oct.', prio: 'normale', kind: 'appeler', ai: true }); toast(`Tâche créée pour accompagner ${m.name.split(' ')[0]}`) }
     } catch (e) { toast(errText(e), 'error') }
   }
   return (
@@ -386,7 +386,7 @@ function MondayMeeting({ scope, kpis, blocked }: { scope: Scope; kpis: Kpi[]; bl
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const total = agenda.reduce((s, a) => s + a.min, 0)
-  const md = () => [`# Réunion commerciale · lundi 13 octobre 2026, 09:00`, `Périmètre : ${scope === 'agence' ? HOME : 'Réseau Riviera'} · ${total} min`, '', '## Ordre du jour', ...agenda.map((a, i) => `${i + 1}. ${a.title} (${a.min} min)\n   ${a.detail}`), '', '## Décisions', ...(decisions.length ? decisions.map((d) => `- [${d.done ? 'x' : ' '}] ${d.text} — ${d.by}`) : ['_Aucune décision consignée._']), '', `_Chiffres : CRM NXT Agent, extraits le ${new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}. Séries de tendance : ${HIST}._`].join('\n')
+  const md = () => [`# Réunion commerciale · lundi 19 octobre 2026, 09:00`, `Périmètre : ${scope === 'agence' ? HOME : 'Réseau Riviera'} · ${total} min`, '', '## Ordre du jour', ...agenda.map((a, i) => `${i + 1}. ${a.title} (${a.min} min)\n   ${a.detail}`), '', '## Décisions', ...(decisions.length ? decisions.map((d) => `- [${d.done ? 'x' : ' '}] ${d.text} — ${d.by}`) : ['_Aucune décision consignée._']), '', `_Chiffres : CRM NXT Agent, extraits le ${new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}. Séries de tendance : ${HIST}._`].join('\n')
   const add = async () => {
     const text = draft.trim()
     if (!text) return toast('Saisissez une décision', 'error')
@@ -523,7 +523,7 @@ export default function Pilotage() {
       <PageHeader
         kicker="Pilotage"
         title={<>Agence & <span className="italic text-champagne-300">réseau</span></>}
-        sub={<>{scope === 'agence' ? `${HOME} · indicateurs recalculés en direct depuis les dossiers, transactions et exécutions du copilote` : 'Réseau Riviera · 6 agences, 39 conseillers · consolidation du samedi 11 octobre à 07:00'} · sources au survol.</>}
+        sub={<>{scope === 'agence' ? `${HOME} · indicateurs recalculés en direct depuis les dossiers, transactions et exécutions du copilote` : 'Réseau Riviera · 6 agences, 39 conseillers · consolidation du lundi 12 octobre à 07:00'} · sources au survol.</>}
         actions={<>
           <Tabs id="pl-scope" value={scope} onChange={setScope} items={[{ id: 'agence', label: <span className="flex items-center gap-1.5"><Buildings size={14} weight="light" />Agence</span> }, { id: 'reseau', label: <span className="flex items-center gap-1.5"><Globe size={14} weight="light" />Réseau</span> }]} />
           <SoftBtn icon={<DownloadSimple size={14} />} onClick={exportCsv}>Exporter .csv</SoftBtn>

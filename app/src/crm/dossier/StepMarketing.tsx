@@ -10,7 +10,7 @@ import type { Journey, Visit, SellerReport } from '../../data/dossier'
 import { useAgents, useEvents, useConversations, useOutbox, useTasks } from '../../data/collections'
 import { Modal, AsyncForm, Field, Input, Select, Textarea, toast } from '../forms'
 import { stepProgress } from './Stepper'
-import { StepHead, Kpi, Paper, useRun, todayIso, addDays, agendaDay, daysFrom, fdate, uid, consignSend } from './sale-ui'
+import { StepHead, Kpi, mandateOf, Paper, useRun, todayIso, addDays, agendaDay, daysFrom, fdate, uid, consignSend } from './sale-ui'
 import type { StepProps } from './index'
 
 type PState = 'publiée' | 'en attente' | 'retirée' | 'off'
@@ -34,6 +34,7 @@ export default function StepMarketing({ dossier, journey, save, goTo }: StepProp
   const [preview, setPreview] = useState<SellerReport | null>(null)
   const [statEdit, setStatEdit] = useState<string | null>(null)
 
+  const signed = mandateOf(dossier, journey).signature === 'signé'
   const start = diff.startedAt ?? journey.mandate.start
   const sellerConv = convs.find((c) => c.dossierId === dossier.id && c.tags.includes('Vendeur'))
   const stats = diff.stats ?? {}
@@ -43,7 +44,7 @@ export default function StepMarketing({ dossier, journey, save, goTo }: StepProp
   const hot = journey.visits.filter((v) => v.interest >= 4).length
   const funnel = [{ l: 'Vues', v: views, I: Eye }, { l: 'Contacts', v: contacts, I: ChatCircleDots }, { l: 'Visites', v: journey.visits.length, I: Door }, { l: 'Intérêt fort', v: hot, I: Sparkle }, { l: 'Offres', v: journey.offers.length, I: FileText }]
   const lastVisit = visits[0]?.date
-  const idle = journey.mandate.signature === 'signé' ? -daysFrom(lastVisit ?? start ?? todayIso()) : 0
+  const idle = signed ? -daysFrom(lastVisit ?? start ?? todayIso()) : 0
   const published = PORTALS.filter((k) => diff.portals[k] === 'publiée').length
 
   const setDiff = (patch: Partial<Diff>) => save({ diffusion: { ...diff, ...patch } as Journey['diffusion'] })
@@ -106,7 +107,7 @@ export default function StepMarketing({ dossier, journey, save, goTo }: StepProp
   const dueReports = REPORTS.map((x) => ({ ...x, due: start ? addDays(start, x.d) : undefined, rep: journey.reports.find((r) => r.label === x.label) }))
   const pending = dueReports.find((x) => x.due && x.due <= addDays(todayIso(), 2) && !x.rep?.sent)
   const prog = stepProgress(dossier, journey).marketing
-  const next = journey.mandate.signature !== 'signé'
+  const next = !signed
     ? { label: 'Le mandat n’est pas encore signé : la diffusion reste en préparation.', cta: 'Aller au mandat', onClick: () => goTo('mandate'), tone: 'coral' as const }
     : !published ? { label: 'Diffuser l’annonce sur les portails.', hint: `${PORTALS.length} portails disponibles`, cta: 'Tout diffuser', onClick: diffuseAll }
       : !diff.shooting ? { label: 'Planifier le shooting photo et la visite 3D.', cta: 'Planifier', onClick: () => setShoot(true) }
@@ -160,7 +161,7 @@ export default function StepMarketing({ dossier, journey, save, goTo }: StepProp
 
       <div className="grid gap-6 2xl:grid-cols-[1.3fr_1fr]">
         <Stagger i={3}>
-          <Card title="Diffusion par portail" kicker="Multiportail" action={<SoftBtn tone="gold" icon={<Broadcast size={14} />} onClick={diffuseAll} disabled={journey.mandate.signature !== 'signé'}>{busy === 'all' ? 'Consignation…' : 'Tout diffuser'}</SoftBtn>}>
+          <Card title="Diffusion par portail" kicker="Multiportail" action={<SoftBtn tone="gold" icon={<Broadcast size={14} />} onClick={diffuseAll} disabled={!signed}>{busy === 'all' ? 'Consignation…' : 'Tout diffuser'}</SoftBtn>}>
             <ul className="divide-y divide-white/[0.05]">
               {PORTALS.map((k) => {
                 const s = (diff.portals[k] ?? 'off') as PState, st = stats[k]
@@ -169,7 +170,7 @@ export default function StepMarketing({ dossier, journey, save, goTo }: StepProp
                     <div className="min-w-0"><div className="flex items-center gap-2 text-[13.5px]">{k}<Pill tone={PS[s].tone}>{PS[s].l}</Pill></div>
                       <button onClick={() => setStatEdit(k)} className="mt-0.5 text-[11.5px] text-mist hover:text-bone">{st ? `${st.views.toLocaleString('fr-FR')} vues · ${st.contacts} contacts` : 'Saisir les statistiques'} · modifier</button></div>
                     <div className="flex flex-wrap gap-1.5">
-                      {(s === 'off' || s === 'retirée') && <SoftBtn onClick={() => setPortal(k, 'en attente')} disabled={journey.mandate.signature !== 'signé'}>Demander la publication</SoftBtn>}
+                      {(s === 'off' || s === 'retirée') && <SoftBtn onClick={() => setPortal(k, 'en attente')} disabled={!signed}>Demander la publication</SoftBtn>}
                       {s === 'en attente' && <SoftBtn tone="gold" onClick={() => setPortal(k, 'publiée')}>Confirmer en ligne</SoftBtn>}
                       {(s === 'publiée' || s === 'en attente') && <SoftBtn onClick={() => setPortal(k, 'retirée')}>Retirer</SoftBtn>}
                     </div>

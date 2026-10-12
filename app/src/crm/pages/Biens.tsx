@@ -323,7 +323,7 @@ function Drawer({ l, dossierId, onClose, onEdit }: { l: Listing; dossierId?: str
                     <div className="flex h-32 items-end gap-1.5">
                       {l.daily.map((v, i) => <motion.div key={i} title={`${v} vues`} initial={{ height: 0 }} animate={{ height: `${Math.max(4, (v / max) * 100)}%` }} transition={{ duration: 0.9, delay: i * 0.03, ease: EXPO }} className={clsx('flex-1 rounded-t-md', i === l.daily.length - 1 ? 'bg-champagne' : 'bg-champagne/30 hover:bg-champagne/60')} />)}
                     </div>
-                    <div className="num mt-1.5 flex justify-between text-[10px] text-mist"><span>28 sept.</span><span>11 oct.</span></div>
+                    <div className="num mt-1.5 flex justify-between text-[10px] text-mist"><span>29 sept.</span><span>12 oct.</span></div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {funnel.map(([k, v], i) => (

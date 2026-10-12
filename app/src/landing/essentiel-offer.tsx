@@ -56,7 +56,7 @@ export function Pricing() {
         </div>
       </div>
 
-      <div className="mt-12 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="mt-12 grid grid-cols-1 gap-5 lg:grid-cols-[0.9fr_1.1fr]">
         {/* Offre unique */}
         <In className="shell !ring-champagne/30">
           <div className="core flex h-full flex-col bg-gradient-to-b from-champagne/[0.10] to-ink-800 p-7 md:p-9">
@@ -88,6 +88,7 @@ export function Pricing() {
             <span className={micro}>Comparer les offres</span>
             <a href="/#tarifs" className="group flex items-center gap-1 text-[12.5px] text-champagne-300 hover:text-champagne">Détail complet <ArrowUpRight size={13} className="transition-transform duration-500 ease-silk group-hover:-translate-y-px group-hover:translate-x-px" /></a>
           </div>
+          <p className="mt-3 text-[11.5px] text-mist sm:hidden">Faites glisser le tableau pour voir les trois offres →</p>
           <div className="-mx-5 mt-5 flex-1 overflow-x-auto px-5 md:-mx-7 md:px-7">
             <table className="w-full min-w-[520px] border-collapse text-left text-[13px]">
               <thead>
@@ -170,7 +171,7 @@ export function Roi() {
   return (
     <Section id="calcul" className="bg-ink-850">
       <Head kicker="Calculateur" title="Combien d’heures" accent="vous rend-il ?" sub="Réglez les curseurs sur votre activité réelle. Le calcul porte sur un siège et un mois." />
-      <div className={clsx(card, 'mt-12 grid overflow-hidden lg:grid-cols-[1fr_1fr]')}>
+      <div className={clsx(card, 'mt-12 grid grid-cols-1 overflow-hidden lg:grid-cols-[1fr_1fr]')}>
         <div className="space-y-7 p-6 md:p-9">
           <Slider label="Rendez-vous vendeurs par mois" value={rdv} set={setRdv} min={1} max={30} unit="RDV" />
           <Slider label="Livrables utilisés par rendez-vous" value={docs} set={setDocs} min={1} max={9} unit="sur 9" />
@@ -199,7 +200,7 @@ export function Roi() {
           </div>
         </div>
       </div>
-      <div className="mt-5 grid gap-x-8 gap-y-1.5 text-[12px] text-mist md:grid-cols-3">
+      <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-1.5 text-[12px] text-mist md:grid-cols-3">
         <span className="md:col-span-3 mb-1 font-medium text-bone/60">Hypothèses du calcul (temps moyens observés en agence pilote, à vérifier pendant votre essai)</span>
         {Object.values(HYP).map((x) => <span key={x.label}>{x.label} : <span className="num">{x.before} min → {x.after} min</span></span>)}
       </div>
@@ -227,7 +228,7 @@ export function Trial() {
     setSt({ s: 'sending' })
     try {
       // ponytail: le serveur ne stocke que name/email/org/size — le téléphone est porté dans « size » pour ne pas être perdu.
-      await action('lead.create', { name: f.name, email: f.email, org: f.org, phone: f.phone, size: `Essai NXT Essentiel 14 j${f.phone ? ` · rappel souhaité au ${f.phone}` : ''}` })
+      await action('lead.create', { name: f.name, email: f.email, org: f.org, phone: f.phone, size: 'Essai NXT Essentiel 14 j' })
       setSt({ s: 'ok', name: f.name.split(' ')[0], email: f.email })
     } catch (x) {
       setSt({ s: 'error', msg: x instanceof ApiError ? x.message : 'Serveur injoignable : rien n’a été transmis. Vérifiez votre connexion et réessayez.' })
@@ -235,7 +236,7 @@ export function Trial() {
   }
   return (
     <Section id="essai">
-      <div className="grid items-start gap-12 lg:grid-cols-[1fr_1fr]">
+      <div className="grid grid-cols-1 items-start gap-12 lg:grid-cols-[1fr_1fr]">
         <div>
           <Head kicker="Essai gratuit" title="Testez-le sur" accent="votre prochain rendez-vous." sub="Quatorze jours, sur vos vrais rendez-vous. Nous ouvrons votre espace et le branchons à votre agenda lors d’un appel de 30 minutes." />
           <ul className="mt-8 space-y-3">
@@ -253,7 +254,7 @@ export function Trial() {
                   <div className="display mt-6 text-4xl">Merci {st.name}.</div>
                   <p className="mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-bone/65">Votre demande d’essai est enregistrée. Un conseiller NXT vous contacte sous 2 h ouvrées pour ouvrir votre espace — les accès seront adressés à <span className="text-bone">{st.email}</span>.</p>
                   <div className="mt-7 flex flex-wrap justify-center gap-3">
-                    <Button variant="ghost" href="/app" icon={<Play size={14} weight="light" />}>Explorer la démo</Button>
+                    <Button variant="ghost" href="/essentiel/app" icon={<Play size={14} weight="light" />}>Explorer la démo</Button>
                     <button onClick={() => setSt({ s: 'idle' })} className="rounded-full px-4 py-2 text-[13px] text-bone/60 transition hover:text-bone">Nouvelle demande</button>
                   </div>
                 </motion.div>

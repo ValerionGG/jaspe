@@ -1,5 +1,6 @@
 // D5 · Mode entretien plein écran, débrief vocal (dictée + extraction) et photos du bien.
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import clsx from 'clsx'
 import { X, ArrowLeft, ArrowRight, Microphone, Stop, MagicWand, Check, SkipForward, UploadSimple, Trash, Image as ImageIcon, Seal, Keyboard, FastForward } from '@phosphor-icons/react'
@@ -55,7 +56,7 @@ export function Interview({ draft, setField, onClose, start }: { draft: Record<s
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); go(i + 1) } }}
               placeholder="Notez la réponse du vendeur…" className="mt-6 w-full resize-none rounded-2xl bg-white/[0.03] px-5 py-4 text-[17px] leading-relaxed text-bone outline-none ring-1 ring-white/[0.08] placeholder:text-mist focus:ring-champagne/50" />
             <div className="mt-4 flex flex-wrap gap-1.5">
-              {ORIGINS.map((o, k) => <button key={o} onClick={() => setField(f.k, { v: val?.v ?? '', origin: o })} className={clsx('rounded-full px-3 py-1.5 text-[12px] ring-1 transition', (val?.origin ?? 'déclaré') === o ? ORIGIN_TONE[o] : 'text-bone/45 ring-white/[0.06] hover:text-bone/75')}><span className="num mr-1.5 text-[10px] opacity-60">⌥{k + 1}</span>{o}</button>)}
+              {ORIGINS.map((o, k) => <button key={o} onClick={() => setField(f.k, { v: val?.v ?? '', origin: o })} className={clsx('rounded-full px-3 py-1.5 text-[12px] ring-1 transition', (val?.origin ?? 'déclaré') === o ? ORIGIN_TONE[o] : 'text-bone/45 ring-white/[0.06] hover:text-bone/75')}><span className="num mr-1.5 text-[10px] opacity-60" title={`Alt+${k + 1}`}>{k + 1}</span>{o}</button>)}
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
               <button onClick={() => go(i - 1)} disabled={i === 0} className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] text-bone/70 ring-1 ring-white/[0.08] transition hover:bg-white/[0.05] disabled:opacity-30"><ArrowLeft size={14} />Précédente</button>
@@ -209,14 +210,14 @@ export function Photos({ journey, save, dossierId }: { journey: JourneyX; save: 
           ))}
         </div>
       )}
-      <AnimatePresence>
+      {createPortal(<AnimatePresence>
         {zoom && (
           <motion.div className="fixed inset-0 z-[85] flex items-center justify-center bg-ink/80 p-4 backdrop-blur-md" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setZoom(null)}>
             <motion.img src={zoom} alt="" initial={{ scale: 0.96 }} animate={{ scale: 1 }} transition={{ duration: 0.45, ease: EXPO }} className="max-h-[86vh] max-w-full rounded-2xl object-contain shadow-float" />
             <span className="theme-dark absolute left-1/2 top-6 -translate-x-1/2 rounded-full bg-ink/70 px-3 py-1 text-[12px] text-bone ring-1 ring-white/15">{roomOf(zoom)}</span>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>, document.body)}
     </Card>
   )
 }

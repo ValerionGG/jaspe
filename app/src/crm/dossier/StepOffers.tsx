@@ -84,7 +84,7 @@ export default function StepOffers({ dossier, journey, save, goTo }: StepProps) 
   const tpl = templates.find((t) => t.id === 'tpl-offre')
   const draftFor = (o: Offer | undefined, k: Reply) => {
     if (!o) return ''
-    const first = o.buyer.replace(/^(M\.|Mme)\s*(&\s*Mme\s*)?/, '')
+    const first = o.buyer
     const base = (tpl?.body ?? 'Bonjour {{prenom}}, votre offre est bien reçue. Réponse au plus tard {{date}}. {{conseiller}}').replace('{{prenom}}', first).replace('{{date}}', fdate(o.expires, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })).replace('{{conseiller}}', ag.name)
     return {
       ack: base,
@@ -129,7 +129,7 @@ export default function StepOffers({ dossier, journey, save, goTo }: StepProps) 
                   <li key={o.id} className={clsx('rounded-2xl p-4 ring-1', o.status === 'acceptée' ? 'bg-sage/[0.06] ring-sage/25' : 'bg-white/[0.02] ring-white/[0.06]')}>
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                       <div className="flex items-start gap-4">
-                        <div><div className="display text-[2rem] leading-none">{eur(o.amount)}</div><div className={clsx('num mt-1 text-[12px]', gap(o.amount) >= 0 ? 'text-sage' : 'text-coral')}>{gap(o.amount) >= 0 ? '+' : ''}{gap(o.amount).toFixed(1).replace('.', ',')} % vs prix</div></div>
+                        <div className="shrink-0"><div className="display whitespace-nowrap text-[2rem] leading-none">{eur(o.amount)}</div><div className={clsx('num mt-1 whitespace-nowrap text-[12px]', gap(o.amount) >= 0 ? 'text-sage' : 'text-coral')}>{gap(o.amount) >= 0 ? '+' : ''}{gap(o.amount).toFixed(1).replace('.', ',')} % vs prix</div></div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2 text-[14px]">{o.buyer}<Pill tone={ST[s]}>{s}</Pill>{best?.id === o.id && active.length > 1 && <Pill tone="gold"><Trophy size={11} />Meilleure</Pill>}</div>
                           <div className="mt-1 text-[12px] text-bone/60">{o.conditions}</div>

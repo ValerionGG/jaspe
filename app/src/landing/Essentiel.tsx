@@ -73,7 +73,7 @@ function Hero() {
   return (
     <section id="top" className="relative overflow-hidden px-5 pb-20 pt-28 md:px-10 md:pb-28 md:pt-40">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(760px_420px_at_85%_8%,rgb(var(--acc-500)_/_0.09),transparent_70%),radial-gradient(600px_360px_at_0%_100%,rgb(var(--sea)_/_0.07),transparent_70%)]" />
-      <div className="relative mx-auto grid max-w-[1200px] items-center gap-14 lg:grid-cols-[1.05fr_1fr] lg:gap-12">
+      <div className="relative mx-auto grid grid-cols-1 max-w-[1200px] items-center gap-14 lg:grid-cols-[1.05fr_1fr] lg:gap-12">
         <div>
           <motion.div {...fade(0)} className="flex flex-wrap items-center gap-3">
             <Eyebrow>NXT Essentiel</Eyebrow>
@@ -87,7 +87,7 @@ function Hero() {
           </motion.p>
           <motion.div {...fade(0.2)} className="mt-8 flex flex-wrap items-center gap-3">
             <Button size="lg" href="#essai">Essai gratuit 14 jours</Button>
-            <Button size="lg" variant="ghost" href="/app" icon={<Play size={16} weight="light" />}>Voir la démo</Button>
+            <Button size="lg" variant="ghost" href="/essentiel/app" icon={<Play size={16} weight="light" />}>Voir la démo</Button>
           </motion.div>
           <motion.p {...fade(0.24)} className="mt-4 text-[12.5px] text-mist">Sans carte bancaire · sans engagement · 49&nbsp;€ HT / siège / mois ensuite</motion.p>
           <motion.div {...fade(0.3)} className="mt-10 border-t border-white/[0.08] pt-6">
@@ -141,8 +141,8 @@ function ProductShot() {
               <span className="num text-[11px] text-mist">09:52</span>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
-              {LIV.map(([c, t, s]) => (
-                <div key={c} className="relative overflow-hidden rounded-lg bg-white/[0.03] px-2.5 py-2 ring-1 ring-white/[0.05]">
+              {LIV.map(([c, t, s], i) => (
+                <div key={c} className={clsx('relative overflow-hidden rounded-lg bg-white/[0.03] px-2.5 py-2 ring-1 ring-white/[0.05]', i > 5 && 'hidden sm:block')}>
                   {s === 'rédaction' && <span className="absolute inset-0 animate-shimmer bg-[linear-gradient(100deg,transparent_30%,rgb(var(--acc-500)_/_0.10)_50%,transparent_70%)] bg-[length:200%_100%]" />}
                   <div className="relative flex items-center gap-2 sm:block">
                     <span className="num text-[10.5px] text-champagne-300">{c}</span>
@@ -151,10 +151,14 @@ function ProductShot() {
                   </div>
                 </div>
               ))}
+              <div className="flex items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2 text-[12px] ring-1 ring-white/[0.05] sm:hidden">
+                <span className="text-bone/85"><span className="num text-[10.5px] text-champagne-300">L7 · L8 · L9</span></span>
+                <span className="text-[10.5px] text-champagne-300">en rédaction…</span>
+              </div>
             </div>
             <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-champagne/[0.08] px-3.5 py-2.5 ring-1 ring-champagne/20">
               <span className="flex items-center gap-2 text-[12.5px] text-bone/85"><Sparkle size={13} weight="fill" className="text-champagne" /> 4 livrables à relire · 2 validés</span>
-              <span className="text-[11px] text-champagne-300">Validation humaine</span>
+              <span className="hidden text-[11px] text-champagne-300 sm:inline">Validation humaine</span>
             </div>
           </div>
         </div>

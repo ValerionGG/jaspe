@@ -4,10 +4,10 @@ import type { Journey } from '../../data/dossier'
 
 export type Proposal = { key: string; value: string; why: string }
 
-const sentences = (t: string) => t.split(/(?<=[.!?…])\s+|\n+/).map((s) => s.trim()).filter(Boolean)
+const sentences = (t: string) => t.split(/(?<=[.!?…])(?<!\b(?:M|Me|Mme|Dr)\.)\s+|\n+/).map((s) => s.trim()).filter(Boolean)
 const firstSentence = (t: string, re: RegExp) => sentences(t).find((s) => re.test(s))
 const clean = (s: string) => s.replace(/\s+/g, ' ').replace(/[.;,]+$/, '').trim()
-const num = (s: string) => s.replace(/[\s  ]/g, '')
+const num = (s: string) => s.replace(/[\s]/g, '')
 const grp = (s: string) => num(s).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 
 const MOTIVES: [RegExp, string][] = [
@@ -23,9 +23,9 @@ export function extractFields(text: string): Proposal[] {
   const add = (key: string, value: string | null | undefined, why: string) => { if (value && !out.some((p) => p.key === key)) out.push({ key, value: clean(value), why }) }
 
   // Surfaces : le terrain d’abord pour ne pas le confondre avec l’habitable.
-  const land = t.match(/terrain\s+(?:de\s+)?(\d[\d\s ]*)\s?m(?:²|2)/i)
+  const land = t.match(/terrain\s+(?:de\s+)?(\d[\d\s]*)\s?m(?:²|2)/i)
   add('terrain', land && grp(land[1]), 'surface suivie de « terrain »')
-  const hab = [...t.matchAll(/(\d[\d\s ]{0,5})\s?m(?:²|2)(?!\w)/gi)].find((m) => !/terrain\s+(?:de\s+)?$/i.test(t.slice(Math.max(0, m.index! - 14), m.index)))
+  const hab = [...t.matchAll(/(\d[\d\s]{0,5})\s?m(?:²|2)(?!\w)/gi)].find((m) => !/terrain\s+(?:de\s+)?$/i.test(t.slice(Math.max(0, m.index! - 14), m.index)))
   add('surface', hab && num(hab[1]), 'surface en m² citée')
 
   const price = t.match(/(\d+(?:[,.]\d+)?)\s?(?:M€|millions?(?:\s+d’euros)?)/i)
@@ -39,9 +39,9 @@ export function extractFields(text: string): Proposal[] {
   add('dpe', dpe && dpe[1].toUpperCase(), 'classe DPE citée')
   const year = t.match(/(?:construite?|bâtie?|date)\s+(?:en\s+)?(1[89]\d\d|20[0-2]\d)/i)
   add('annee', year?.[1], 'année de construction')
-  const tf = t.match(/taxe foncière[^\d]{0,20}(\d[\d\s ]*)\s?€/i)
+  const tf = t.match(/taxe foncière[^\d]{0,20}(\d[\d\s]*)\s?€/i)
   add('taxeFonciere', tf && `${grp(tf[1])} €`, 'montant de taxe foncière')
-  const charges = t.match(/charges[^\d]{0,20}(\d[\d\s ]*)\s?€/i)
+  const charges = t.match(/charges[^\d]{0,20}(\d[\d\s]*)\s?€/i)
   add('charges', charges && `${grp(charges[1])} €/an`, 'montant de charges')
 
   const motive = MOTIVES.find(([re]) => re.test(t))

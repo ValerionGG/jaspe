@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import clsx from 'clsx'
 import { PlayCircle, CheckCircle, Warning, CloudCheck, CloudArrowUp, CloudSlash, ChatTeardropText, SealCheck, ArrowRight, Lightning } from '@phosphor-icons/react'
@@ -168,9 +169,9 @@ export default function StepDiscovery({ dossier: d, journey, save, goTo }: StepP
         </Card>
       )}
 
-      <AnimatePresence>{interview !== false && <Interview draft={draft} setField={setField} start={interview || undefined} onClose={() => { setInterview(false); flush() }} />}</AnimatePresence>
+      {createPortal(<AnimatePresence>{interview !== false && <Interview draft={draft} setField={setField} start={interview || undefined} onClose={() => { setInterview(false); flush() }} />}</AnimatePresence>, document.body)}
 
-      <Modal open={confirm} onClose={() => setConfirm(false)} kicker={`${d.ref} · ${d.seller}`} title="Valider la découverte ?">
+      {createPortal(<Modal open={confirm} onClose={() => setConfirm(false)} kicker={`${d.ref} · ${d.seller}`} title="Valider la découverte ?">
         <div className="space-y-3 text-[13.5px]">
           <div className="flex items-center justify-between rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-white/[0.06]"><span className="text-mist">Complétude</span><span className="num">{filled}/{FIELDS.length} · {total} %</span></div>
           {missingCritical.length > 0 && <div className="rounded-xl bg-coral/10 px-4 py-3 text-coral ring-1 ring-coral/20"><div className="flex items-center gap-2 font-medium"><Warning size={15} />{missingCritical.length} champ(s) critique(s) manquant(s)</div><div className="mt-1 text-[12.5px] opacity-90">{missingCritical.map((k) => LABELS[k]).join(' · ')} — les livrables concernés le signaleront.</div></div>}
@@ -178,7 +179,7 @@ export default function StepDiscovery({ dossier: d, journey, save, goTo }: StepP
           <p className="text-bone/60">Le dossier passe en post-RDV et neuf livrables (L1 → L9) sont générés. Aucun n’est envoyé sans votre validation.</p>
         </div>
         <div className="mt-6 flex justify-end gap-2"><SoftBtn onClick={() => setConfirm(false)}>Annuler</SoftBtn><SoftBtn tone="gold" disabled={moving} onClick={validate} icon={<SealCheck size={14} weight="fill" />}>{moving ? 'Validation…' : 'Valider et lancer L1 → L9'}</SoftBtn></div>
-      </Modal>
+      </Modal>, document.body)}
     </>
   )
 }

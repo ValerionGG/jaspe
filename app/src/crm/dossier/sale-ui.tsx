@@ -9,6 +9,16 @@ import { toast, errText } from '../forms'
 import type { Conversation } from '../../data/messaging'
 import type { Outbox } from '../../data/collections'
 import type { Ops } from '../../data/store'
+import { STAGES, prop, type Dossier } from '../../data/mock'
+import type { Journey, MandateInfo } from '../../data/dossier'
+
+/** Mandat effectif : un dossier déjà passé « Mandat signé » sans fiche mandat est reconstitué depuis le dossier (lecture seule). */
+export function mandateOf(d: Dossier, j: Journey): MandateInfo & { inferred?: boolean } {
+  const m = j.mandate
+  const past = STAGES.findIndex((s) => s.id === d.stage) >= STAGES.findIndex((s) => s.id === 'mandat')
+  if (past && !m.type && m.signature === 'à préparer') return { ...m, type: d.mandate ?? 'Exclusif', price: m.price || prop(d.propertyId).price, signature: 'signé', mentions: { dpe: true, fees: true, surface: true, risks: true }, inferred: true }
+  return { ...m, type: m.type || d.mandate || '' }
+}
 
 export const DAY = 86400e3
 export const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

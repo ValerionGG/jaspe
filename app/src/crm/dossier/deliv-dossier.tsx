@@ -38,7 +38,7 @@ export function L6Section({ ctx }: { ctx: Ctx }) {
                     {cur.kind === 'cover' && (
                       <div className="relative h-[360px] md:h-[420px]">
                         <img src={p.photo} alt={p.title} className="absolute inset-0 h-full w-full object-cover" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/30 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/25 to-ink/45" />
                         <div className="absolute left-5 top-5 text-[22px] italic text-bone">Maison Riviera<span className="text-champagne-300">.</span></div>
                         <div className="absolute inset-x-6 bottom-6 text-bone md:inset-x-8 md:bottom-8">
                           <div className="font-sans text-[10px] uppercase tracking-eyebrow text-champagne-300">Book de services · {d.ref}</div>
@@ -49,7 +49,7 @@ export function L6Section({ ctx }: { ctx: Ctx }) {
                     )}
                     {cur.kind === 'service' && (
                       <div className="grid h-full md:min-h-[420px] md:grid-cols-2">
-                        <div className="relative h-48 md:h-auto"><img src={p.gallery[cur.n % p.gallery.length] ?? p.photo} alt="" className="absolute inset-0 h-full w-full object-cover" />{cur.n === 2 && <AiBadge className="absolute bottom-3 left-3" label="Image virtuelle — IA" />}</div>
+                        <div className="relative h-48 md:h-auto"><img src={p.gallery[cur.n % p.gallery.length] ?? p.photo} alt="" className="absolute inset-0 h-full w-full object-cover" /></div>
                         <div className="flex flex-col p-6 md:p-8">
                           <div className="font-sans text-[10px] uppercase tracking-eyebrow text-ink/45">Engagement {String(cur.n).padStart(2, '0')}</div>
                           <div className="num mt-2 text-[44px] leading-none text-champagne-700">0{cur.n}</div>
@@ -127,7 +127,7 @@ export function L7Section({ ctx }: { ctx: Ctx }) {
         const toggle = (addr: string) => ctx.setPrefs('L7', { ...pref, rejected: rejected.includes(addr) ? rejected.filter((x) => x !== addr) : [...rejected, addr] })
         return (
           <div className="space-y-5">
-            <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+            <div className="grid gap-4 2xl:grid-cols-[1.3fr_1fr]">
               <Panel title="Fourchette retenue · avis de valeur">
                 <div className="display text-[2.6rem] leading-none md:text-5xl">{eur(lo)} – {eur(hi)}</div>
                 <div className="num mt-1 text-[12px] text-mist">{fmt(Math.round(lo / p.surface))} – {fmt(Math.round(hi / p.surface))} €/m² · {p.surface} m² · DPE {p.dpe}</div>
@@ -146,15 +146,15 @@ export function L7Section({ ctx }: { ctx: Ctx }) {
                 </div>
               </Panel>
               <Panel title="Recalcul déterministe">
-                <div className="num text-[2rem] leading-none text-sea">{eur(calc[0])} – {eur(calc[1])}</div>
+                <div className="display text-4xl text-sea">{eur(calc[0])} – {eur(calc[1])}</div>
                 <p className="mt-2 text-[12.5px] text-bone/70">Médiane de <span className="num">{fmt(Math.round(ppm))}</span> €/m² sur <span className="num">{kept.length}</span> vente{kept.length > 1 ? 's' : ''} DVF retenue{kept.length > 1 ? 's' : ''}, ±5 %. Calculé hors génération de texte.</p>
                 <div className="mt-4 space-y-1.5">{ADJUST.map(([k, v, s]) => <div key={k} className="flex items-center justify-between gap-3 text-[12.5px]"><span className="text-bone/75">{k}</span><span className="flex items-center gap-2"><span className="text-[10.5px] text-mist">{s}</span><span className={clsx('num w-11 text-right', v.startsWith('+') ? 'text-sage' : 'text-coral')}>{v}</span></span></div>)}</div>
                 <p className="mt-3 border-t border-white/[0.05] pt-3 text-[11.5px] text-mist">Avis de valeur professionnel, pas une expertise. La largeur de la fourchette reflète l’incertitude de l’échantillon.</p>
               </Panel>
             </div>
             <Panel title={`Comparables · ${kept.length} retenus sur ${comps.length}`}>
-              <div className="thin-scroll -mx-1 overflow-x-auto">
-                <table className="w-full min-w-[620px] text-[12.5px]">
+              <div className="thin-scroll -mx-1 overflow-x-auto [contain:inline-size]">
+                <table className="w-full min-w-[640px] whitespace-nowrap text-[12.5px]">
                   <thead><tr className="text-left text-[10.5px] uppercase tracking-eyebrow text-mist"><th className="px-2 py-2 font-normal">Adresse</th><th className="px-2 font-normal">Date</th><th className="px-2 font-normal">Nature</th><th className="px-2 text-right font-normal">Surface</th><th className="px-2 text-right font-normal">Prix</th><th className="px-2 text-right font-normal">€/m²</th><th className="px-2 text-right font-normal">Distance</th><th className="px-2 text-right font-normal">Retenu</th></tr></thead>
                   <tbody>
                     {comps.map((c) => {
@@ -164,7 +164,7 @@ export function L7Section({ ctx }: { ctx: Ctx }) {
                           <td className="px-2 py-2.5">{c.addr}</td><td className="px-2 text-mist">{c.date}</td>
                           <td className="px-2"><span className={clsx('rounded-full px-2 py-0.5 text-[10.5px]', sale ? 'bg-sea/10 text-sea' : 'bg-white/[0.05] text-mist')}>{c.kind}</span></td>
                           <td className="num px-2 text-right">{c.surface} m²</td><td className="num px-2 text-right">{eur(c.price)}</td><td className="num px-2 text-right">{fmt(Math.round(c.price / c.surface))}</td><td className="px-2 text-right text-mist">{c.dist}</td>
-                          <td className="px-2 text-right"><button role="switch" aria-checked={on} aria-label={`Retenir ${c.addr}`} onClick={() => toggle(c.addr)} className={clsx('relative inline-flex h-5 w-9 rounded-full ring-1 transition', on ? 'bg-champagne/80 ring-champagne' : 'bg-white/[0.05] ring-white/10')}><span className={clsx('absolute top-0.5 h-4 w-4 rounded-full bg-bone transition-all duration-300 ease-silk', on ? 'left-[18px]' : 'left-0.5')} /></button></td>
+                          <td className="px-2 text-right"><button role="switch" aria-checked={on} aria-label={`Retenir ${c.addr}`} onClick={() => toggle(c.addr)} className={clsx('relative inline-flex h-5 w-9 rounded-full ring-1 transition', on ? 'bg-champagne/80 ring-champagne' : 'bg-white/[0.05] ring-white/10')}><span className={clsx('absolute top-0.5 h-4 w-4 rounded-full bg-snow shadow-sm transition-all duration-300 ease-silk', on ? 'left-[18px]' : 'left-0.5')} /></button></td>
                         </tr>
                       )
                     })}
@@ -197,14 +197,14 @@ export function L8Section({ ctx }: { ctx: Ctx }) {
   return (
     <DelivSection code="L8" ctx={ctx}>
       {() => (
-        <div className="grid gap-5 lg:grid-cols-[1.45fr_1fr]">
+        <div className="grid items-start gap-5 2xl:grid-cols-[1.45fr_1fr]">
           <div className="space-y-3">
             <div className="theme-dark relative aspect-[16/10] overflow-hidden rounded-xl">
               <img src={photo} alt="Projection retouchée par IA" className="absolute inset-0 h-full w-full object-cover" style={{ filter: variant.filter }} />
               <img src={photo} alt="Photo originale" className="absolute inset-0 h-full w-full object-cover" style={{ clipPath: `inset(0 ${100 - x}% 0 0)` }} />
               <div className="pointer-events-none absolute inset-y-0 w-px bg-bone" style={{ left: `${x}%` }}><span className="absolute top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-bone text-ink shadow-float"><ArrowsLeftRight size={15} /></span></div>
               <span className="absolute left-3 top-3 rounded-full bg-ink/70 px-2.5 py-1 text-[10px] font-medium uppercase tracking-eyebrow text-bone backdrop-blur">Avant · original</span>
-              <span className="absolute right-3 top-3 rounded-full bg-champagne px-2.5 py-1 text-[10px] font-medium uppercase tracking-eyebrow text-ink">Après · {variant.label}</span>
+              <span className="absolute right-3 top-3 rounded-full bg-champagne px-2.5 py-1 text-[10px] font-medium uppercase tracking-eyebrow text-ink">Après</span>
               <AiBadge className="absolute bottom-3 right-3" label="Image virtuelle — IA" />
               <input type="range" min={0} max={100} value={x} onChange={(e) => setX(+e.target.value)} aria-label="Comparer avant et après" className="absolute inset-0 h-full w-full cursor-ew-resize opacity-0" />
             </div>
@@ -219,8 +219,8 @@ export function L8Section({ ctx }: { ctx: Ctx }) {
               <p className="mt-3 text-[12px] text-mist">Structure, ouvertures et volumes préservés. Étiquette « Image virtuelle — IA » incrustée sur chaque export (AI Act, août 2026).</p>
             </Panel>
             <Panel title="Budget indicatif daté" action={<span className="text-[10.5px] text-mist">Prix relevés le 12/10/2026</span>}>
-              <div className="space-y-2">{variant.items.map(([label, kind, a, b]) => <div key={label} className="flex items-center justify-between gap-3 text-[12.5px]"><span className="min-w-0"><span className="text-bone/80">{label}</span> <span className={clsx('ml-1 rounded-full px-1.5 py-px text-[10px]', kind === 'Travaux' ? 'bg-coral/10 text-coral' : 'bg-sea/10 text-sea')}>{kind}</span></span><span className="num shrink-0 text-bone/80">{b ? `${fmt(a)} – ${fmt(b)} €` : 'inclus'}</span></div>)}</div>
-              <div className="mt-3 flex items-baseline justify-between border-t border-white/[0.05] pt-3"><span className="text-[12px] text-mist">Total TTC · devis artisans partenaires</span><span className="num text-[15px]">{fmt(lo)} – {fmt(hi)} €</span></div>
+              <div className="space-y-2">{variant.items.map(([label, kind, a, b]) => <div key={label} className="flex items-center justify-between gap-3 text-[12.5px]"><span className="min-w-0"><span className="text-bone/80">{label}</span> <span className={clsx('ml-1 rounded-full px-1.5 py-px text-[10px]', kind === 'Travaux' ? 'bg-coral/10 text-coral' : 'bg-sea/10 text-sea')}>{kind}</span></span><span className="num shrink-0 whitespace-nowrap text-bone/80">{b ? `${fmt(a)} – ${fmt(b)} €` : 'inclus'}</span></div>)}</div>
+              <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-white/[0.05] pt-3"><span className="text-[12px] text-mist">Total TTC · devis artisans partenaires</span><span className="num shrink-0 whitespace-nowrap text-[15px]">{fmt(lo)} – {fmt(hi)} €</span></div>
               <p className="mt-2 text-[11.5px] text-mist">Aucun gain de valeur n’est déduit automatiquement de ces travaux.</p>
             </Panel>
           </div>
@@ -243,8 +243,9 @@ function itemsOf(ctx: Ctx, docItems: { label: string; state: string; ref: string
   const out: Item[] = docItems.map((i) => ({ label: i.label, state: (i.state in IC ? i.state : 'check') as Item['state'], ref: i.ref, origin: 'Extraction des pièces' }))
   const regime = j.discovery.regime?.v ?? ''
   const rule = (label: string, state: Item['state'], ref: string) => !out.some((o) => o.label === label) && out.push({ label, state, ref, origin: 'Règle conditionnelle' })
-  rule('Constat plomb (CREP)', p.year >= 1949 ? 'na' : 'check', p.year >= 1949 ? `Construit en ${p.year} (après 1949)` : 'Avant 1949')
-  rule('Diagnostic gaz / électricité', p.year >= 2011 ? 'na' : 'check', p.year >= 2011 ? 'Installation de moins de 15 ans' : 'Installation > 15 ans')
+  const has = (re: RegExp) => out.some((o) => re.test(o.label))
+  if (!has(/plomb/i)) rule('Constat plomb (CREP)', p.year >= 1949 ? 'na' : 'check', p.year >= 1949 ? `Construit en ${p.year} (après 1949)` : 'Avant 1949')
+  if (!has(/gaz/i)) rule('Diagnostic gaz', p.year >= 2011 ? 'na' : 'check', p.year >= 2011 ? 'Installation de moins de 15 ans' : 'Installation de plus de 15 ans')
   if (p.type === 'Appartement' || /copro/i.test(regime)) { rule('Fiche synthétique de copropriété', 'check', 'à demander au syndic'); rule('Pré-état daté', 'missing', '—'); rule('Carnet d’entretien', 'check', 'à vérifier') }
   if (/ASL/i.test(regime)) rule('Statuts et budget de l’ASL', 'check', j.discovery.syndic?.v ?? 'ASL')
   if (p.features.some((f) => /piscine/i.test(f))) rule('Dispositif de sécurité piscine', 'check', 'Norme NF P90-306')
@@ -292,7 +293,7 @@ export function L9Section({ ctx }: { ctx: Ctx }) {
                       <div className="min-w-0"><div className="text-[13px]">{it.label}</div><div className="text-[11px] text-mist">{it.origin}</div></div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pl-8 sm:pl-0">
-                      {it.ref && it.ref !== '—' && <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.04] px-2 py-0.5 text-[10.5px] text-bone/65 ring-1 ring-white/[0.06]"><Quotes size={10} />{it.ref}</span>}
+                      {it.ref && !['—', 'à vérifier'].includes(it.ref) && <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.04] px-2 py-0.5 text-[10.5px] text-bone/65 ring-1 ring-white/[0.06]"><Quotes size={10} />{it.ref}</span>}
                       <span className={clsx('text-[11px]', c)}>{l}</span>
                       {it.state === 'missing' && (asked(it.label)
                         ? <span className="rounded-full bg-sea/10 px-2 py-0.5 text-[10.5px] text-sea">Demandée · tâche ouverte</span>

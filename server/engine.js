@@ -108,11 +108,11 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       return { ok: true }
     },
     /** AUT-001 / AUT-003 : un lead entrant devient contact + tâche affectée au secteur. */
-    'lead.create': ({ name, email, org, size }) => {
+    'lead.create': ({ name, email, org, size, phone }) => {
       if (!name || !email) throw new HttpError(400, 'Nom et e-mail requis')
-      const lead = put('leads', { name, email, org, size, at: new Date().toISOString(), status: 'nouveau', source: 'Site — demande de démo' }, { front: true })
-      put('contacts', { name, email, org, roles: ['acquereur'], city: '—', phone: '', dossiers: [], score: 50, last: 'Aujourd’hui · formulaire', pref: { ch: 'Email', slot: '—', lang: 'Français' }, consents: [], history: [{ d: 'Aujourd’hui', ch: 'Email', dir: 'in', s: `Demande de démonstration (${size ?? 'taille ?'})` }] }, { front: true })
-      put('tasks', { title: `Rappeler ${name} (${org ?? 'organisation ?'}) — demande de démo`, due: 'Sous 2 h', prio: 'haute', kind: 'appeler', ai: true, done: false, leadId: lead.id }, { front: true })
+      const lead = put('leads', { name, email, org, size, phone, at: new Date().toISOString(), status: 'nouveau', source: 'Site — demande de démo' }, { front: true })
+      put('contacts', { name, email, org, roles: ['acquereur'], city: '—', phone: phone ?? '', dossiers: [], score: 50, last: 'Aujourd’hui · formulaire', pref: { ch: 'Email', slot: '—', lang: 'Français' }, consents: [], history: [{ d: 'Aujourd’hui', ch: 'Email', dir: 'in', s: `Demande de démonstration (${size ?? 'taille ?'})` }] }, { front: true })
+      put('tasks', { title: `Rappeler ${name} (${org ?? 'organisation ?'})${phone ? ` au ${phone}` : ''} — ${size ?? 'demande de démo'}`, due: 'Sous 2 h', prio: 'haute', kind: 'appeler', ai: true, done: false, leadId: lead.id }, { front: true })
       notify('Nouveau lead', `${name} · ${org ?? ''} demande une démonstration`, 'win', '/app/contacts')
       run('AUT-001', 'ok', `Lead reçu une fois — ${email}`, 12)
       run('AUT-003', 'ok', 'Affecté à Claire Delmas (secteur Antibes)', 8)

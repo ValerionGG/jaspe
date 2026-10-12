@@ -51,7 +51,7 @@ export default function Aide() {
   // ——— Checklist : détection sur les données réelles, cochage manuel en repli ———
   const signature = settings.find((s) => s.id === 'agency')?.signature
   const checklist = [
-    { id: 'tour', label: 'Suivre la visite « Prise en main »', hint: 'Trois minutes pour repérer chaque écran.', auto: !!tut.get('tour:onboarding')?.done, run: () => startTour('onboarding'), cta: 'Lancer' },
+    { id: 'tour', label: 'Suivre la visite « Prise en main »', hint: 'Trois minutes pour repérer chaque écran.', auto: !!tut.get('tour-onboarding')?.done, run: () => startTour('onboarding'), cta: 'Lancer' },
     { id: 'dossier', label: 'Créer votre premier dossier vendeur', hint: 'Bouton « Nouveau dossier » du pipeline.', auto: dossiers.some((d) => !SEED_D.has(d.id)), to: '/app/dossiers' },
     { id: 'generate', label: 'Générer un livrable', hint: 'Depuis un dossier ou le Studio.', auto: documents.length > 0, to: '/app/studio' },
     { id: 'validate', label: 'Valider un livrable', hint: 'Relecture dans « Tâches & validations ».', auto: documents.some((d) => d.status === 'validated'), to: '/app/taches' },
@@ -59,18 +59,18 @@ export default function Aide() {
     { id: 'reminder', label: 'Programmer un rappel WhatsApp', hint: 'J-1 et H-2 depuis un rendez-vous.', auto: reminders.some((r) => !SEED_R.has(r.id)), to: '/app/agenda' },
     { id: 'routine', label: 'Activer ou ajuster une routine', hint: 'Interrupteur d’une automatisation.', auto: routines.some((r) => (r.enabled !== false) !== (r.phase !== 'P2')), to: '/app/automatisations' },
     { id: 'signature', label: 'Personnaliser votre signature', hint: 'Réglages de l’agence.', auto: !!signature && signature !== DEFAULT_SIGNATURE, to: '/app/reglages' },
-  ].map((s) => ({ ...s, manual: !!tut.get(`step:${s.id}`)?.done, done: s.auto || !!tut.get(`step:${s.id}`)?.done }))
+  ].map((s) => ({ ...s, manual: !!tut.get(`step-${s.id}`)?.done, done: s.auto || !!tut.get(`step-${s.id}`)?.done }))
   const doneCount = checklist.filter((s) => s.done).length
   const pct = Math.round((doneCount / checklist.length) * 100)
   const nextStep = checklist.find((s) => !s.done)
-  const toggleStep = (id: string, done: boolean) => tut.upsert(`step:${id}`, { kind: 'step', done, at: new Date().toISOString() }).then(() => toast(done ? 'Étape marquée comme faite' : 'Étape rouverte', 'info')).catch((e) => toast(errText(e), 'error'))
+  const toggleStep = (id: string, done: boolean) => tut.upsert(`step-${id}`, { kind: 'step', done, at: new Date().toISOString() }).then(() => toast(done ? 'Étape marquée comme faite' : 'Étape rouverte', 'info')).catch((e) => toast(errText(e), 'error'))
 
   // ——— Recherche transverse ———
   const nq = norm(q.trim())
   const lessons = useMemo(() => LESSONS.filter((l) => (role === 'Tous' || l.role === role) && (!nq || norm(`${l.title} ${l.summary} ${l.steps.map((s) => s.t + s.d).join(' ')}`).includes(nq))), [role, nq])
   const terms = useMemo(() => GLOSSARY.filter((t) => (cat === 'Tous' || t.cat === cat) && (!nq || norm(`${t.term} ${t.def}`).includes(nq))), [cat, nq])
   const faqs = useMemo(() => FAQ.filter((f) => !nq || norm(f.q + f.a).includes(nq)), [nq])
-  const lessonsDone = LESSONS.filter((l) => tut.get(`lesson:${l.id}`)?.done).length
+  const lessonsDone = LESSONS.filter((l) => tut.get(`lesson-${l.id}`)?.done).length
   const tickets = tut.docs.filter((d) => d.kind === 'ticket').sort((a, b) => String(b.at).localeCompare(String(a.at)))
 
   const goTab = (t: Tab) => { setTab(t); setTimeout(() => tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30) }
@@ -128,7 +128,7 @@ export default function Aide() {
                 <p className="mt-2 max-w-sm text-[13px] text-bone/70">Brief, recherche, copilote, messagerie, validation : la visite s’adapte à l’écran et passe d’une page à l’autre.</p>
                 <div className="mt-5 flex items-center gap-3">
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-champagne text-ink shadow-glow transition-transform duration-500 ease-silk group-hover:scale-110"><Play size={18} weight="fill" /></span>
-                  <span className="text-[13px] text-bone/85">{tut.get('tour:onboarding')?.done ? 'Revoir la visite' : 'Commencer maintenant'}</span>
+                  <span className="text-[13px] text-bone/85">{tut.get('tour-onboarding')?.done ? 'Revoir la visite' : 'Commencer maintenant'}</span>
                 </div>
               </div>
             </div>
@@ -162,10 +162,10 @@ export default function Aide() {
           </Card>
         </Stagger>
         <Stagger i={3} className="lg:col-span-5">
-          <Card className="h-full" kicker={`${TOURS.filter((t) => tut.get(`tour:${t.id}`)?.done).length}/${TOURS.length} terminées`} title="Visites guidées">
+          <Card className="h-full" kicker={`${TOURS.filter((t) => tut.get(`tour-${t.id}`)?.done).length}/${TOURS.length} terminées`} title="Visites guidées">
             <div className="space-y-1.5">
               {TOURS.map((t) => {
-                const st = tut.get(`tour:${t.id}`)
+                const st = tut.get(`tour-${t.id}`)
                 return (
                   <button key={t.id} onClick={() => startTour(t.id)} className="group flex w-full items-center gap-3 rounded-2xl p-2 text-left ring-1 ring-transparent transition hover:bg-white/[0.03] hover:ring-white/[0.06]">
                     <img src={img(t.img)} alt="" className="h-11 w-11 shrink-0 rounded-xl object-cover" />
@@ -210,7 +210,7 @@ export default function Aide() {
               {lessons.length === 0 ? <Empty title="Aucun tutoriel ne correspond">Essayez un autre rôle ou un autre mot-clé.</Empty> : (
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {lessons.map((l, i) => {
-                    const done = tut.get(`lesson:${l.id}`)?.done
+                    const done = tut.get(`lesson-${l.id}`)?.done
                     return (
                       <motion.button key={l.id} onClick={() => setLesson(l)} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.6, ease: EXPO }}
                         className="group flex flex-col justify-start overflow-hidden rounded-[1.4rem] bg-white/[0.02] p-1 text-left ring-1 ring-white/[0.06] transition hover:ring-champagne/30">
@@ -347,7 +347,7 @@ export default function Aide() {
                   const at = new Date().toISOString()
                   const prio = v.prio === 'haute' ? 'haute' : 'normale'
                   const task = await taskOps.create({ title: `Support NXT · ${subject}`, due: prio === 'haute' ? 'Aujourd’hui' : 'Sous 48 h', prio, kind: 'relancer' })
-                  await tut.ops.create({ id: `ticket:${Date.now().toString(36)}`, kind: 'ticket', subject, message, category: v.category, prio, page: v.page, at, status: 'consigné', taskId: task.id })
+                  await tut.ops.create({ id: `ticket-${Date.now().toString(36)}`, kind: 'ticket', subject, message, category: v.category, prio, page: v.page, at, status: 'consigné', taskId: task.id })
                   await notifOps.create({ at, title: 'Demande support consignée', body: `« ${subject} » — connecteur support non configuré, suivi ajouté à vos tâches.`, tone: 'info', read: false, link: '/app/aide' })
                   setFormKey((k) => k + 1)
                 }}>
@@ -396,8 +396,8 @@ export default function Aide() {
         </motion.div>
       </AnimatePresence>
 
-      <LessonReader lesson={lesson} onClose={() => setLesson(null)} done={!!(lesson && tut.get(`lesson:${lesson.id}`)?.done)}
-        onDone={(v) => lesson && tut.upsert(`lesson:${lesson.id}`, { kind: 'lesson', done: v, at: new Date().toISOString() }).then(() => toast(v ? 'Leçon terminée' : 'Leçon rouverte', v ? 'ok' : 'info')).catch((e) => toast(errText(e), 'error'))}
+      <LessonReader lesson={lesson} onClose={() => setLesson(null)} done={!!(lesson && tut.get(`lesson-${lesson.id}`)?.done)}
+        onDone={(v) => lesson && tut.upsert(`lesson-${lesson.id}`, { kind: 'lesson', done: v, at: new Date().toISOString() }).then(() => toast(v ? 'Leçon terminée' : 'Leçon rouverte', v ? 'ok' : 'info')).catch((e) => toast(errText(e), 'error'))}
         onTour={launch} />
     </div>
   )

@@ -40,6 +40,9 @@ export type Journey = {
   photos?: string[]; coaching?: { score: number; objections: string[] }
   mandate: MandateInfo; diffusion: { portals: Record<string, 'publiée' | 'en attente' | 'retirée' | 'off'>; shooting?: string; visit3d?: boolean; startedAt?: string }
   visits: Visit[]; reports: SellerReport[]; offers: Offer[]; closing: Closing; afterSale: AfterSale
+  /** Préparation du RDV (check-list D4, identité confirmée) et classement des photos par pièce. */
+  prep?: { checklist?: { label: string; done: boolean }[]; identityConfirmed?: boolean } & Record<string, unknown>
+  photoRooms?: Record<string, string>
 }
 
 const fv = (v: string, origin: Origin = 'déclaré'): FieldVal => ({ v, origin })
@@ -91,6 +94,23 @@ export const JOURNEYS: Record<string, Journey> = {
     diffusion: { portals: { SeLoger: 'publiée', Leboncoin: 'publiée', 'Bien’ici': 'publiée' }, startedAt: '2026-09-02' },
     visits: [{ id: 'v1', date: '2026-10-04', buyer: 'Mme Okafor', agent: 'Paul Garnier', feedback: 'Très intéressée, revient avec son mari', interest: 5 }, { id: 'v2', date: '2026-10-11', buyer: 'Mme Okafor (contre-visite)', agent: 'Paul Garnier', feedback: 'Offre annoncée', interest: 5 }],
     offers: [{ id: 'o1', date: '2026-10-10', buyer: 'Mme Okafor', amount: 1550000, conditions: 'Prêt 70 %, meubles de jardin inclus', financing: 'prêt', expires: '2026-10-12T18:00', status: 'contre-offre', counter: 1590000 }],
+  },
+  d5: {
+    ...emptyJourney(),
+    discovery: { motivation: fv('Agrandissement de la famille'), horizon: fv('4 mois'), surface: fv('240', 'pièce'), dpe: fv('C', 'pièce'), atouts: fv('Jacuzzi, cuisine d’été, vue collines') },
+    mandate: { type: 'Semi-exclusif', price: 2750000, feesPct: 4, feesPayer: 'vendeur', duration: 3, start: '2026-10-08', signature: 'signé', registry: 'Registre n° 2026-201', mentions: { dpe: true, fees: true, surface: true, risks: true } },
+    diffusion: { portals: { SeLoger: 'en attente', 'Belles Demeures': 'en attente' }, shooting: '2026-10-13' },
+  },
+  d11: {
+    ...emptyJourney(),
+    mandate: { type: 'Exclusif', price: 3890000, feesPct: 4, feesPayer: 'vendeur', duration: 3, start: '2026-09-15', signature: 'signé', registry: 'Registre n° 2026-176', mentions: { dpe: true, fees: true, surface: true, risks: true }, notes: 'Off-market : 3 visites privées maximum.' },
+    diffusion: { portals: { SeLoger: 'off', 'Belles Demeures': 'off' }, visit3d: true, startedAt: '2026-09-18' },
+    visits: [{ id: 'v1', date: '2026-09-29', buyer: 'Family Office Lindqvist (visio)', agent: 'Marc Olivieri', feedback: 'Demande une visite privée', interest: 4, followUp: 'Visite privée mardi' }],
+  },
+  d12: {
+    ...emptyJourney(),
+    mandate: { type: 'Exclusif', price: 1720000, feesPct: 4, feesPayer: 'vendeur', duration: 3, start: '2026-10-05', signature: 'signé', registry: 'Registre n° 2026-197', mentions: { dpe: true, fees: true, surface: true, risks: true } },
+    diffusion: { portals: { SeLoger: 'en attente', Leboncoin: 'en attente', 'Bien’ici': 'en attente' }, visit3d: true },
   },
   d6: {
     ...emptyJourney(),

@@ -27,15 +27,18 @@ function classify(text) {
 export function suggestReplies(conv, msgs, ctx) {
   const lastIn = [...msgs].reverse().find((m) => m.dir === 'in')
   const t = (lastIn?.text ?? '').toLowerCase()
-  const first = (conv.title ?? '').replace(/^(M\.|Mme|Dr\.)\s*(&\s*Mme\s*)?/, '').split(' ')[0]
+  const t0 = String(conv.title ?? '')
+  // Formule d’appel adaptée : famille, couple, maître, lead portail, prénom.
+  const hello = /^Famille /.test(t0) ? `Bonjour à vous, ${t0.replace('Famille', 'famille')}` : /^M\. & Mme/.test(t0) ? 'Bonjour Madame, Monsieur' : /^Me /.test(t0) ? `Bonjour Maître ${t0.replace(/^Me\s+/, '').split(/[\s—-]/)[0]}` : /^Lead/.test(t0) ? `Bonjour ${(t0.split('—')[1] ?? '').trim().split(' ')[0] || ''}`.trim() : /^(M\.|Mme|Dr\.)\s/.test(t0) ? `Bonjour ${t0.replace(/^Mme /, 'Madame ').replace(/^M\. /, 'Monsieur ').replace(/^Dr\. /, 'Docteur ')}` : `Bonjour ${t0.split(' ')[0]}`
+  const first = hello.replace(/^Bonjour (à vous, )?/, '')
   const out = []
-  if (/visit|créneau|disponib|voir/.test(t)) out.push(`Bonjour ${first}, je vous propose mardi 10 h ou jeudi 17 h 30 pour la visite. Lequel vous convient ?`)
+  if (/visit|créneau|disponib|voir/.test(t)) out.push(`${hello}, je vous propose mercredi 10 h ou jeudi 17 h 30 pour la visite. Quel créneau vous convient ?`)
   if (/prix|offre|propos|négoc/.test(t)) out.push(`Merci pour votre retour. Je transmets votre proposition au vendeur aujourd’hui et je reviens vers vous avant demain midi.`)
   if (/document|diagnostic|dpe|pv|pièce/.test(t)) out.push(`Bien noté, je vous envoie les pièces disponibles dans la journée ; il nous manque encore le PV d’AG 2025, demandé au syndic.`)
-  if (/merci|parfait|super|top/.test(t)) out.push(`Avec plaisir ${first} ! Je reste disponible pour la suite.`)
+  if (/merci|parfait|super|top/.test(t)) out.push(`Avec plaisir${first ? `, ${first}` : ''} ! Je reste disponible pour la suite.`)
   if (ctx?.event) out.push(`Je vous confirme notre rendez-vous du ${ctx.event} — à très vite.`)
   if (ctx?.dossier) out.push(`Point d’étape sur votre dossier : ${ctx.dossier.next.toLowerCase()}. Je vous tiens informé(e) dès que c’est fait.`)
-  out.push(`Bonjour ${first}, je reviens vers vous très vite avec une réponse précise.`)
+  out.push(`${hello}, je reviens vers vous très vite avec une réponse précise.`)
   return [...new Set(out)].slice(0, 3)
 }
 
@@ -80,10 +83,13 @@ export function createMessaging(db, { put, patch, activity, notify, run }) {
   /** Programme les rappels J-1 (18:00) et H-2 d’un rendez-vous ou d’une visite. */
   function scheduleForEvent(e, { manual = false } = {}) {
     const when = eventDate(e)
-    const existing = db.list('reminders').filter((r) => r.eventId === e.id && r.status !== 'annulé')
+    // Un rappel déjà créé (même annulé par le conseiller) ne doit jamais être recréé automatiquement.
+    const existing = db.list('reminders').filter((r) => r.eventId === e.id && (!manual || r.status !== 'annulé'))
     if (existing.length && !manual) return []
     const tpl = db.get('templates', e.kind === 'visite' ? 'tpl-visite' : 'tpl-rdv')
-    const vars = { prenom: String(e.who ?? '').split('·')[0].trim(), date: when.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }), heure: e.start, lieu: e.place, bien: e.title, conseiller: 'Claire Delmas' }
+    const d = e.dossier ? db.get('dossiers', e.dossier) : null
+    const p = d ? db.get('properties', d.propertyId) : null
+    const vars = { prenom: String(e.who ?? '').split('·')[0].trim(), date: when.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }), heure: e.start, lieu: e.place, bien: p ? `« ${p.title} »` : 'le bien', conseiller: 'Claire Delmas' }
     const j1 = new Date(when); j1.setDate(j1.getDate() - 1); j1.setHours(18, 0, 0, 0)
     const h2 = new Date(when.getTime() - 2 * H)
     return [['J-1', j1], ['H-2', h2]].filter(([, d]) => d.getTime() > Date.now() - 6 * H).map(([rule, d]) => put('reminders', {

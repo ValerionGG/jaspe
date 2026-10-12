@@ -108,7 +108,7 @@ export function createApp({ dbPath = join(here, 'data', 'nxt.sqlite'), filesDir 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost')
     try {
-      if (url.pathname.startsWith('/api/')) return await api(req, res, url.pathname.slice(5).split('/').filter(Boolean))
+      if (url.pathname.startsWith('/api/')) return await api(req, res, url.pathname.slice(5).split('/').filter(Boolean).map((x) => decodeURIComponent(x)))
       return await staticFile(req, res, url.pathname)
     } catch (e) {
       const status = e instanceof HttpError ? e.status : Number.isInteger(e?.status) ? e.status : 500

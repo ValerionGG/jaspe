@@ -23,7 +23,7 @@ const initials = (n: string) => n.replace(/^(M\.|Mme|Dr\.)\s*(&\s*(Mme|M\.)\s*)?
 const wishesOf = (b: B) => b.wishes ?? WISHES[b.id] ?? []
 const modeOf = (b: B): AlertMode => b.alert ?? (b.heat === 3 ? 'instant' : 'daily')
 // ponytail: créneaux fixes de la semaine prochaine ; brancher l'agenda Google pour de vraies disponibilités vendeur
-const SLOTS = [{ l: 'Mar. 14 oct. · 10:00', day: 14, start: '10:00', end: '11:00' }, { l: 'Mer. 15 oct. · 17:30', day: 15, start: '17:30', end: '18:30' }, { l: 'Sam. 18 oct. · 11:00', day: 18, start: '11:00', end: '12:00' }]
+const SLOTS = [{ l: 'Mer. 14 oct. · 10:00', day: 14, start: '10:00', end: '11:00' }, { l: 'Jeu. 15 oct. · 17:30', day: 15, start: '17:30', end: '18:30' }, { l: 'Sam. 17 oct. · 11:00', day: 17, start: '11:00', end: '12:00' }]
 
 type Crit = { l: string; ok: boolean; d: string }
 /** Matching recalculé à chaque rendu sur les biens vivants : 90 pts de critères durs + 10 pts de souhaits. */
@@ -285,7 +285,7 @@ export default function Acquereurs() {
                           </div>
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             {sentAt ? <button onClick={() => { const d = dossierOf(p.id); if (d) setDocId(`${d}-L3`) }}><Pill tone="green"><CheckCircle size={11} weight="fill" />L3 générée le {new Date(sentAt).toLocaleDateString('fr-FR')} · voir</Pill></button> : <SoftBtn tone="gold" icon={<PaperPlaneTilt size={13} />} onClick={() => setL3({ b: b.id, p: p.id })}>Envoyer l’avant-première</SoftBtn>}
-                            {v ? <span className="inline-flex items-center gap-1.5"><Pill tone="blue"><CalendarPlus size={11} />Visite le {v.day} oct. à {v.start}</Pill><button onClick={() => cancelVisit(v)} title="Annuler la visite" className="text-mist transition hover:text-coral"><CalendarX size={14} /></button></span> : <SoftBtn icon={<CalendarPlus size={13} />} onClick={() => setSlotFor(slotFor === k ? null : k)}>Planifier une visite</SoftBtn>}
+                            {v ? <span className="inline-flex items-center gap-1.5"><Pill tone="blue"><CalendarPlus size={11} />Visite le {new Date(2026, 9, v.day).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} à {v.start}</Pill><button onClick={() => cancelVisit(v)} title="Annuler la visite" className="text-mist transition hover:text-coral"><CalendarX size={14} /></button></span> : <SoftBtn icon={<CalendarPlus size={13} />} onClick={() => setSlotFor(slotFor === k ? null : k)}>Planifier une visite</SoftBtn>}
                             {miss.length > 0 && <span className="text-[11px] text-mist">{miss.length} critère{miss.length > 1 ? 's' : ''} manquant{miss.length > 1 ? 's' : ''}</span>}
                           </div>
                           <AnimatePresence>

@@ -73,6 +73,10 @@ export const NAV = [
 
 /** Mode simple : navigation réduite à l’essentiel du conseiller (mémorisé localement). */
 const SIMPLE = new Set(['', 'messages', 'agenda', 'taches', 'dossiers', 'biens', 'acquereurs', 'studio', 'aide'])
+/** Édition Essentiel : CRM épuré pour conseiller indépendant (activée par /essentiel/app). */
+export const isEssentiel = () => { try { return localStorage.getItem('nxt-edition') === 'essentiel' } catch { return false } }
+export const setEdition = (e: 'essentiel' | 'complet') => { try { localStorage.setItem('nxt-edition', e) } catch { /* indisponible */ } }
+
 function useSimpleMode() {
   const [simple, set] = useState(() => { try { return localStorage.getItem('nxt-simple') === '1' } catch { return false } })
   const toggle = () => set((v) => { try { localStorage.setItem('nxt-simple', v ? '0' : '1') } catch { /* indisponible */ } return !v })
@@ -83,7 +87,11 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const [convs] = useConversations()
   const [queue] = useQueue()
   const [dossiers] = useDossiers()
-  const { simple, toggle } = useSimpleMode()
+  const { simple: simplePref, toggle } = useSimpleMode()
+  const essentiel = isEssentiel()
+  const simple = essentiel || simplePref
+  const nav = useNavigate()
+  const switchEdition = () => { setEdition(essentiel ? 'complet' : 'essentiel'); nav('/app'); location.reload() }
   const badges: Record<string, number> = {
     messages: convs.reduce((n, c) => n + (c.unread ?? 0), 0),
     taches: queue.length,
@@ -95,13 +103,18 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         <Link to="/" title="Retour au site">{collapsed ? <Logo className="[&>span:last-child]:hidden" /> : <Logo />}</Link>
         {!collapsed && <IconBtn label="Réduire" onClick={onToggle}><SidebarSimple size={16} weight="light" /></IconBtn>}
       </div>
-      {!collapsed && (
+      {!collapsed && (essentiel ? (
+        <div className="mx-3 mb-2 rounded-2xl bg-gradient-to-br from-champagne/20 to-transparent p-3 ring-1 ring-champagne/25">
+          <div className="flex items-center justify-between"><span className="text-[13px] font-medium">Édition Essentiel</span><span className="rounded-full bg-champagne px-2 py-0.5 text-[10px] font-medium text-ink">49 €/mois</span></div>
+          <div className="mt-1 text-[11px] text-mist">Conseiller indépendant · Claire Delmas</div>
+        </div>
+      ) : (
         <button className="mx-3 mb-2 flex items-center gap-3 rounded-2xl bg-white/[0.03] p-2.5 text-left ring-1 ring-white/[0.06] transition hover:bg-white/[0.05]">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-champagne to-champagne-700 font-serif text-[15px] italic text-ink">A</span>
           <span className="min-w-0 flex-1"><span className="block truncate text-[13px]">Antibes Vieille-Ville</span><span className="block text-[11px] text-mist">Réseau Riviera · 6 agences</span></span>
           <CaretUpDown size={14} className="text-mist" />
         </button>
-      )}
+      ))}
       <nav className="thin-scroll flex-1 overflow-y-auto px-3 pb-4">
         {NAV.map((g) => ({ ...g, items: g.items.filter((it) => !simple || SIMPLE.has(it.to)) })).filter((g) => g.items.length).map((g) => (
           <div key={g.group} className="mb-3">
@@ -124,8 +137,14 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         ))}
       </nav>
       <div className="border-t border-white/[0.06] p-3">
-        {!collapsed && (
-          <button onClick={toggle} data-tour="simple-mode" className="mb-2 flex w-full items-center justify-between rounded-xl px-3 py-2 text-[12px] text-bone/60 transition hover:bg-white/[0.04] hover:text-bone" aria-pressed={simple}>
+        {!collapsed && essentiel && (
+          <div className="mb-2 rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/[0.06]">
+            <div className="text-[12px] text-bone/80">Pilotage, automatisations, réseau…</div>
+            <button onClick={switchEdition} className="mt-1.5 text-[12px] text-champagne-300 hover:underline">Passer à l’édition complète →</button>
+          </div>
+        )}
+        {!collapsed && !essentiel && (
+          <button onClick={toggle} data-tour="simple-mode" className="mb-2 flex w-full items-center justify-between rounded-xl px-3 py-2 text-[12px] text-bone/60 transition hover:bg-white/[0.04] hover:text-bone" aria-pressed={simplePref}>
             <span>{simple ? 'Mode simple' : 'Mode complet'}</span>
             <span className={clsx('relative h-4 w-7 rounded-full transition-colors', simple ? 'bg-champagne' : 'bg-white/15')}><span className={clsx('absolute top-0.5 h-3 w-3 rounded-full bg-bone transition-all duration-300', simple ? 'left-3.5' : 'left-0.5')} /></span>
           </button>

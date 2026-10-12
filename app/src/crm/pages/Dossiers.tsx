@@ -156,7 +156,7 @@ export default function Dossiers() {
             <Field label="Prix envisagé (€)" className="sm:col-span-2"><Input name="price" type="number" min={0} step={1000} inputMode="numeric" /></Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Rendez-vous de découverte"><Input name="due" placeholder="Mar. 14 oct. 10:00" /></Field>
+            <Field label="Rendez-vous de découverte"><Input name="due" placeholder="Mer. 14 oct. 10:00" /></Field>
             <Field label="Horizon"><Input name="timeline" placeholder="3 à 6 mois" /></Field>
           </div>
           <Field label="Motivation déclarée"><Textarea name="motivation" rows={2} placeholder="Ce que le vendeur a dit de son projet, sans interprétation" /></Field>

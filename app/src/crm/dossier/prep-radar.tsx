@@ -60,7 +60,7 @@ export default function RadarPanel({ d, head, foot }: { d: Dossier; head: ReactN
       {head}
       <div className="overflow-hidden rounded-[1.2rem] ring-1 ring-white/[0.06]">
         <GeoMap className="h-[340px] md:h-[420px]" markers={markers} shapes={shapes} center={[p.lng, p.lat]} zoom={14} activeId={active ?? 'bien'} onHover={setActive}>
-          <div className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-ink/75 px-3 py-1.5 text-[11px] text-bone/80 ring-1 ring-white/10 backdrop-blur-md">Cercles : 500 m · 1 km</div>
+          <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-ink/75 px-3 py-1.5 text-[11px] text-bone/80 ring-1 ring-white/10 backdrop-blur-md">Cercles : 500 m · 1 km</div>
         </GeoMap>
       </div>
       <div className="flex flex-wrap gap-1.5">

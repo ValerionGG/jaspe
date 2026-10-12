@@ -51,7 +51,7 @@ export function Benefits() {
   return (
     <Section className="bg-ink-850">
       <Head kicker="Ce que vous y gagnez" title="Moins de bureau," accent="plus de mandats." />
-      <div className="mt-12 grid gap-4 md:grid-cols-3">
+      <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-3">
         {BENEFITS.map((b, i) => (
           <In key={b.t} delay={i * 0.08} className={clsx(card, 'flex flex-col p-7')}>
             <div className="flex items-center justify-between">
@@ -123,7 +123,7 @@ export function Steps() {
   return (
     <Section id="comment">
       <Head kicker="Comment ça marche" title="Trois gestes," accent="c’est tout." sub="Pas de formation de trois jours, pas de nouveau logiciel à apprendre : NXT travaille autour de votre agenda." />
-      <div className="mt-12 grid gap-4 md:grid-cols-3">
+      <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-3">
         {STEPS.map((s, i) => (
           <In key={s.n} delay={i * 0.08} className={clsx(card, 'flex flex-col p-6')}>
             <div className="flex items-baseline justify-between"><span className="num text-[13px] text-champagne-300">{s.n}</span><span className="text-[11.5px] text-mist">{s.time}</span></div>
@@ -201,7 +201,7 @@ export function DayCompare() {
           <span className="flex items-center gap-2"><span className="h-2 w-5 rounded-full bg-sage/70" /> Terrain & clients</span>
         </div>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_280px]">
+        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_280px]">
           <AnimatePresence mode="wait">
             <motion.ol key={mode} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.4, ease: EXPO }} className="divide-y divide-white/[0.06]">
               {d.slots.map((s) => (
@@ -249,7 +249,7 @@ export function Deliverables() {
   return (
     <Section id="livrables">
       <Head kicker="Après chaque rendez-vous" title="Neuf documents rédigés," accent="à relire, pas à écrire." sub="Chaque livrable reprend votre débrief, votre marque et des chiffres sourcés. Vous modifiez une phrase si besoin, puis vous validez." />
-      <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-12 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {LIVRABLES.map((l, i) => (
           <In key={l.c} delay={(i % 3) * 0.06} className={clsx(card, 'group flex gap-4 p-5 transition-colors duration-500 ease-silk hover:bg-ink-700')}>
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-champagne-300 ring-1 ring-white/[0.08]"><l.icon size={18} weight="light" /></span>
@@ -279,7 +279,7 @@ const THREAD: { from: 'out' | 'in' | 'sys'; t: string; h?: string; tag?: string 
 export function Reminders() {
   return (
     <Section className="bg-ink-850">
-      <div className="grid items-center gap-12 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
         <div>
           <Head kicker="Rappels automatiques" title="Vos relances partent," accent="même quand vous visitez." sub="J-1 à 18 h, H-2 le jour même : chaque rendez-vous de votre agenda déclenche ses rappels WhatsApp. Le client confirme d’un chiffre, votre agenda se met à jour." />
           <ul className="mt-8 space-y-3.5">
@@ -338,7 +338,7 @@ const CONVS: { ch: Icon; who: string; t: string; tag: string; tone: string; h: s
 export function Inbox() {
   return (
     <Section>
-      <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_1fr]">
+      <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1.15fr_1fr]">
         <In className={clsx(card, 'order-2 overflow-hidden lg:order-1')}>
           <div className="flex gap-1.5 overflow-x-auto border-b border-white/[0.06] p-3 scrollbar-none">
             {CHANNELS.map(([I, l, n]) => (
@@ -389,7 +389,7 @@ export function Compliance() {
   return (
     <Section className="bg-ink-850">
       <Head center kicker="Conformité incluse" title="Serein face aux règles" accent="de 2026." />
-      <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-12 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {COMPLIANCE.map(([I, t, d], i) => (
           <In key={t} delay={i * 0.05} className={clsx(card, 'p-5')}>
             <div className="flex items-center gap-2.5">
@@ -417,7 +417,7 @@ export function Scenarios() {
   return (
     <Section>
       <Head kicker="Scénarios d’usage" title="À quoi ressemble" accent="votre semaine." sub="Ces portraits sont des scénarios illustratifs construits avec des agences pilotes — pas des témoignages de clients." />
-      <div className="mt-12 grid gap-4 md:grid-cols-3">
+      <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-3">
         {SCENARIOS.map((s, i) => (
           <In key={s.who} delay={i * 0.08} className={clsx(card, 'flex flex-col p-6')}>
             <div className="flex items-center gap-3">
@@ -450,7 +450,7 @@ export function Faq() {
   const [o, setO] = useState<number | null>(0)
   return (
     <Section id="faq" className="bg-ink-850">
-      <div className="grid gap-10 md:grid-cols-[0.8fr_1.2fr]">
+      <div className="grid grid-cols-1 gap-10 md:grid-cols-[0.8fr_1.2fr]">
         <Head kicker="FAQ" title="Les questions" accent="qu’on nous pose." />
         <div>
           {FAQ.map(([q, a], i) => (

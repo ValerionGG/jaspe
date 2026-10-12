@@ -1,5 +1,7 @@
 # NXT Agent — v2 fonctionnelle
 
+**En ligne :** https://valeriongg.github.io/nxt-agent/ — portail de tous les accès : https://valeriongg.github.io/nxt-agent/#/portail
+
 Landing animée + CRM/back-office complet, branchés sur une vraie API (Node 24 + SQLite natif), en mode **clair « Calcaire & Azur »** et **sombre « Nocturne Riviera »**. Aucun code repris des anciens ZIP ni de la v0.23.
 
 ## Lancer
@@ -13,7 +15,7 @@ Première fois : `npm run install:all` (depuis `design-v2/`).
 | Développement : front (HMR, proxy /api) | `npm run dev` | http://127.0.0.1:5317 |
 | Tests serveur (parcours métier) | `npm test` | — |
 
-Landing sur `/`, CRM sur `/app`. Base : `server/data/nxt.sqlite` (supprimer le fichier pour repartir des données de démonstration). Copilote en langage libre : définir `ANTHROPIC_API_KEY` avant `npm start` (modèle `claude-opus-5-5`, repli serveur activé) ; sans clé, il répond par règles sur les données réelles.
+Landing sur `/`, portail des raccourcis sur `/portail`, offre commerciale sur `/essentiel`, CRM complet sur `/app`, CRM Essentiel sur `/essentiel/app`. Base : `server/data/nxt.sqlite` (supprimer le fichier pour repartir des données de démonstration). Copilote en langage libre : définir `ANTHROPIC_API_KEY` avant `npm start` (modèle `claude-opus-5-5`, repli serveur activé) ; sans clé, il répond par règles sur les données réelles.
 
 ## Architecture
 
@@ -28,8 +30,17 @@ Landing sur `/`, CRM sur `/app`. Base : `server/data/nxt.sqlite` (supprimer le f
   - `src/data/collections.ts` : un hook par collection avec son amorce.
   - `src/ui/theme.tsx` : clair / sombre / système, sans flash au chargement.
 
+## Version en ligne (GitHub Pages)
+`npm --prefix app run build:static` produit `app/dist-static` : routes par ancre (`#/app`), chemins relatifs, et **moteur métier embarqué** (le même `server/engine.js` exécuté dans le navigateur) avec stockage local. Le copilote y répond par réponses préparées ; les fichiers déposés sont limités à 1,5 Mo.
+
 ## Ce qui fonctionne réellement
 Création/édition/suppression persistées sur toutes les pages (dossiers, biens, acquéreurs, contacts et consentements, agenda, tâches, transactions et conditions, campagnes, routines, idées, réglages, équipe, coaching) ; glisser-déposer du pipeline ; génération, édition, versions, validation et programmation des livrables ; dépôt de pièces ; notes et journal ; notifications et exécutions de routines en direct ; formulaire de démo → lead + contact + tâche ; palette ⌘K sur les données vivantes ; impression PDF des livrables.
+
+## Nouveautés (phase 3)
+- Messagerie unifiée : WhatsApp (consentement, fenêtre 24 h, modèles approuvés), e-mail, SMS, leads portails, canaux d’équipe (mentions, réactions, épinglage), tags + classement automatique (AUT-112), suggestions de réponse, modèles, rappels WhatsApp J-1/H-2 automatiques (AUT-110), alerte client sans réponse (AUT-111).
+- Dossier vendeur en stepper 8 étapes : préparation D1–D4 (carte quartier), découverte D5 en 5 blocs avec mode entretien et extraction du débrief, livrables L1–L9 enrichis, mandat, commercialisation (visites, bilans J+7/J+21/J+42), offres, compromis & acte, après-vente.
+- Aide & tutoriels : visite guidée interactive (6 parcours), leçons, glossaire, FAQ, checklist de prise en main.
+- Offre Essentiel (page commerciale + calculateur), édition CRM Essentiel, mode simple, portail des raccourcis.
 
 ## Limites assumées
 - Aucun envoi externe réel : e-mails, SMS, courriers, portails, signature, synchro agendas sont **consignés** (« connecteur non configuré »).

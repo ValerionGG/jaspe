@@ -1,6 +1,6 @@
 import { StrictMode, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import Landing from './landing/Landing'
 
@@ -27,6 +27,13 @@ if (import.meta.env.VITE_STATIC === '1') {
 
 const CrmApp = lazy(() => import('./crm/CrmApp'))
 const Essentiel = lazy(() => import('./landing/Essentiel'))
+const Portail = lazy(() => import('./landing/Portail'))
+
+/** Entrée de l’édition Essentiel du CRM : mémorise l’édition puis ouvre le CRM. */
+function EssentielApp() {
+  try { localStorage.setItem('nxt-edition', 'essentiel') } catch { /* indisponible */ }
+  return <Navigate to="/app" replace />
+}
 
 // Une seule racine, même après un rechargement à chaud de ce module.
 const w = window as unknown as { __nxtRoot?: ReturnType<typeof createRoot> }
@@ -35,6 +42,8 @@ const w = window as unknown as { __nxtRoot?: ReturnType<typeof createRoot> }
     <Router>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/essentiel/app" element={<EssentielApp />} />
+        <Route path="/portail" element={<Suspense fallback={<div className="h-screen bg-ink" />}><Portail /></Suspense>} />
         <Route path="/essentiel" element={<Suspense fallback={<div className="h-screen bg-ink" />}><Essentiel /></Suspense>} />
         <Route path="/app/*" element={<Suspense fallback={<div className="h-screen bg-ink" />}><CrmApp /></Suspense>} />
       </Routes>

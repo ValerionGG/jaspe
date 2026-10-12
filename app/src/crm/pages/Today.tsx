@@ -71,7 +71,7 @@ export default function Today() {
             </div>
           )}
         </Stagger>
-        <Stagger i={1} className="grid grid-cols-2 gap-4 lg:col-span-5">
+        <Stagger i={1} className="grid min-w-0 grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:col-span-5">
           <Stat label="CA signé · octobre" value="168 k€" delta="+22 %" hint="Objectif 240 k€"><Ring value={70} size={46}><span className="num text-[10px]">70%</span></Ring></Stat>
           <Stat label="Mandats actifs" value={String(mandats)} delta="+3" hint={`dont ${DOSSIERS.filter((d) => d.mandate === 'Exclusif').length} exclusifs`}><Spark data={[8, 9, 9, 11, 12, 12, 14]} w={70} h={30} /></Stat>
           <Stat label="Temps gagné · semaine" value="7 h 40" hint="Saisie, mises en page, relances" />

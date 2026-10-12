@@ -51,6 +51,14 @@ export function buildDocument(code, { dossier: d, property: p, agent: a, buyers 
       `Couches consultées : adresse IGN, parcelle cadastrale, zonage PLU (Géoportail de l’urbanisme), risques (Géorisques).`,
       `Aucun impact sur la valeur n’est déduit automatiquement : les projets sont listés avec leur statut (autorisé, commencé, livré).`,
     ], sources: [src('IGN Géoplateforme'), src('GPU'), src('Géorisques')] }
+    case 'D4': return { ...base, kind: 'report', body: [
+      `Répétition du rendez-vous — ${seller}`,
+      `Objectif : obtenir un mandat ${d.mandate ? d.mandate.toLowerCase() : 'exclusif'} sur la base d’un plan de commercialisation clair.`,
+      `Objections probables : « vos honoraires sont élevés », « pourquoi l’exclusivité ? », « le voisin a vendu plus cher », « je veux d’abord tester le prix ».`,
+      `Réponses à préparer : valeur des services réellement fournis (L6), comparables vendus (D2) plutôt qu’affichés, engagement de comptes rendus réguliers, durée et sortie du mandat.`,
+      `Points d’écoute : ${d.motivation}. Horizon ${d.timeline}. Ne pas promettre de prix ni de délai.`,
+      `Simulation vocale disponible dans Coaching ; le retour reste privé sauf partage volontaire.`,
+    ], sources: [src('Découverte et brief D1'), src('Comparables D2')] }
     case 'L1': return { ...base, kind: 'email', to: seller, subject: `Merci pour votre accueil — ${p.title}`, body: [
       `${civil},`,
       `Merci pour le temps que vous m’avez accordé et pour la visite de votre bien ${p.address}. Votre projet — ${d.motivation.toLowerCase()} — est clair, et nous construirons un calendrier qui le respecte.`,

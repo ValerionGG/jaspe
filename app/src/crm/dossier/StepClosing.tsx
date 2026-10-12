@@ -28,7 +28,7 @@ export default function StepClosing({ dossier, journey, save, goTo }: StepProps)
   const [item, setItem] = useState('')
   const accepted = journey.offers.find((o) => o.status === 'acceptée')
   const price = tx?.price ?? accepted?.amount ?? journey.mandate.price ?? p.price
-  const sru = f.compromisDate ? addDays(f.compromisDate, 10) : undefined
+  const sru = f.compromisDate === c.compromisDate && c.sruEnd ? c.sruEnd : f.compromisDate ? addDays(f.compromisDate, 10) : undefined
   const pick = (x: Closing) => JSON.stringify([x.compromisDate, x.loanDeadline, x.acteDate, x.notary, x.deposit])
   const dirty = pick(f) !== pick(c)
 
@@ -83,7 +83,7 @@ export default function StepClosing({ dossier, journey, save, goTo }: StepProps)
                     </div>
                   ))}
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-[11.5px] sm:grid-cols-4">{keyDates.map((k) => <div key={k.l}><div className="text-mist">{k.l}</div><div className={clsx(k.d && daysFrom(k.d, now) < 0 ? 'text-sage' : 'text-bone/80')}>{fdate(k.d, { day: 'numeric', month: 'short' })}</div></div>)}</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[11.5px] sm:grid-cols-4">{keyDates.map((k) => <div key={k.l}><div className="text-mist">{k.l}</div><div className="text-bone/85">{k.d && daysFrom(k.d, now) < 0 ? '✓ ' : ''}{fdate(k.d, { day: 'numeric', month: 'short' })}</div></div>)}</div>
                 {dossier.stage === 'compromis' && c.compromisDate && c.compromisDate <= todayIso() && <div className="mt-5"><SoftBtn tone="gold" icon={<Stamp size={14} />} onClick={toActe}>{busy === 'acte' ? 'Mise à jour…' : 'Passer en « Acte authentique »'}</SoftBtn></div>}
               </div>
             </div>

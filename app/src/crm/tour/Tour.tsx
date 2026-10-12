@@ -8,7 +8,8 @@ import { EXPO } from '../../ui/kit'
 import { useCollection } from '../../data/store'
 import { TOURS, type TutDoc } from './tours'
 
-/** Collection `tutorials` + écriture idempotente (création ou mise à jour selon l’existence). */
+/** Collection `tutorials` + écriture idempotente (création ou mise à jour selon l’existence).
+ *  Identifiants « tour-x », « step-x », « lesson-x », « ticket-x » : pas de « : », l’API ne décode pas les chemins. */
 export function useTutorials() {
   const [docs, ops] = useCollection<TutDoc>('tutorials')
   const upsert = useCallback((id: string, patch: Partial<TutDoc>) => (docs.some((d) => d.id === id) ? ops.update(id, patch) : ops.create({ id, ...patch }).then(() => undefined)), [docs, ops])
@@ -58,7 +59,7 @@ export function TourHost() {
     let off = false, timer = 0
     fetch('/api/tutorials').then((r) => (r.ok ? r.json() : [])).catch(() => []).then((docs: TutDoc[]) => {
       if (off) return
-      if (docs.some((d) => d.id === 'tour:onboarding')) return markAuto()
+      if (docs.some((d) => d.id === 'tour-onboarding')) return markAuto()
       timer = window.setTimeout(() => { markAuto(); setRun({ id: 'onboarding', i: 0 }) }, 1400)
     })
     return () => { off = true; clearTimeout(timer) }
@@ -108,7 +109,7 @@ export function TourHost() {
 
   const close = useCallback((done: boolean) => {
     if (!run) return
-    upsert(`tour:${run.id}`, { kind: 'tour', ...(done ? { done: true } : { skipped: true }), step: run.i, at: new Date().toISOString() }).catch(() => {})
+    upsert(`tour-${run.id}`, { kind: 'tour', ...(done ? { done: true } : { skipped: true }), step: run.i, at: new Date().toISOString() }).catch(() => {})
     setRun(null); setBox(null)
   }, [run, upsert])
   const go = useCallback((d: 1 | -1) => {

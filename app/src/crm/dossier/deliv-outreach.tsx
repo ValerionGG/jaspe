@@ -216,7 +216,7 @@ export function L4Section({ ctx }: { ctx: Ctx }) {
                 ))}
               </div>
             </Paper>
-            <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+            <div className="grid gap-4 2xl:grid-cols-[1.4fr_1fr]">
               <Panel title="Calendrier de publication">
                 <div className="grid grid-cols-7 gap-1.5">
                   {WEEK.map((day) => {
@@ -225,7 +225,7 @@ export function L4Section({ ctx }: { ctx: Ctx }) {
                       <div key={day.toISOString()} className={clsx('min-h-[64px] rounded-xl p-1.5 ring-1', here.length ? 'bg-champagne/[0.06] ring-champagne/25' : 'bg-white/[0.02] ring-white/[0.05]')}>
                         <div className="text-[10px] uppercase text-mist">{day.toLocaleDateString('fr-FR', { weekday: 'short' })}</div>
                         <div className="num text-[13px]">{day.getDate()}</div>
-                        {here.map((x) => <div key={x.net} className="mt-0.5 truncate rounded bg-champagne/15 px-1 text-[9.5px] text-champagne-300">{x.net.slice(0, 2)} {schedule[x.net].slice(11)}</div>)}
+                        {here.map((x) => <div key={x.net} className="mt-0.5 truncate rounded bg-champagne/15 px-1 text-[9.5px] text-champagne-300">{({ Instagram: 'IG', LinkedIn: 'LI', Facebook: 'FB' } as Record<string, string>)[x.net]} {schedule[x.net].slice(11)}</div>)}
                       </div>
                     )
                   })}
@@ -262,7 +262,7 @@ const STREETS: Record<string, string[]> = {
 export function L5Section({ ctx }: { ctx: Ctx }) {
   const { d, p, a } = ctx
   const pref = ctx.prefs.L5 ?? {}
-  const streets = pref.streets ?? STREETS[p.district] ?? [p.address.replace(/^\d+\s*/, ''), `Quartier ${p.district}`]
+  const streets = pref.streets ?? STREETS[p.district] ?? [p.address.replace(/^\d+\s*/, '').replace(/^./, (c) => c.toUpperCase()), `Quartier ${p.district}`]
   const exclusions = pref.exclusions ?? EXCL.slice(0, 3)
   const [vol, setVol] = useState(String(pref.volume ?? 48 * Math.max(1, streets.length - 2)))
   const [street, setStreet] = useState('')
@@ -289,7 +289,7 @@ export function L5Section({ ctx }: { ctx: Ctx }) {
               </form>
               <div className="mt-3 text-[11px] text-mist">Exclusions</div>
               <div className="-mx-2 mt-1">{EXCL.map((x) => <Check key={x} on={exclusions.includes(x)} onChange={(v) => set({ exclusions: v ? [...exclusions, x] : exclusions.filter((y) => y !== x) })}>{x}</Check>)}</div>
-              <div className="mt-3 flex items-baseline justify-between border-t border-white/[0.05] pt-3 text-[12px]"><span className="text-mist">Impression + distribution · tarif imprimeur 0,38 €/u (devis 09/2026)</span><span className="num text-bone">{fmt(Math.round(volume * 0.38))} €</span></div>
+              <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-white/[0.05] pt-3 text-[12px]"><span className="text-mist">Impression + distribution · tarif imprimeur 0,38 €/u (devis 09/2026)</span><span className="num shrink-0 whitespace-nowrap text-bone">{fmt(Math.round(volume * 0.38))} €</span></div>
             </Panel>
             <div className="rounded-2xl bg-sea/[0.07] p-4 ring-1 ring-sea/20">
               <div className="flex items-center gap-2 text-[12.5px] font-medium text-sea"><Scales size={15} />Rappel légal · prospection</div>

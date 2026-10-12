@@ -9,7 +9,7 @@ import { useDossiers, useOutbox } from '../../data/collections'
 import { action } from '../../data/store'
 import { Field, Input, Select, Textarea, toast } from '../forms'
 import { stepProgress } from './Stepper'
-import { StepHead, Seg, Eyebrow, Kpi, Paper, useRun, todayIso, addMonths, fdate, money } from './sale-ui'
+import { StepHead, Seg, mandateOf, Eyebrow, Kpi, Paper, useRun, todayIso, addMonths, fdate, money } from './sale-ui'
 import type { StepProps } from './index'
 
 type M = MandateInfo & { sentAt?: string; signedAt?: string }
@@ -24,14 +24,15 @@ const SIG: M['signature'][] = ['à préparer', 'envoyé', 'signé']
 
 export default function StepMandate({ dossier, journey, save, goTo }: StepProps) {
   const p = prop(dossier.propertyId), a = agent(dossier.agentId)
-  const saved = journey.mandate as M
+  const eff = mandateOf(dossier, journey)
+  const saved = eff as M
   const [m, setM] = useState<M>(() => ({ ...saved, price: saved.price || p.price }))
   const [dossiers] = useDossiers()
   const [, outbox] = useOutbox()
   const { busy, run } = useRun()
   const set = <K extends keyof M>(k: K, v: M[K]) => setM((x) => ({ ...x, [k]: v }))
   const dirty = JSON.stringify(m) !== JSON.stringify({ ...saved, price: saved.price || p.price })
-  const locked = saved.signature !== 'à préparer'
+  const locked = saved.signature !== 'à préparer' && !eff.inferred
 
   const fees = Math.round((m.price * m.feesPct) / 100)
   const start = m.start ?? todayIso()
@@ -53,12 +54,12 @@ export default function StepMandate({ dossier, journey, save, goTo }: StepProps)
     return `Registre n° ${new Date().getFullYear()}-${String(Math.max(187, ...nums) + 1).padStart(3, '0')}`
   }, [dossiers])
 
-  const persist = (patch: Partial<M>, extra = {}) => save({ mandate: { ...m, ...patch } }, extra)
+  const persist = (patch: Partial<M>, extra = {}) => { const { inferred: _i, ...rest } = { ...m, ...patch } as M & { inferred?: boolean }; void _i; return save({ mandate: rest }, extra) }
   const onSave = () => run('save', () => persist({}), 'Mandat enregistré')
   const toggleMention = (k: keyof M['mentions']) => {
     const mentions2 = { ...m.mentions, [k]: !m.mentions[k] }
     setM((x) => ({ ...x, mentions: mentions2 }))
-    run('m', () => save({ mandate: { ...saved, mentions: mentions2 } }))
+    run('m', () => persist({ ...saved, mentions: mentions2 }))
   }
   const send = () => run('send', async () => {
     const at = new Date().toISOString()
@@ -74,9 +75,9 @@ export default function StepMandate({ dossier, journey, save, goTo }: StepProps)
   }, 'Mandat signé — dossier passé en « Mandat signé »')
   const back = () => run('back', async () => { setM((x) => ({ ...x, signature: 'à préparer' })); await persist({ signature: 'à préparer', sentAt: undefined }) }, 'Envoi annulé — mandat de nouveau modifiable', 'info')
 
-  const prog = stepProgress(dossier, journey).mandate
+  const prog = stepProgress(dossier, { ...journey, mandate: eff }).mandate
   const next = saved.signature === 'signé'
-    ? { label: 'Mandat signé : lancer la diffusion et planifier le shooting.', hint: `Enregistré ${saved.registry ?? ''} · fin ${fdate(addMonths(saved.start ?? start, saved.duration))}`, cta: 'Ouvrir la commercialisation', onClick: () => goTo('marketing'), tone: 'sage' as const }
+    ? { label: 'Mandat signé : lancer la diffusion et planifier le shooting.', hint: `${saved.registry ?? 'Numéro de registre à compléter'} · fin ${fdate(addMonths(saved.start ?? start, saved.duration))}`, cta: 'Ouvrir la commercialisation', onClick: () => goTo('marketing'), tone: 'sage' as const }
     : saved.signature === 'envoyé'
       ? { label: 'Mandat envoyé : consigner la signature dès réception de l’exemplaire signé.', hint: saved.sentAt ? `Envoi consigné le ${fdate(saved.sentAt, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}` : undefined, cta: 'Marquer comme signé', onClick: sign }
       : missing.length
@@ -89,7 +90,7 @@ export default function StepMandate({ dossier, journey, save, goTo }: StepProps)
         <StepHead n={4} kicker="Mandat" progress={prog} next={next}
           title={<>Mandat <span className="italic text-champagne-300">{(m.type || 'à définir').toLowerCase()}</span></>}
           sub={`${p.title} · ${p.address}, ${p.city} — mandant : ${dossier.seller}`}
-          aside={<><Pill tone={saved.signature === 'signé' ? 'green' : saved.signature === 'envoyé' ? 'blue' : 'neutral'}>{saved.signature}</Pill>{saved.registry && <Pill tone="gold">{saved.registry}</Pill>}<Pill>{eur(m.price)}</Pill></>} />
+          aside={<>{eff.inferred && <Pill tone="amber">Reconstitué depuis l’étape du dossier</Pill>}<Pill tone={saved.signature === 'signé' ? 'green' : saved.signature === 'envoyé' ? 'blue' : 'neutral'}>{saved.signature}</Pill>{saved.registry && <Pill tone="gold">{saved.registry}</Pill>}<Pill>{eur(m.price)}</Pill></>} />
       </Stagger>
 
       {/* Type de mandat — comparaison des engagements */}
