@@ -264,7 +264,7 @@ function Workbench({ sel, dossier, doc, out, busy, editing, setEditing, plan, se
               {!doc && (
                 <div className="flex min-h-[340px] flex-col items-center justify-center rounded-xl border border-dashed border-white/10 p-8 text-center">
                   {state === 'running' ? <ArrowsClockwise size={22} className="animate-spin text-sea" /> : <Sparkle size={22} className="text-champagne" />}
-                  <p className="mt-3 max-w-sm text-[13.5px] text-bone/60">{state === 'running' ? 'Le livrable est marqué « en cours » mais aucun document n’a encore été produit. Vous pouvez relancer la génération.' : state === 'done' ? 'Livrable marqué prêt, mais aucun document n’est conservé dans NXT. Générez-le pour l’archiver avec ses sources.' : 'Le copilote prépare ce livrable à partir des faits du dossier, avec ses sources datées.'}</p>
+                  <p className="mt-3 max-w-sm text-[13.5px] text-bone/60">{state === 'running' ? 'Le livrable est marqué « en cours » mais aucun document n’a encore été produit. Vous pouvez relancer la génération.' : state === 'done' ? 'Livrable marqué prêt, mais aucun document n’est conservé dans Jaspe. Générez-le pour l’archiver avec ses sources.' : 'Le copilote prépare ce livrable à partir des faits du dossier, avec ses sources datées.'}</p>
                   <div className="mt-5"><SoftBtn tone="gold" icon={<Sparkle size={13} weight="fill" />} onClick={() => onGenerate()}>{regen ? 'Génération…' : 'Générer maintenant'}</SoftBtn></div>
                 </div>
               )}

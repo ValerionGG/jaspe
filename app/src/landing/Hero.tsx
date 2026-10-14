@@ -57,7 +57,7 @@ export function Hero({ ready }: { ready: boolean }) {
           )}
           <div className="mt-8 flex flex-col gap-8 md:mt-10 md:flex-row md:items-end md:justify-between">
             <motion.p initial={{ opacity: 0, y: 20 }} animate={go ? { opacity: 1, y: 0 } : {}} transition={{ delay: 1.15, duration: 1.1, ease: EXPO }} className="max-w-md text-[15px] leading-relaxed text-bone/70 md:text-base">
-              NXT prépare chaque rendez-vous, structure la découverte vendeur, rédige les neuf livrables et fait tourner votre agence — pour que vos conseillers ne fassent plus que l’essentiel : la relation.
+              Jaspe prépare chaque rendez-vous, structure la découverte vendeur, rédige les neuf livrables et fait tourner votre agence — pour que vos conseillers ne fassent plus que l’essentiel : la relation.
             </motion.p>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={go ? { opacity: 1, y: 0 } : {}} transition={{ delay: 1.3, duration: 1.1, ease: EXPO }} className="flex flex-wrap items-center gap-3">
               <Button size="lg" href="#demo">Réserver une démonstration</Button>

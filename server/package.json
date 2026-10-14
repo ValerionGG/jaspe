@@ -1,8 +1,10 @@
 {
-  "name": "nxt-server",
+  "name": "jaspe-server",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node --no-warnings index.js",
     "test": "node --no-warnings --test test.js"

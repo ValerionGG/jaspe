@@ -10,13 +10,13 @@ import { Logo } from './chrome'
 import { Benefits, Steps, DayCompare, Deliverables, Reminders, Inbox, Compliance, Scenarios, Faq, card } from './essentiel-sections'
 import { Pricing, Roi, Trial } from './essentiel-offer'
 
-/** NXT Essentiel : page de vente courte pour conseillers et petites agences (la grande landing reste la vitrine). */
+/** Jaspe Essentiel : page de vente courte pour conseillers et petites agences (la grande landing reste la vitrine). */
 export default function Essentiel() {
   const trialRef = useRef<HTMLDivElement>(null)
   const trialInView = useInView(trialRef, { margin: '0px 0px -30% 0px' })
   const [scrolled, setScrolled] = useState(false)
   useEffect(() => {
-    document.title = 'NXT Essentiel — vos rendez-vous vendeurs préparés, vos documents rédigés'
+    document.title = 'Jaspe Essentiel — vos rendez-vous vendeurs préparés, vos documents rédigés'
     const html = document.documentElement
     html.style.scrollBehavior = 'smooth'
     const on = () => setScrolled(window.scrollY > 40)
@@ -51,7 +51,7 @@ function Nav({ scrolled }: { scrolled: boolean }) {
   return (
     <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-3 pt-3 md:pt-5">
       <nav className={clsx('flex w-full max-w-[1200px] items-center justify-between gap-2 rounded-full py-1.5 pl-4 pr-1.5 ring-1 transition-all duration-500 ease-silk', scrolled ? 'glass shadow-float ring-white/10' : 'ring-transparent')}>
-        <a href="#top" aria-label="NXT Essentiel — haut de page" className="flex items-center gap-2">
+        <a href="#top" aria-label="Jaspe Essentiel — haut de page" className="flex items-center gap-2">
           <Logo />
           <span className="hidden rounded-full bg-champagne/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-champagne-300 ring-1 ring-champagne/20 sm:inline">Essentiel</span>
         </a>
@@ -76,14 +76,14 @@ function Hero() {
       <div className="relative mx-auto grid grid-cols-1 max-w-[1200px] items-center gap-14 lg:grid-cols-[1.05fr_1fr] lg:gap-12">
         <div>
           <motion.div {...fade(0)} className="flex flex-wrap items-center gap-3">
-            <Eyebrow>NXT Essentiel</Eyebrow>
+            <Eyebrow>Jaspe Essentiel</Eyebrow>
             <span className="text-[12.5px] text-mist">pour conseillers & petites agences</span>
           </motion.div>
           <motion.h1 {...fade(0.06)} className="display mt-6 text-[2.55rem] leading-[1] sm:text-[3.4rem] lg:text-[4.1rem]">
             Votre rendez-vous vendeur préparé, vos 9 documents rédigés, <span className="italic text-champagne-300">vos relances faites.</span>
           </motion.h1>
           <motion.p {...fade(0.14)} className="mt-6 max-w-[34rem] text-[16px] leading-relaxed text-bone/70">
-            NXT prépare votre brief la veille, rédige les neuf livrables après un débrief vocal de deux minutes et rappelle vos clients sur WhatsApp. Vous relisez, vous validez&nbsp;: rien ne part sans vous.
+            Jaspe prépare votre brief la veille, rédige les neuf livrables après un débrief vocal de deux minutes et rappelle vos clients sur WhatsApp. Vous relisez, vous validez&nbsp;: rien ne part sans vous.
           </motion.p>
           <motion.div {...fade(0.2)} className="mt-8 flex flex-wrap items-center gap-3">
             <Button size="lg" href="#essai">Essai gratuit 14 jours</Button>
@@ -200,7 +200,7 @@ function Footer() {
         </nav>
       </div>
       <div className="mx-auto mt-8 flex max-w-[1200px] flex-col gap-2 text-[11.5px] text-mist md:flex-row md:justify-between">
-        <span>© 2026 NXT Agent · Démonstrateur — données synthétiques.</span>
+        <span>© 2026 Jaspe · Démonstrateur — données synthétiques.</span>
         <span>Hébergement européen · Cookies essentiels uniquement</span>
       </div>
     </footer>

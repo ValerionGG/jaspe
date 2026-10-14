@@ -305,7 +305,7 @@ export function L9Section({ ctx }: { ctx: Ctx }) {
               })}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-mist">
-              <span>{mine.length} pièce{mine.length > 1 ? 's' : ''} déposée{mine.length > 1 ? 's' : ''} dans NXT{mine.length ? ' — régénérez L9 pour les intégrer à l’extraction' : ''}.</span>
+              <span>{mine.length} pièce{mine.length > 1 ? 's' : ''} déposée{mine.length > 1 ? 's' : ''} dans Jaspe{mine.length ? ' — régénérez L9 pour les intégrer à l’extraction' : ''}.</span>
               <Eyebrow>Absent ≠ non applicable ≠ à vérifier ≠ expiré</Eyebrow>
             </div>
           </div>

@@ -85,7 +85,7 @@ export default function Aide() {
   return (
     <div className="space-y-6">
       <PageHeader kicker="Centre d’aide" title={<>Aide & <span className="italic text-champagne-300">tutoriels</span></>}
-        sub="Visites guidées, leçons pas à pas, glossaire métier et support : tout pour maîtriser NXT Agent sans manuel."
+        sub="Visites guidées, leçons pas à pas, glossaire métier et support : tout pour maîtriser Jaspe sans manuel."
         actions={<>
           <SoftBtn icon={<Lifebuoy size={14} />} onClick={() => goTab('support')}>Contacter le support</SoftBtn>
           <SoftBtn tone="gold" icon={<Play size={14} weight="fill" />} onClick={() => startTour('onboarding')}>Lancer la visite</SoftBtn>
@@ -98,7 +98,7 @@ export default function Aide() {
             <div className="absolute inset-0 rounded-[1.6rem] bg-[conic-gradient(from_200deg_at_50%_50%,rgb(var(--acc-500)_/_.45),rgb(var(--acc-500)_/_.04),rgb(var(--sea)_/_.3),rgb(var(--acc-500)_/_.04),rgb(var(--acc-500)_/_.45))]" />
             <div className="relative flex h-full flex-col rounded-[calc(1.6rem-1px)] bg-ink-800 p-6 md:p-8">
               <div className="text-[10.5px] uppercase tracking-eyebrow text-mist">Apprendre en faisant</div>
-              <h2 className="display mt-3 text-[2.4rem] leading-[0.95] md:text-[3.1rem]">Maîtriser NXT, <span className="italic text-champagne-300">une étape</span> à la fois.</h2>
+              <h2 className="display mt-3 text-[2.4rem] leading-[0.95] md:text-[3.1rem]">Maîtriser Jaspe, <span className="italic text-champagne-300">une étape</span> à la fois.</h2>
               <p className="mt-3 max-w-lg text-[14px] leading-relaxed text-bone/60">Cherchez un geste, un terme ou une règle. Les résultats couvrent les tutoriels, le glossaire et la FAQ.</p>
               <label className="mt-6 flex items-center gap-3 rounded-2xl bg-white/[0.03] px-4 py-3.5 ring-1 ring-white/[0.08] transition focus-within:ring-champagne/50">
                 <MagnifyingGlass size={18} weight="light" className="text-mist" />
@@ -346,7 +346,7 @@ export default function Aide() {
                   if (!subject || !message) throw new Error('Le sujet et le message sont obligatoires')
                   const at = new Date().toISOString()
                   const prio = v.prio === 'haute' ? 'haute' : 'normale'
-                  const task = await taskOps.create({ title: `Support NXT · ${subject}`, due: prio === 'haute' ? 'Aujourd’hui' : 'Sous 48 h', prio, kind: 'relancer' })
+                  const task = await taskOps.create({ title: `Support Jaspe · ${subject}`, due: prio === 'haute' ? 'Aujourd’hui' : 'Sous 48 h', prio, kind: 'relancer' })
                   await tut.ops.create({ id: `ticket-${Date.now().toString(36)}`, kind: 'ticket', subject, message, category: v.category, prio, page: v.page, at, status: 'consigné', taskId: task.id })
                   await notifOps.create({ at, title: 'Demande support consignée', body: `« ${subject} » — connecteur support non configuré, suivi ajouté à vos tâches.`, tone: 'info', read: false, link: '/app/aide' })
                   setFormKey((k) => k + 1)

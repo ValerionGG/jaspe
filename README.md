@@ -1,6 +1,6 @@
-# NXT Agent — v2 fonctionnelle
+# Jaspe — v2 fonctionnelle
 
-**En ligne :** https://valeriongg.github.io/nxt-agent/ — portail de tous les accès : https://valeriongg.github.io/nxt-agent/#/portail
+**En ligne :** https://valeriongg.github.io/jaspe/ — portail de tous les accès : https://valeriongg.github.io/jaspe/#/portail
 
 Landing animée + CRM/back-office complet, branchés sur une vraie API (Node 24 + SQLite natif), en mode **clair « Calcaire & Azur »** et **sombre « Nocturne Riviera »**. Aucun code repris des anciens ZIP ni de la v0.23.
 
@@ -15,7 +15,7 @@ Première fois : `npm run install:all` (depuis `design-v2/`).
 | Développement : front (HMR, proxy /api) | `npm run dev` | http://127.0.0.1:5317 |
 | Tests serveur (parcours métier) | `npm test` | — |
 
-Landing sur `/`, portail des raccourcis sur `/portail`, offre commerciale sur `/essentiel`, CRM complet sur `/app`, CRM Essentiel sur `/essentiel/app`. Base : `server/data/nxt.sqlite` (supprimer le fichier pour repartir des données de démonstration). Copilote en langage libre : définir `ANTHROPIC_API_KEY` avant `npm start` (modèle `claude-opus-5-5`, repli serveur activé) ; sans clé, il répond par règles sur les données réelles.
+Landing sur `/`, portail des raccourcis sur `/portail`, offre commerciale sur `/essentiel`, CRM complet sur `/app`, CRM Essentiel sur `/essentiel/app`. Base : `server/data/jaspe.sqlite` (supprimer le fichier pour repartir des données de démonstration). Copilote en langage libre : définir `ANTHROPIC_API_KEY` avant `npm start` (modèle `claude-opus-5-5`, repli serveur activé) ; sans clé, il répond par règles sur les données réelles.
 
 ## Architecture
 

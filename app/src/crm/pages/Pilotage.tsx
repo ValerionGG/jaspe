@@ -386,7 +386,7 @@ function MondayMeeting({ scope, kpis, blocked }: { scope: Scope; kpis: Kpi[]; bl
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const total = agenda.reduce((s, a) => s + a.min, 0)
-  const md = () => [`# Réunion commerciale · lundi 19 octobre 2026, 09:00`, `Périmètre : ${scope === 'agence' ? HOME : 'Réseau Riviera'} · ${total} min`, '', '## Ordre du jour', ...agenda.map((a, i) => `${i + 1}. ${a.title} (${a.min} min)\n   ${a.detail}`), '', '## Décisions', ...(decisions.length ? decisions.map((d) => `- [${d.done ? 'x' : ' '}] ${d.text} — ${d.by}`) : ['_Aucune décision consignée._']), '', `_Chiffres : CRM NXT Agent, extraits le ${new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}. Séries de tendance : ${HIST}._`].join('\n')
+  const md = () => [`# Réunion commerciale · lundi 19 octobre 2026, 09:00`, `Périmètre : ${scope === 'agence' ? HOME : 'Réseau Riviera'} · ${total} min`, '', '## Ordre du jour', ...agenda.map((a, i) => `${i + 1}. ${a.title} (${a.min} min)\n   ${a.detail}`), '', '## Décisions', ...(decisions.length ? decisions.map((d) => `- [${d.done ? 'x' : ' '}] ${d.text} — ${d.by}`) : ['_Aucune décision consignée._']), '', `_Chiffres : CRM Jaspe, extraits le ${new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}. Séries de tendance : ${HIST}._`].join('\n')
   const add = async () => {
     const text = draft.trim()
     if (!text) return toast('Saisissez une décision', 'error')

@@ -158,7 +158,7 @@ export default function DossierDetail() {
                 <Card title="Pièces du dossier" kicker="L9 · checklist conditionnelle" action={<label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white/[0.04] px-4 py-2 text-[13px] font-medium ring-1 ring-white/[0.08] transition hover:bg-white/[0.08]"><UploadSimple size={14} />{uploading ? 'Dépôt…' : 'Déposer'}<input type="file" multiple className="sr-only" onChange={(e) => { onUpload(e.currentTarget.files); e.currentTarget.value = '' }} /></label>}>
                   {myFiles.length > 0 && (
                     <div className="mb-4 space-y-2">
-                      <div className="text-[10.5px] uppercase tracking-eyebrow text-mist">Déposées dans NXT</div>
+                      <div className="text-[10.5px] uppercase tracking-eyebrow text-mist">Déposées dans Jaspe</div>
                       {myFiles.map((f) => <a key={f.id} href={`/api/files/${f.id}/raw`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl bg-champagne/[0.06] px-3.5 py-3 ring-1 ring-champagne/20 transition hover:bg-champagne/10"><FileText size={18} weight="light" className="text-champagne-300" /><span className="flex-1 truncate text-[13px]">{f.name}</span><span className="num text-[11px] text-mist">{Math.max(1, Math.round(f.size / 1024))} Ko</span></a>)}
                     </div>
                   )}

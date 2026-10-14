@@ -560,7 +560,7 @@ function Conformite() {
     <div className="space-y-6">
       <div className="flex items-start gap-3 rounded-[1.3rem] bg-champagne/[0.06] p-4 ring-1 ring-champagne/20">
         <Scales size={20} weight="light" className="mt-0.5 shrink-0 text-champagne-300" />
-        <div className="text-[12.5px] text-bone/75"><span className="text-bone">Depuis le 11 août 2026</span>, le démarchage téléphonique sans consentement préalable est interdit. NXT bloque tout appel ou SMS sortant vers un contact sans consentement valide et trace chaque preuve ci-dessous.</div>
+        <div className="text-[12.5px] text-bone/75"><span className="text-bone">Depuis le 11 août 2026</span>, le démarchage téléphonique sans consentement préalable est interdit. Jaspe bloque tout appel ou SMS sortant vers un contact sans consentement valide et trace chaque preuve ci-dessous.</div>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {([['Consentements exprès', consents.filter((c) => c.status === 'Exprès').length, 'text-sage'], ['À recueillir', consents.filter((c) => c.status === 'À recueillir').length, 'text-sea'], ['Refus & expirés', consents.filter((c) => c.status === 'Refus' || c.status === 'Expiré').length, 'text-coral'], ['Téléphone non appelable', phoneBlocked, 'text-bone']] as const).map(([l, v, c]) => <Card key={l}><div className="text-[11.5px] text-mist">{l}</div><div className={clsx('display mt-1 text-[2rem] leading-none', c)}>{v}</div></Card>)}
@@ -674,7 +674,7 @@ function Facturation() {
   const [hover, setHover] = useState<number | null>(null)
   const [req, setReq] = useState<'plan' | 'seats' | null>(null)
   const logs = ag.billingLog ?? []
-  const invoice = (f: (typeof INVOICES)[number]) => { download(`${f.id}-recapitulatif.csv`, csv([['Facture', 'Date', 'Montant HT (€)', 'Statut', 'Plan'], [f.id, f.date, f.amount, f.status, 'Réseau Prestige · 45 sièges'], [], ['Récapitulatif généré par NXT Agent — la facture officielle est émise par le prestataire de paiement (non connecté).']]), 'text/csv'); toast('Récapitulatif téléchargé (.csv)') }
+  const invoice = (f: (typeof INVOICES)[number]) => { download(`${f.id}-recapitulatif.csv`, csv([['Facture', 'Date', 'Montant HT (€)', 'Statut', 'Plan'], [f.id, f.date, f.amount, f.status, 'Réseau Prestige · 45 sièges'], [], ['Récapitulatif généré par Jaspe — la facture officielle est émise par le prestataire de paiement (non connecté).']]), 'text/csv'); toast('Récapitulatif téléchargé (.csv)') }
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_1fr]">
@@ -723,7 +723,7 @@ function Facturation() {
           ))}
         </div>
       </Card>
-      <Modal open={!!req} onClose={() => setReq(null)} title={req === 'plan' ? 'Changer de plan' : 'Ajouter des sièges'} kicker="Demande au service commercial NXT" width={480}>
+      <Modal open={!!req} onClose={() => setReq(null)} title={req === 'plan' ? 'Changer de plan' : 'Ajouter des sièges'} kicker="Demande au service commercial Jaspe" width={480}>
         <AsyncForm submitLabel="Consigner la demande" onCancel={() => setReq(null)} onSubmit={async (v) => {
           let what = ''
           if (req === 'seats') { const n = Number(v.seats); if (!Number.isInteger(n) || n < 1 || n > 100) throw new Error('Nombre de sièges entre 1 et 100'); what = `Ajout de ${n} siège${n > 1 ? 's' : ''}` }

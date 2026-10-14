@@ -1,8 +1,8 @@
-# Brief commun — CRM NXT Agent (design-v2)
+# Brief commun — CRM Jaspe (design-v2)
 
 Projet : `D:/Immo_Agent/design-v2/app` (Vite + React 19 + TS strict + Tailwind 3.4 + motion 11 (`motion/react`) + @phosphor-icons/react + maplibre-gl 4.7). Dev server déjà lancé : http://127.0.0.1:5317 (HMR). Ne lance PAS d'autre serveur, n'installe AUCUN paquet.
 
-Produit : NXT Agent — copilote proactif pour agences/réseaux immobiliers de luxe (Côte d'Azur). Parcours vendeur D1 brief, D2 marché, D3 quartier, D4 coaching, D5 découverte, livrables L1 remerciement, L2 synthèse équipe, L3 avant-première acquéreurs, L4 kit social, L5 courrier voisinage, L6 book services, L7 estimation, L8 avant/après, L9 copro & diagnostics. Règles métier clés : chaque chiffre sourcé et daté ; validation humaine avant tout envoi externe ; original conservé et images IA étiquetées (AI Act, août 2026) ; démarchage téléphonique sans consentement interdit en France depuis le 11/08/2026 → registre des consentements ; RGPD.
+Produit : Jaspe — copilote proactif pour agences/réseaux immobiliers de luxe (Côte d'Azur). Parcours vendeur D1 brief, D2 marché, D3 quartier, D4 coaching, D5 découverte, livrables L1 remerciement, L2 synthèse équipe, L3 avant-première acquéreurs, L4 kit social, L5 courrier voisinage, L6 book services, L7 estimation, L8 avant/après, L9 copro & diagnostics. Règles métier clés : chaque chiffre sourcé et daté ; validation humaine avant tout envoi externe ; original conservé et images IA étiquetées (AI Act, août 2026) ; démarchage téléphonique sans consentement interdit en France depuis le 11/08/2026 → registre des consentements ; RGPD.
 
 ## Direction artistique « Nocturne Riviera » (OBLIGATOIRE)
 LIS D'ABORD : `tailwind.config.js`, `src/index.css`, `src/ui/kit.tsx`, `src/crm/ui.tsx`, `src/data/mock.ts`, et les pages de référence `src/crm/pages/Today.tsx`, `Dossiers.tsx`, `DossierDetail.tsx`. Copie leur langage visuel exactement.

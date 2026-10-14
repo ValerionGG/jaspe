@@ -273,7 +273,7 @@ export default function Idees() {
 
   return (
     <div>
-      <PageHeader kicker="Produit · NXT Agent" title={<>Feuille de <span className="italic text-champagne-300">route</span></>}
+      <PageHeader kicker="Produit · Jaspe" title={<>Feuille de <span className="italic text-champagne-300">route</span></>}
         sub={IDEAS.length ? <>{IDEAS.length} idées · {by('livré')} livrées · {by('maquette')} en maquette · {by('proposé')} proposées · {sprintCount} dans le prochain sprint. Soutenez, planifiez, faites évoluer.</> : 'Le catalogue d’idées est en cours de chargement.'}
         actions={<>
           <Tabs id="id-view" value={view} onChange={setView} items={[

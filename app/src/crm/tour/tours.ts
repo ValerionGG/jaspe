@@ -7,7 +7,7 @@ export const TOURS: Tour[] = [
     id: 'onboarding', title: 'Prise en main', minutes: 3, role: 'Conseiller', img: 'villa-pool',
     desc: 'Le cockpit en dix arrêts : brief du matin, recherche, copilote, file de validation.',
     steps: [
-      { route: '/app', title: 'Bienvenue dans NXT Agent', body: 'En trois minutes, faisons le tour de votre cockpit : où regarder le matin, où décider, et où le copilote travaille pour vous.', hint: 'Flèches ← → pour naviguer, Échap pour quitter.' },
+      { route: '/app', title: 'Bienvenue dans Jaspe', body: 'En trois minutes, faisons le tour de votre cockpit : où regarder le matin, où décider, et où le copilote travaille pour vous.', hint: 'Flèches ← → pour naviguer, Échap pour quitter.' },
       { target: 'nav-today', route: '/app', title: 'Aujourd’hui, votre brief', body: 'Chaque matin à 07:30, le copilote résume l’agenda, les décisions en attente et vos priorités triées par impact.' },
       { target: 'search', title: 'Tout trouver, tout lancer', body: 'La palette ouvre biens, contacts et dossiers, mais aussi des actions comme « générer L7 » ou « nouveau dossier ».', hint: '⌘K ou Ctrl K, depuis n’importe quelle page.' },
       { target: 'copilot', title: 'Un copilote qui cite ses sources', body: 'Posez vos questions en langage naturel. Chaque chiffre cité est sourcé et daté ; rien ne part chez un client sans votre validation.' },

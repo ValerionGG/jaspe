@@ -99,7 +99,7 @@ export function Pricing() {
 }
 
 const FAQ = [
-  ['Faut-il abandonner notre CRM actuel ?', 'Non. Le mode Overlay se branche sur Apimo, Hektor ou Modelo : NXT lit vos biens et contacts, prépare et rédige, puis réécrit ce que vous validez. Vous pouvez migrer plus tard vers le CRM natif, sans ressaisie.'],
+  ['Faut-il abandonner notre CRM actuel ?', 'Non. Le mode Overlay se branche sur Apimo, Hektor ou Modelo : Jaspe lit vos biens et contacts, prépare et rédige, puis réécrit ce que vous validez. Vous pouvez migrer plus tard vers le CRM natif, sans ressaisie.'],
   ['Les textes et chiffres sont-ils fiables ?', 'Chaque chiffre est calculé hors génération de texte, daté et relié à sa source (DVF, INSEE, IGN, pièces du dossier). Une estimation affiche sa fourchette et ses limites ; un document manquant n’est jamais présenté comme « sans point bloquant ».'],
   ['Qu’est-ce qui part chez le client sans validation ?', 'Rien par défaut. Chaque routine a un niveau d’autonomie : automatique pour les tâches internes, validé par le conseiller pour tout ce qui sort de l’agence. Vous gardez la main sur les destinataires, les engagements et les dates.'],
   ['Et la conformité — RGPD, prospection, AI Act ?', 'Registre des consentements, opposition propagée à toutes les séquences, prospection sans démarchage téléphonique non consenti, images de valorisation étiquetées et original conservé, journal d’audit complet et hébergement européen.'],
@@ -209,10 +209,10 @@ export function Footer() {
           ))}
         </div>
         <Reveal y={80}>
-          <div className="display select-none py-6 text-center text-[23vw] leading-[0.8] text-bone/[0.06]">NXT <span className="italic">agent</span></div>
+          <div className="display select-none py-6 text-center text-[23vw] leading-[0.8] text-bone/[0.06]">Jas<span className="italic">pe</span></div>
         </Reveal>
         <div className="flex flex-col justify-between gap-3 text-[12px] text-mist md:flex-row">
-          <span>© 2026 NXT Agent. Démonstrateur — données synthétiques.</span>
+          <span>© 2026 Jaspe. Démonstrateur — données synthétiques.</span>
           <span>Mentions légales · Confidentialité · Cookies essentiels uniquement</span>
         </div>
       </div>

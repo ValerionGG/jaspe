@@ -142,7 +142,7 @@ export default function Agenda() {
 
       {/* Barre d'état : sources, conflits, charge */}
       <Stagger className="mb-5 flex flex-wrap items-center gap-2">
-        {[{ I: GoogleLogo, l: 'Google Agenda', n: bySource('google') }, { I: MicrosoftOutlookLogo, l: 'Outlook · Étude', n: bySource('outlook') }, { I: Sparkle, l: 'NXT', n: bySource('nxt') }].map(({ I, l, n }) => (
+        {[{ I: GoogleLogo, l: 'Google Agenda', n: bySource('google') }, { I: MicrosoftOutlookLogo, l: 'Outlook · Étude', n: bySource('outlook') }, { I: Sparkle, l: 'Jaspe', n: bySource('nxt') }].map(({ I, l, n }) => (
           <span key={l} className="flex items-center gap-2 rounded-full bg-white/[0.03] px-3 py-1.5 text-[12px] ring-1 ring-white/[0.06]">
             <I size={14} weight="light" className="text-bone/70" />{l}<span className="num text-mist">{n}</span>
           </span>
@@ -231,7 +231,7 @@ export default function Agenda() {
                   </button>
                 )
               })}
-              <span className="ml-auto flex items-center gap-3 text-[11px] text-mist"><span className="flex items-center gap-1"><GoogleLogo size={11} /> Google</span><span className="flex items-center gap-1"><MicrosoftOutlookLogo size={11} /> Outlook</span><span className="flex items-center gap-1"><Sparkle size={11} /> NXT</span></span>
+              <span className="ml-auto flex items-center gap-3 text-[11px] text-mist"><span className="flex items-center gap-1"><GoogleLogo size={11} /> Google</span><span className="flex items-center gap-1"><MicrosoftOutlookLogo size={11} /> Outlook</span><span className="flex items-center gap-1"><Sparkle size={11} /> Jaspe</span></span>
             </div>
           </Card>
         </Stagger>
@@ -395,7 +395,7 @@ function EventPanel({ e, d, reminders, conflict, preparing, onCheck, onPrepare, 
         <div className="flex items-center justify-between gap-2">
           <span className={clsx('flex items-center gap-1.5 rounded-full bg-ink-800/80 px-2.5 py-1 text-[11px] ring-1 ring-white/10 backdrop-blur', k.text)}><span className={clsx('h-1.5 w-1.5 rounded-full', k.dot)} />{k.label}</span>
           <div className="flex items-center gap-1.5">
-            <span className="mr-1 flex items-center gap-1 text-[10.5px] text-mist"><SrcI size={12} weight="light" />{e.source === 'nxt' ? 'NXT' : e.source === 'google' ? 'Google' : 'Outlook'}</span>
+            <span className="mr-1 flex items-center gap-1 text-[10.5px] text-mist"><SrcI size={12} weight="light" />{e.source === 'nxt' ? 'Jaspe' : e.source === 'google' ? 'Google' : 'Outlook'}</span>
             <IconBtn label="Modifier" onClick={onEdit}><PencilSimple size={14} weight="light" /></IconBtn>
             <IconBtn label={confirm ? 'Confirmer la suppression' : 'Supprimer'} active={confirm} onClick={() => (confirm ? onDelete() : setConfirm(true))}><Trash size={14} weight="light" className={confirm ? 'text-coral' : ''} /></IconBtn>
           </div>

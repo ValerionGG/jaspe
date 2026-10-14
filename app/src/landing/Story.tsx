@@ -31,7 +31,7 @@ function Word({ w, progress, range }: { w: string; progress: MotionValue<number>
 export function Manifesto() {
   const ref = useRef<HTMLDivElement>(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start 0.8', 'end 0.45'] })
-  const text = 'Un grand conseiller ne perd pas son temps à saisir, chercher, relancer ou mettre en page. Il écoute, il conseille, il conclut. NXT prend tout le reste — et le fait avec le même niveau d’exigence, dans chaque agence du réseau.'
+  const text = 'Un grand conseiller ne perd pas son temps à saisir, chercher, relancer ou mettre en page. Il écoute, il conseille, il conclut. Jaspe prend tout le reste — et le fait avec le même niveau d’exigence, dans chaque agence du réseau.'
   const words = text.split(' ')
   return (
     <section className="relative bg-bone-100 px-5 py-32 text-ink md:px-10 md:py-48">
@@ -61,11 +61,11 @@ export function Manifesto() {
 
 /* ——— Parcours horizontal épinglé ——— */
 const CHAPTERS = [
-  { n: 'D1', k: 'La veille', t: 'Brief relationnel', d: 'La veille du rendez-vous, NXT rassemble le contexte du vendeur, l’historique du bien et les points à confirmer. Chaque fait porte sa source.', photo: 'window-sea', icon: ChatCircleText, ui: 'brief' },
+  { n: 'D1', k: 'La veille', t: 'Brief relationnel', d: 'La veille du rendez-vous, Jaspe rassemble le contexte du vendeur, l’historique du bien et les points à confirmer. Chaque fait porte sa source.', photo: 'window-sea', icon: ChatCircleText, ui: 'brief' },
   { n: 'D2', k: 'Le marché', t: 'Comparables & tendances', d: 'Transactions DVF, annonces actives, délais de vente : un échantillon visible, des prix vendus distincts des prix affichés.', photo: 'villa-modern', icon: ChartLineUp, ui: 'market' },
   { n: 'D3', k: 'Le quartier', t: 'Radar d’évolution', d: 'Projets d’urbanisme, transports, permis et zonages au point exact — fait établi et impact supposé séparés.', photo: 'antibes-skyline', icon: MapPin, ui: 'radar' },
   { n: 'D4', k: 'La répétition', t: 'Coaching simulé', d: 'Un vendeur virtuel rejoue les objections probables. Feedback précis, privé, jamais un jugement de personnalité.', photo: 'int-chair', icon: Target, ui: 'coach' },
-  { n: 'D5', k: 'La découverte', t: 'Entretien guidé & dictée', d: 'Sur le terrain, une dictée de deux minutes suffit : NXT propose les champs, vous validez. Hors connexion, rien ne se perd.', photo: 'balcony-breakfast', icon: Microphone, ui: 'voice' },
+  { n: 'D5', k: 'La découverte', t: 'Entretien guidé & dictée', d: 'Sur le terrain, une dictée de deux minutes suffit : Jaspe propose les champs, vous validez. Hors connexion, rien ne se perd.', photo: 'balcony-breakfast', icon: Microphone, ui: 'voice' },
   { n: 'L1–L9', k: 'L’après', t: 'Neuf livrables, prêts à valider', d: 'Remerciement, synthèse équipe, avant-première acquéreurs, kit social, courrier voisinage, book de services, estimation, avant/après, dossier copro.', photo: 'villa-dusk-pool', icon: Sparkle, ui: 'deliver' },
 ]
 

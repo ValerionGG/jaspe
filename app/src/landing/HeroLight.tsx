@@ -13,7 +13,7 @@ function Seal({ className }: { className?: string }) {
         <defs><path id="seal-circle" d="M100,100 m-78,0 a78,78 0 1,1 156,0 a78,78 0 1,1 -156,0" /></defs>
         <text className="fill-coral font-sans text-[12px] font-medium"><textPath href="#seal-circle" textLength="486" lengthAdjust="spacing">{text}</textPath></text>
       </motion.svg>
-      <span className="absolute inset-0 m-auto flex h-[46%] w-[46%] items-center justify-center rounded-full bg-champagne font-serif text-4xl italic text-ink shadow-float">N</span>
+      <span className="absolute inset-0 m-auto flex h-[46%] w-[46%] items-center justify-center rounded-full bg-champagne font-serif text-4xl italic text-ink shadow-float">J</span>
     </div>
   )
 }
@@ -58,7 +58,7 @@ export function HeroLight({ ready }: { ready: boolean }) {
               lines={[<>L’immobilier</>, <>d’exception,</>, <span className="italic text-champagne-300">orchestré<span className="text-coral">.</span></span>]} />
           )}
           <motion.p initial={{ opacity: 0, y: 20 }} animate={go ? { opacity: 1, y: 0 } : {}} transition={{ delay: 0.95, duration: 1.1, ease: EXPO }} className="mt-8 max-w-[34rem] text-[16px] leading-relaxed text-bone/70">
-            NXT prépare chaque rendez-vous, structure la découverte vendeur, rédige les neuf livrables et fait tourner votre agence — pour que vos conseillers ne fassent plus que l’essentiel : <span className="font-serif text-[19px] italic text-bone">la relation.</span>
+            Jaspe prépare chaque rendez-vous, structure la découverte vendeur, rédige les neuf livrables et fait tourner votre agence — pour que vos conseillers ne fassent plus que l’essentiel : <span className="font-serif text-[19px] italic text-bone">la relation.</span>
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={go ? { opacity: 1, y: 0 } : {}} transition={{ delay: 1.1, duration: 1.1, ease: EXPO }} className="mt-9 flex flex-wrap items-center gap-3">
             <Button size="lg" href="#demo">Réserver une démonstration</Button>

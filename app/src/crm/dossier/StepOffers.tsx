@@ -171,7 +171,7 @@ export default function StepOffers({ dossier, journey, save, goTo }: StepProps) 
                     ['Financement', (o: Offer) => `${o.financing} · ${'●'.repeat(SAFE[o.financing])}${'○'.repeat(3 - SAFE[o.financing])}`],
                     ['Conditions', (o: Offer) => o.conditions],
                     ['Expiration', (o: Offer) => countdown(ts(o.expires), now)],
-                    ['Score NXT', (o: Offer) => <span className={clsx('num', best?.id === o.id ? 'text-champagne-300' : '')}>{score(o)}</span>],
+                    ['Score Jaspe', (o: Offer) => <span className={clsx('num', best?.id === o.id ? 'text-champagne-300' : '')}>{score(o)}</span>],
                   ] as const).map(([l, f]) => <tr key={l}><td className="py-2.5 pr-4 text-mist">{l}</td>{active.map((o) => <td key={o.id} className={clsx('py-2.5 pr-4', best?.id === o.id && 'text-bone')}>{f(o)}</td>)}</tr>)}
                 </tbody>
               </table>

@@ -1,4 +1,4 @@
-# 02 — Benchmark motion : landing NXT Agent (animée, dynamique, interactive, luxe)
+# 02 — Benchmark motion : landing Jaspe (animée, dynamique, interactive, luxe)
 
 **Date de recherche : 11 octobre 2026.** Sources : navigation de motionsites.ai dans le navigateur intégré (sans compte, aucune connexion), lecture complète de 3 prompts gratuits (Agent Wave, Space Voyage, Monolith Hero), détection des librairies sur 3 sites Awwwards immobilier, sources GitHub et registre npm, WebSearch/WebFetch. Captures dans `shots/ms-*.jpg`.
 
@@ -10,7 +10,7 @@
 
 1. **Le « wow » des meilleurs sites MotionSites ne vient pas surtout du WebGL.** Il vient de la combinaison suivante : une **vidéo IA cinématographique** plein écran (générée avec Higgsfield/Kling, hébergée sur CloudFront), une **typographie retenue** (Inter + un mot en *Instrument Serif italic*), une **chorégraphie d'entrée en CSS** (lignes masquées qui montent, flou → net, délais échelonnés), du **grain**, des **boutons « liquid glass / liquid metal »** avec un reflet qui balaie le bouton au survol, et un **parallax souris amorti**. Le prompt Agent Wave interdit même explicitement vidéo/WebGL/Three/Lottie pour la page elle-même : la vidéo y sert de fond, rien de plus.
 2. **Les sites immobiliers primés en 2026 utilisent GSAP + Lenis.** ERA Residence (Awwwards Site of the Month, août 2026) charge `gsap@3.15` + ScrollTrigger + SplitText + CustomEase, `lenis@1.3.21`, Barba et Lottie. Sobha Privy Collection (SOTD, sept. 2026) utilise Three.js, Barba, ScrollTrigger, des transitions vidéo en `clip-path` et 12 vidéos sur la page.
-3. **Stack recommandée pour NXT Agent :**
+3. **Stack recommandée pour Jaspe :**
    - GSAP 3.15.0 (ScrollTrigger, SplitText, Flip, Draggable, CustomEase, tous gratuits depuis 3.13) ;
    - Lenis 1.3.26 ;
    - `motion` 13.4.4 en vanilla pour les micro-interactions ;
@@ -70,13 +70,13 @@
 
 **Conclusion méthode :**
 - Visuel = vidéo IA de qualité + typographie + timing. Code = CSS keyframes + un peu de JS.
-- Pour NXT Agent, on garde cette base légère et on ajoute **GSAP ScrollTrigger** pour la partie storytelling, absente de ces prompts mono-écran.
+- Pour Jaspe, on garde cette base légère et on ajoute **GSAP ScrollTrigger** pour la partie storytelling, absente de ces prompts mono-écran.
 
 ### 1.3 Top 15 des exemples MotionSites (URL = `https://motionsites.ai/?prompt=<slug>`)
 
 Slugs vérifiés quand indiqués. Pour les autres, ouvrir la carte depuis la home : le slug suit le titre.
 
-| # | Exemple (catégorie) | URL | Ce qui le rend impressionnant / réutilisable pour NXT |
+| # | Exemple (catégorie) | URL | Ce qui le rend impressionnant / réutilisable pour Jaspe |
 |---|---|---|---|
 | 1 | **Monolith Hero** (Architecture, gratuit) | `?prompt=monolith-hero` | Promoteur immobilier : rail de 6 chapitres, une vidéo par chapitre en fondu, titre masqué qui se remplace, libellés « décodés », parallax souris amorti, cadre chanfreiné. **Modèle direct du parcours D1 → L9.** |
 | 2 | **Luxury Hero** (Hero) | `?prompt=luxury-hero` | Villa méditerranéenne à l'heure dorée en vidéo, titre en capitales serif, nav pill en verre, CTA « Book a tour ». C'est le ton visuel visé (Riviera). |
@@ -100,14 +100,14 @@ Mentions : *Dream Garden* (éditorial mode, vidéo), *Atrium MTL* (éditorial N&
 
 ## 2. Galeries, bibliothèques et outils similaires (20)
 
-| # | Site | Ce qu'il offre | 2–3 composants/effets à prendre pour NXT (luxe immo + IA) |
+| # | Site | Ce qu'il offre | 2–3 composants/effets à prendre pour Jaspe (luxe immo + IA) |
 |---|---|---|---|
 | 1 | **React Bits** (reactbits.dev, GitHub DavidHDev/react-bits) | Plus de 130 composants open source (JS/TS × CSS/Tailwind), CLI. Fonds en OGL ou WebGL brut, texte en GSAP/Motion. | **Grainient** (OGL, dégradé granuleux) ou **Silk** (three + R3F) pour le hero et le CTA ; **SplitText** et **ScrollReveal** (GSAP + ScrollTrigger) ; **Magic Bento** (GSAP, halo qui suit le curseur). Aussi : DecryptedText, CountUp, GradualBlur, GlassSurface, ScrollStack, Stepper. |
 | 2 | **Aceternity UI** (ui.aceternity.com) | Composants Tailwind + Motion, blocs payants. | **Sticky Scroll Reveal** (texte à gauche, visuel collant à droite : parcours produit) ; **Animated Testimonials** (pile de portraits + texte mot à mot) ; **Container Scroll Animation / Macbook Scroll** (démo CRM qui se redresse au scroll). Aussi : Timeline, Bento Grid, SVG Mask Effect, Spotlight. |
 | 3 | **Magic UI** (magicui.design) | Plus de 150 composants shadcn + Motion. | **Animated Beam** (sources DVF/INSEE/cadastre reliées au cœur IA) ; **Number Ticker** (KPIs) ; **Safari / iPhone mocks** + **Border Beam** (cadre de démo CRM). Aussi : Bento Grid, Marquee, Blur Fade, Progressive Blur. |
 | 4 | **Cult UI** (cult-ui.com) | shadcn, orienté IA et landing. | **Dynamic Island** (notifications d'agent IA dans la démo CRM) ; **Agent Suggest Card Stack** ; **Hero Liquid Metal / Hero Dithering** (Paper Shaders). Aussi : Texture Card, Fluted Glass, Rolling Number. |
 | 5 | **21st.dev** | Catalogue communautaire (heroes, pricing, testimonials, shaders) en registre shadcn, avec « Copy prompt » pour agent. | Sections pricing à bascule, testimonials marquee, heroes shader. À parcourir par recherche « pricing », « testimonial », « shader ». |
-| 6 | **Paper Shaders** (shaders.paper.design) | Shaders canvas **sans dépendance**, vanilla ou React. | **Mesh Gradient** (encre / champagne / ivoire, très lent) ; **Grain Gradient** ou **Paper Texture** (matière luxe) ; **Liquid Metal** (logo NXT au CTA) ; **God Rays** (CTA final). Aussi : Fluted Glass (filtre image), Dithering. |
+| 6 | **Paper Shaders** (shaders.paper.design) | Shaders canvas **sans dépendance**, vanilla ou React. | **Mesh Gradient** (encre / champagne / ivoire, très lent) ; **Grain Gradient** ou **Paper Texture** (matière luxe) ; **Liquid Metal** (logo Jaspe au CTA) ; **God Rays** (CTA final). Aussi : Fluted Glass (filtre image), Dithering. |
 | 7 | **Unicorn Studio** (unicorn.studio) | Éditeur no-code de scènes WebGL, embed `data-us-project` + `unicornStudio.umd.js`. | Fond de hero interactif (lumière qui suit la souris sur du marbre ou un plan) produit sans code ; à réserver à une variante A/B. Badge sur le plan gratuit. |
 | 8 | **ShaderGradient** (shadergradient.co, `@shadergradient/react` 2.4.20) | Dégradés 3D animés configurables (R3F). | Bloc « aurore » doux derrière le pricing ; trop « startup » s'il est saturé, à garder désaturé. |
 | 9 | **Spline Community** (spline.design/community) | Scènes 3D remixables, runtime `@splinetool/runtime`. | Possible : maquette architecturale low-poly en rotation lente. **Déconseillé** en hero (runtime lourd, look jouet). |
@@ -150,7 +150,7 @@ Polices (Google Fonts ou auto-hébergées en sous-ensemble) : **Inter** (UI) et 
   gsap.ticker.lagSmoothing(0);
   ```
   Désactiver Lenis si `prefers-reduced-motion`.
-- **Préchargeur sobre** (Space Voyage) : compteur 0 → 100 % lié au `canplaythrough` de la vidéo hero et à `document.fonts.ready`. Le logo NXT glisse ensuite vers le header (GSAP Flip). **Plafonner à 1.2 s** ; ne pas l'afficher aux visites suivantes (`sessionStorage`, dans un try/catch).
+- **Préchargeur sobre** (Space Voyage) : compteur 0 → 100 % lié au `canplaythrough` de la vidéo hero et à `document.fonts.ready`. Le logo Jaspe glisse ensuite vers le header (GSAP Flip). **Plafonner à 1.2 s** ; ne pas l'afficher aux visites suivantes (`sessionStorage`, dans un try/catch).
 - **Grain global :** `.grain` fixe, SVG `feTurbulence` en data-URI, `opacity:.06`, `mix-blend-mode:overlay`.
 - **Chorégraphie d'entrée** (recette Agent Wave) : `cubic-bezier(0.16,1,0.3,1)`, délais échelonnés via `--d`, opacité de repos à 1 et fallback `.is-in`.
 - **Curseur custom** (desktop, `pointer:fine` uniquement) : point + anneau amortis, l'anneau grossit sur les éléments interactifs.
@@ -180,7 +180,7 @@ Polices (Google Fonts ou auto-hébergées en sous-ensemble) : **Inter** (UI) et 
 - **Structure « rail de chapitres » (Stratum) :** section épinglée par `ScrollTrigger.create({ pin: true, scrub: 1, end: '+=400%' })` avec un timeline maître. **Rail vertical à gauche :** D1 BRIEF · D2 MARCHÉ · D3 QUARTIER · D4 PRÉPARATION · D5 ENTRETIEN · L1–L9 LIVRABLES. L'item actif reçoit un marqueur et son libellé est « décodé ».
 - **Scène à droite, qui change par chapitre :**
   1. **Brief (D1) :** carte de fiche vendeur qui se remplit champ par champ (texte « tapé », DecryptedText).
-  2. **Marché et quartier (D2/D3) :** carte d'Antibes en SVG (tracé `stroke-dashoffset` scrubé) avec points DVF qui apparaissent et **Animated Beam** des sources vers le cœur NXT.
+  2. **Marché et quartier (D2/D3) :** carte d'Antibes en SVG (tracé `stroke-dashoffset` scrubé) avec points DVF qui apparaissent et **Animated Beam** des sources vers le cœur Jaspe.
   3. **Entretien (D5) :** transcript qui défile, onde vocale (Rive ou SVG animé) et puces « insights » extraites qui se détachent et vont se ranger (GSAP Flip).
   4. **Livrables :** pile de 9 documents (vignettes réelles L1…L9 depuis les PDF du dossier) qui **s'ouvre en éventail 3D** (`rotateY`, `perspective`, à la manière de Book Hero), puis se **réorganise en grille 3×3** avec `Flip.from(state, { stagger: .05, ease: 'power3.inOut' })`. Compteur 0 → 9.
 - **Changement de texte entre chapitres :** lignes masquées qui descendent puis remontent (`yPercent: 112`), 0.5 s.
@@ -195,7 +195,7 @@ Polices (Google Fonts ou auto-hébergées en sous-ensemble) : **Inter** (UI) et 
 - **Apparition :** `ScrollTrigger.batch('.bento-card', { onEnter: b => gsap.from(b, { y: 40, opacity: 0, stagger: .08 }) })`.
 
 ### 3.5 Démo interactive du CRM
-- **DOM réel, pas une vidéo :** un mock du CRM NXT dans un cadre navigateur (Magic UI Safari mock + Border Beam), qui **se redresse au scroll** (Aceternity Container Scroll : `rotateX 20° → 0`, `scale .9 → 1`, scrub).
+- **DOM réel, pas une vidéo :** un mock du CRM Jaspe dans un cadre navigateur (Magic UI Safari mock + Border Beam), qui **se redresse au scroll** (Aceternity Container Scroll : `rotateX 20° → 0`, `scale .9 → 1`, scrub).
 - **Interactions jouables :**
   - **Kanban** des mandats déplaçable : GSAP **Draggable** + **Flip** pour réordonner les colonnes « Estimation → Mandat → Vente ».
   - **Palette Ctrl+K** : taper « Prépare le RDV MARTIN » déclenche un streaming de texte (scramble puis typewriter) et génère les cartes L1–L9 avec des toasts **Dynamic Island** (Cult UI) du type « L7 Analyse de valeur prête ».
@@ -215,8 +215,8 @@ Polices (Google Fonts ou auto-hébergées en sous-ensemble) : **Inter** (UI) et 
 
 ### 3.8 CTA final et footer
 - **Retour du hero :** la vidéo Riviera revient dans un `clip-path: inset(20% 30% round 24px)` qui s'ouvre en plein écran au scroll (ScrollTrigger scrub, technique Sobha Privy), avec le titre CTA en SplitText.
-- **Bouton magnétique** (attraction de ±12 px, `gsap.quickTo`) et logo NXT en **Liquid Metal** (Paper Shaders) ou **God Rays** très discrets.
-- **Footer :** wordmark « NXT AGENT » géant révélé par masque (`yPercent: 100 → 0`) en bas de page.
+- **Bouton magnétique** (attraction de ±12 px, `gsap.quickTo`) et logo Jaspe en **Liquid Metal** (Paper Shaders) ou **God Rays** très discrets.
+- **Footer :** wordmark « JASPE » géant révélé par masque (`yPercent: 100 → 0`) en bas de page.
 
 ### 3.9 Budget performance (garde-fous)
 - LCP < 2.5 s : le poster de la vidéo hero est l'élément LCP, préchargé avec `<link rel="preload" as="image">`.

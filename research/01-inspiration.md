@@ -1,4 +1,4 @@
-# NXT Agent: Visual Research Sprint 01 (Inspiration)
+# Jaspe: Visual Research Sprint 01 (Inspiration)
 
 Date: 2026-10-11. Scope: landing page plus the CRM/app for an AI-first, proactive platform for French real-estate agents and networks. Positioning: Côte d'Azur luxury meets top-tier AI SaaS.
 
@@ -38,7 +38,7 @@ Date: 2026-10-11. Scope: landing page plus the CRM/app for an AI-first, proactiv
 | 13 | **Knight Frank**: https://www.knightfrank.com · `site-knightfrank.jpeg` | Live | Tiempos Headline + Suisse Intl; illustrated editorial cover for "The Residence Report"; huge numerals "130 · 600+ · 20,000+". | Big-number social-proof band | **The valuation report as an editorial magazine cover**: a model for the deliverables |
 | 14 | **The Agency**: https://www.theagencyre.com · `site-theagency.jpeg` | Live | Playfair with an italic emphasis word ("world's *finest*"); red block logo; full video. | Italic emphasis word in the headline (one word only) | — |
 | 15 | **Linear**: https://linear.app · `site-linear.jpeg` | Live | `#08090A` bg; Inter Variable at weight 510, -1.4px; product UI is the hero; Berkeley Mono; pill CTAs. Ease `(.25,.46,.45,.94)`. | Product-as-hero framed in a 1px-border window with a soft glow | Sidebar IA, activity timeline ("Triage Intelligence added labels…"), keyboard-first, 1/84 record navigator |
-| 16 | **Attio**: https://attio.com · `site-attio.jpeg` | Live | Inter Display 600/64px, -1.28px; a Tiempos serif for accents; JetBrains Mono; "Ask Attio" button; workflow runs with Running/Paused/Done states; dotted canvas; Live toggle. | "Welcome to agentic revenue." Short, declarative, product right below | Automation builder on a dotted canvas plus a run-history list; "Ask NXT" global button |
+| 16 | **Attio**: https://attio.com · `site-attio.jpeg` | Live | Inter Display 600/64px, -1.28px; a Tiempos serif for accents; JetBrains Mono; "Ask Attio" button; workflow runs with Running/Paused/Done states; dotted canvas; Live toggle. | "Welcome to agentic revenue." Short, declarative, product right below | Automation builder on a dotted canvas plus a run-history list; "Ask Jaspe" global button |
 | 17 | **Twenty CRM**: https://twenty.com · `site-twenty.jpeg` | Live | Aleo Light serif mixed with bold Host Grotesk in the same line ("CRM **at AI Speed**"); notched cut-corner buttons; pixel-bar side ornament; a dense, clean table with chip cells. | Mixed serif/sans inside one headline | Record table: chip cells, avatar owners, checkbox column, "New Record" CTA |
 | 18 | **Folk**: https://www.folk.app/fr · `site-folk.jpeg` | Live (French UI) | Uxum Grotesque 72px, -1.8px; bracketed mono eyebrow "[ PRÉSENTATION … ]"; grainy grey gradient behind the product; kanban stages with totals ("Proposition envoyée 2 · 118 000 $"). | Bracketed mono eyebrows; grain-gradient stage behind the product shot | Kanban column headers with count and € total; French microcopy tone |
 | 19 | **Vercel**: https://vercel.com · `site-vercel.jpeg` | Live | Geist Sans 64px, -3.84px; `#FAFAFA`; one object with a soft drop shadow; logo marquee. | Network-logo marquee; one hero object with a contact shadow | — |
@@ -195,7 +195,7 @@ Night mode for the CRM "focus" theme: `--nuit #0F1315`, `--nuit-2 #161C1F`, `--n
 **Signature hero:** "Fenêtre sur la mer".
 - Layout: limestone page; left, a 9-column headline in Instrument Serif: "Chaque vendeur mérite *un dossier d'exception*." (italic in azur).
 - Right, a 28px-radius arched window frame (Provençal arch top) showing a slow video of the Antibes coastline.
-- On scroll, the arch pins and the view inside it cross-fades, through a sliding mask, into the actual NXT Agent seller cockpit, so the product appears inside the window.
+- On scroll, the arch pins and the view inside it cross-fades, through a sliding mask, into the actual Jaspe seller cockpit, so the product appears inside the window.
 - Under the arch: a Chisel-style thin azur line diagram that connects "RDV" to "9 livrables". Each node pops in as the user scrolls.
 - Coordinates and live clock in Geist Mono.
 
@@ -265,7 +265,7 @@ Night mode for the CRM "focus" theme: `--nuit #0F1315`, `--nuit-2 #161C1F`, `--n
 2. **It is where 2026 winners are converging.** Every top-scoring site I measured pairs an elegant serif, often with an italic accent phrase, with a precise grotesk: Loam (Cormorant + DM Sans), Vestris, Lenval (Financier + Helvetica Now), Twenty (Aleo + Host Grotesk), Attio (Inter Display + Tiempos), Knight Frank (Tiempos + Suisse). Instrument Serif plus Geist is the free, Google-hosted version of that pairing.
 3. **It works for the product, not only the hero.** Agents spend hours in the CRM. Warm light paper with ink-blue reads better and feels less "gamer" than dark mode. The Nuit theme (warm/azur-tinted black, champagne accent) still covers evening use and showroom demos.
 4. **The 9 deliverables are print-like** (letters, services book, valuation report, condo dossier). B's paper/ink/ochre-gold system carries over directly to PDF and print. Knight Frank's report covers and The Blumont's stationery show how premium that can look.
-5. **AI gets one consistent voice.** Azur means "NXT did this": AI suggestions sit on `--azur-mist`, AI-written text carries an azur hairline, projections are hatched azur. That consistency is what makes a proactive AI trustworthy (Vestris's "human checkpoint", Palco's hatched forecasts).
+5. **AI gets one consistent voice.** Azur means "Jaspe did this": AI suggestions sit on `--azur-mist`, AI-written text carries an azur hairline, projections are hatched azur. That consistency is what makes a proactive AI trustworthy (Vestris's "human checkpoint", Palco's hatched forecasts).
 6. **It is cheap to build.** Every font is on Google Fonts, and the motion runs on GSAP, Lenis and CSS: no WebGL dependency for the core experience. A's Nocturne video and C's blueprint line-draw can still appear as single moments (the case-study section, the valuation report page).
 
 **Guardrails:**
@@ -304,7 +304,7 @@ Night mode for the CRM "focus" theme: `--nuit #0F1315`, `--nuit-2 #161C1F`, `--n
 | 21 | AI streaming skeleton → content | Skeleton rows shimmer (1.6s loop), then resolve field by field with a 40ms stagger as the brief is written | Lev "Screen result" |
 | 22 | Headline-as-insight | The CRM home H1 is a generated sentence; key nouns are chips that open the record | Behance Agentic AI CRM |
 | 23 | Proactive brief rail | Greeting, 3–5 bullet insights, a 2x2 one-tap action grid; new insights slide in from the top with a soft azur flash | NexusAI right rail |
-| 24 | Command palette ⌘K | Fuzzy search across sellers, properties and actions; AI "Ask NXT" mode; 160ms scale-in from 0.98 | Clay nav ⌘K, Linear, Attio "Ask" |
+| 24 | Command palette ⌘K | Fuzzy search across sellers, properties and actions; AI "Ask Jaspe" mode; 160ms scale-in from 0.98 | Clay nav ⌘K, Linear, Attio "Ask" |
 | 25 | Kanban with drag physics | Cards lift (scale 1.03, shadow lifted), rotate ±2° by drag velocity, spring-drop (stiffness 380, damping 30); column header € totals tick | Folk pipeline |
 | 26 | Seller journey ink rail | A vertical azur line fills between steps as each completes; the completed node gets an overshoot check | Linear activity timeline, Vestris steps |
 | 27 | Hatched forecast vs solid actual | Projected bars and lines drawn with an animated diagonal hatch pattern; real values morph solid when confirmed | Palco CRM |

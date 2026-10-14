@@ -1,7 +1,7 @@
 // Copilote : Claude (si une clé est configurée) avec un instantané des données ; sinon règles sur les données réelles.
 import Anthropic from '@anthropic-ai/sdk'
 
-const SYSTEM = `Tu es le copilote de NXT Agent, CRM d'une agence immobilière haut de gamme sur la Côte d'Azur.
+const SYSTEM = `Tu es le copilote de Jaspe, CRM d'une agence immobilière haut de gamme sur la Côte d'Azur.
 Réponds en français, de façon brève et actionnable (3 à 6 phrases maximum).
 Appuie-toi uniquement sur l'instantané JSON fourni : n'invente aucun chiffre, nom ou date. Si l'information manque, dis-le.
 Ne prétends jamais avoir envoyé un message ou modifié une donnée : propose l'action, le conseiller valide.`

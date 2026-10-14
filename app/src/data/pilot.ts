@@ -217,7 +217,7 @@ export const AUDIT = [
 
 export const SESSIONS = [
   { device: 'MacBook Pro · Safari', place: 'Antibes, France', last: 'Session actuelle', current: true },
-  { device: 'iPhone 16 · App NXT', place: 'Antibes, France', last: 'il y a 12 min', current: false },
+  { device: 'iPhone 16 · App Jaspe', place: 'Antibes, France', last: 'il y a 12 min', current: false },
   { device: 'iPad Air · Chrome', place: 'Juan-les-Pins, France', last: 'hier 19:42', current: false },
   { device: 'Windows · Edge', place: 'Nice, France', last: 'il y a 9 jours', current: false },
 ]

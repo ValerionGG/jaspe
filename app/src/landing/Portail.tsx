@@ -66,7 +66,7 @@ export default function Portail() {
       <main className="relative mx-auto max-w-[1400px] px-5 pb-24 md:px-10">
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: EXPO }} className="pb-10 pt-6 md:pt-12">
           <Eyebrow>Portail · tous les accès</Eyebrow>
-          <h1 className="display mt-5 text-6xl md:text-8xl">Tout NXT, <span className="italic text-champagne-300">en un geste.</span></h1>
+          <h1 className="display mt-5 text-6xl md:text-8xl">Tout Jaspe, <span className="italic text-champagne-300">en un geste.</span></h1>
           <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-bone/60">La vitrine, l’offre commerciale, les deux éditions du CRM et chacun de ses espaces. Démonstration : les données sont synthétiques et restent dans votre navigateur.</p>
           <div className="mt-7 flex flex-wrap gap-2">
             <button onClick={tour} className="inline-flex items-center gap-2 rounded-full bg-champagne px-5 py-2.5 text-[13.5px] font-medium text-ink transition hover:bg-champagne-300"><Play size={14} weight="fill" /> Visite guidée (3 min)</button>

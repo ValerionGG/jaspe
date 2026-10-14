@@ -114,7 +114,7 @@ function IllusValidate() {
 }
 
 const STEPS = [
-  { n: '01', t: 'Connectez votre agenda', d: 'Google ou Outlook, et votre CRM si vous en avez un (Apimo, Hektor, Modelo). NXT repère vos rendez-vous vendeurs et prépare le brief la veille.', time: '10 minutes, une seule fois', el: <IllusAgenda /> },
+  { n: '01', t: 'Connectez votre agenda', d: 'Google ou Outlook, et votre CRM si vous en avez un (Apimo, Hektor, Modelo). Jaspe repère vos rendez-vous vendeurs et prépare le brief la veille.', time: '10 minutes, une seule fois', el: <IllusAgenda /> },
   { n: '02', t: 'Dictez deux minutes', d: 'En sortant du rendez-vous, racontez ce que vous avez appris. Le copilote structure la découverte : projet, délais, travaux, points sensibles.', time: '2 minutes par rendez-vous', el: <IllusVoice /> },
   { n: '03', t: 'Relisez, validez', d: 'Les neuf livrables vous attendent. Vous corrigez si besoin, vous validez : rien ne part chez un client sans votre clic.', time: '10 minutes de relecture', el: <IllusValidate /> },
 ]
@@ -122,7 +122,7 @@ const STEPS = [
 export function Steps() {
   return (
     <Section id="comment">
-      <Head kicker="Comment ça marche" title="Trois gestes," accent="c’est tout." sub="Pas de formation de trois jours, pas de nouveau logiciel à apprendre : NXT travaille autour de votre agenda." />
+      <Head kicker="Comment ça marche" title="Trois gestes," accent="c’est tout." sub="Pas de formation de trois jours, pas de nouveau logiciel à apprendre : Jaspe travaille autour de votre agenda." />
       <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-3">
         {STEPS.map((s, i) => (
           <In key={s.n} delay={i * 0.08} className={clsx(card, 'flex flex-col p-6')}>
@@ -180,7 +180,7 @@ export function DayCompare() {
           {(['sans', 'avec'] as const).map((m) => (
             <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className="relative rounded-full px-5 py-2 text-[13px]">
               {mode === m && <motion.span layoutId="ess-day" className="absolute inset-0 rounded-full bg-bone" transition={{ duration: 0.5, ease: EXPO }} />}
-              <span className={clsx('relative', mode === m ? 'text-ink' : 'text-bone/70')}>{m === 'sans' ? 'Sans NXT' : 'Avec NXT Essentiel'}</span>
+              <span className={clsx('relative', mode === m ? 'text-ink' : 'text-bone/70')}>{m === 'sans' ? 'Sans Jaspe' : 'Avec Jaspe Essentiel'}</span>
             </button>
           ))}
         </div>
@@ -440,9 +440,9 @@ export function Scenarios() {
 
 const FAQ = [
   ['Que se passe-t-il après les 14 jours ?', 'Rien d’automatique : aucune carte bancaire n’est demandée. Vous choisissez de continuer à 49 € HT par siège et par mois, ou vous exportez vos documents ; vos données sont alors supprimées sous 30 jours.'],
-  ['Faut-il changer de CRM ?', 'Non. NXT Essentiel se branche sur Apimo, Hektor ou Modelo, ou fonctionne seul avec votre agenda. Vous gardez vos habitudes, NXT s’occupe de la rédaction et des relances.'],
+  ['Faut-il changer de CRM ?', 'Non. Jaspe Essentiel se branche sur Apimo, Hektor ou Modelo, ou fonctionne seul avec votre agenda. Vous gardez vos habitudes, Jaspe s’occupe de la rédaction et des relances.'],
   ['Est-ce que des messages partent sans moi ?', 'Seuls les rappels de rendez-vous, sur des modèles que vous avez validés et à des clients qui ont donné leur accord. Tout le reste — livrables, relances, courriers — attend votre validation.'],
-  ['De quoi ai-je besoin pour WhatsApp ?', 'D’un numéro WhatsApp Business. Nous le connectons avec vous pendant l’appel de démarrage de 30 minutes ; en attendant, les rappels restent préparés et visibles dans NXT.'],
+  ['De quoi ai-je besoin pour WhatsApp ?', 'D’un numéro WhatsApp Business. Nous le connectons avec vous pendant l’appel de démarrage de 30 minutes ; en attendant, les rappels restent préparés et visibles dans Jaspe.'],
   ['Et si mon agence grandit ?', 'Vous passez à l’offre Agence (5 sièges, CRM natif, matching acquéreurs) à tout moment, sans ressaisie, au prorata du mois en cours.'],
 ]
 

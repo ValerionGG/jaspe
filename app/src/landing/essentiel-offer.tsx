@@ -61,7 +61,7 @@ export function Pricing() {
         <In className="shell !ring-champagne/30">
           <div className="core flex h-full flex-col bg-gradient-to-b from-champagne/[0.10] to-ink-800 p-7 md:p-9">
             <div className="flex items-center justify-between">
-              <span className="text-[17px] font-medium">NXT Essentiel</span>
+              <span className="text-[17px] font-medium">Jaspe Essentiel</span>
               <span className="eyebrow bg-champagne text-ink">14 jours offerts</span>
             </div>
             <p className="mt-2 text-[13.5px] text-bone/60">Pour le conseiller indépendant et l’agence de 1 à 4 personnes.</p>
@@ -126,7 +126,7 @@ export function Pricing() {
 
 /* ——— Calculateur de temps gagné ——— */
 
-/** Minutes par tâche, sans → avec NXT. Affiché tel quel sous le calculateur. */
+/** Minutes par tâche, sans → avec Jaspe. Affiché tel quel sous le calculateur. */
 export const HYP = {
   prep: { before: 60, after: 20, label: 'Préparation d’un rendez-vous vendeur' },
   doc: { before: 25, after: 8, label: 'Rédaction d’un livrable (relecture comprise)' },
@@ -195,7 +195,7 @@ export function Roi() {
             ))}
           </div>
           <div className="mt-8 rounded-2xl bg-ink-800/70 p-4 text-[13.5px] ring-1 ring-white/[0.06]">
-            Pour <span className="font-medium text-bone">{PRICE} €</span> HT par mois, NXT Essentiel vous rend <span className="font-medium text-champagne-300">{eur(r.value)} €</span> de temps,
+            Pour <span className="font-medium text-bone">{PRICE} €</span> HT par mois, Jaspe Essentiel vous rend <span className="font-medium text-champagne-300">{eur(r.value)} €</span> de temps,
             soit <span className="font-medium text-bone">×{eur(r.multiple, 0)}</span> son prix{r.net > 0 && <> — <span className="font-medium text-sage">{eur(r.net)} €</span> de gain net</>}.
           </div>
         </div>
@@ -228,7 +228,7 @@ export function Trial() {
     setSt({ s: 'sending' })
     try {
       // ponytail: le serveur ne stocke que name/email/org/size — le téléphone est porté dans « size » pour ne pas être perdu.
-      await action('lead.create', { name: f.name, email: f.email, org: f.org, phone: f.phone, size: 'Essai NXT Essentiel 14 j' })
+      await action('lead.create', { name: f.name, email: f.email, org: f.org, phone: f.phone, size: 'Essai Jaspe Essentiel 14 j' })
       setSt({ s: 'ok', name: f.name.split(' ')[0], email: f.email })
     } catch (x) {
       setSt({ s: 'error', msg: x instanceof ApiError ? x.message : 'Serveur injoignable : rien n’a été transmis. Vérifiez votre connexion et réessayez.' })
@@ -252,7 +252,7 @@ export function Trial() {
                 <motion.div key="ok" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, ease: EXPO }} className="py-8 text-center" role="status">
                   <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-champagne text-ink"><Check size={24} /></span>
                   <div className="display mt-6 text-4xl">Merci {st.name}.</div>
-                  <p className="mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-bone/65">Votre demande d’essai est enregistrée. Un conseiller NXT vous contacte sous 2 h ouvrées pour ouvrir votre espace — les accès seront adressés à <span className="text-bone">{st.email}</span>.</p>
+                  <p className="mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-bone/65">Votre demande d’essai est enregistrée. Un conseiller Jaspe vous contacte sous 2 h ouvrées pour ouvrir votre espace — les accès seront adressés à <span className="text-bone">{st.email}</span>.</p>
                   <div className="mt-7 flex flex-wrap justify-center gap-3">
                     <Button variant="ghost" href="/essentiel/app" icon={<Play size={14} weight="light" />}>Explorer la démo</Button>
                     <button onClick={() => setSt({ s: 'idle' })} className="rounded-full px-4 py-2 text-[13px] text-bone/60 transition hover:text-bone">Nouvelle demande</button>

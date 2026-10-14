@@ -10,11 +10,11 @@ export function Logo({ className, mark = true }: { className?: string; mark?: bo
     <span className={clsx('inline-flex items-center gap-2.5', className)}>
       {mark && (
         <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-bone text-ink">
-          <span className="font-serif text-[19px] italic leading-none">N</span>
+          <span className="font-serif text-[19px] italic leading-none">J</span>
           <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-champagne ring-2 ring-ink" />
         </span>
       )}
-      <span className="text-[15px] font-medium tracking-[-0.02em]">NXT<span className="font-serif text-[17px] italic text-champagne-300"> agent</span></span>
+      <span className="font-serif text-[21px] leading-none tracking-[-0.01em]">Jas<span className="italic text-champagne-300">pe</span></span>
     </span>
   )
 }
@@ -43,7 +43,7 @@ export function Preloader({ onDone }: { onDone: () => void }) {
           </div>
           <div className="overflow-hidden">
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ duration: 1.2, ease: EXPO }} className="display pb-[0.12em] text-[22vw] leading-[0.9] text-bone md:text-[16vw]">
-              NXT <span className="italic text-champagne">agent</span>
+              Jas<span className="italic text-champagne">pe</span>
             </motion.div>
           </div>
           <div className="flex items-end justify-between">
@@ -99,7 +99,7 @@ export function Nav() {
     <>
       <motion.header initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 1, delay: 0.2, ease: EXPO }} className="fixed inset-x-0 top-0 z-[70] flex justify-center px-4 pt-4 md:pt-6">
         <nav className={clsx('flex w-full max-w-[1100px] items-center justify-between rounded-full py-2 pl-5 pr-2 ring-1 transition-all duration-700 ease-silk', scrolled ? 'glass ring-white/10 shadow-float' : 'bg-transparent ring-transparent')}>
-          <a href="#top" aria-label="NXT Agent — accueil"><Logo /></a>
+          <a href="#top" aria-label="Jaspe — accueil"><Logo /></a>
           <div className="hidden items-center gap-1 lg:flex">
             {LINKS.map(([l, h]) => (
               <a key={h} href={h} className="rounded-full px-4 py-2 text-[13px] text-bone/70 transition-colors duration-300 hover:bg-white/[0.06] hover:text-bone">{l}</a>

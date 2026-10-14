@@ -1,4 +1,4 @@
-# 04 — Idées produit et automatisations NXT Agent
+# 04 — Idées produit et automatisations Jaspe
 
 *Version du 11/10/2026. 398 idées (`src/data/ideas.json`), 100 routines (`routines.json` + `routines-extra.json`). Sources : audit documentaire (§ 4–8), backlog des 240 idées, catalogue des 60 routines, benchmark v2, recherches design et motion.*
 
@@ -7,7 +7,7 @@ Conventions : **Phase** P0 pilote → P3 expansion · **Effort** S < 1 sem., M 1
 ## 1. Synthèse
 
 - **Volume** : 398 idées sur 21 thèmes ; P0 : 104, P1 : 170, P2 : 104, P3 : 20 ; 56 déjà maquettées, 342 proposées.
-- **Fil rouge** : NXT est l’agent du mandat vendeur — il prépare, produit les livrables qui font signer, prouve leur conformité et s’installe au-dessus du CRM existant.
+- **Fil rouge** : Jaspe est l’agent du mandat vendeur — il prépare, produit les livrables qui font signer, prouve leur conformité et s’installe au-dessus du CRM existant.
 - **Ce qui a changé en 2026** : démarchage téléphonique opt-in depuis le 11/08/2026 (le courrier, le contenu et l’inbound deviennent les canaux principaux) ; AI Act art. 50 depuis le 02/08/2026 (étiquetage des images virtuelles et des assistants IA) ; DPE 2026 (coefficient 1,9) ; facturation électronique.
 
 ### 1.1 Top 25 : fort impact, faible effort (P0–P1, effort S/M, 3 max par thème)
@@ -45,9 +45,9 @@ Conventions : **Phase** P0 pilote → P3 expansion · **Effort** S < 1 sem., M 1
 1. **Agent post-RDV** (NX-229) — Aucun concurrent public ne produit L1–L9 depuis un dossier unique ; c’est la promesse « dans l’heure » qui fait signer.
 2. **Contrôle de cohérence inter-livrables** (NX-042) — Rend vérifiable ce que les autres génèrent : une surface, un prix, un DPE identiques partout.
 3. **Bascule de la pige téléphonique vers le courrier** (NX-114) — Transforme l’interdiction du 11/08/2026 en opportunité commerciale immédiate pour les agences.
-4. **Campagnes voisinage déclenchées par événement** (NX-111) — Le courrier licite devient le canal principal ; NXT l’automatise à partir des jalons réels.
+4. **Campagnes voisinage déclenchées par événement** (NX-111) — Le courrier licite devient le canal principal ; Jaspe l’automatise à partir des jalons réels.
 5. **Simulation de reclassement DPE 2026** (NX-005) — ~850 000 logements F/G peuvent gagner une classe : argument de RDV et de prospection unique.
-6. **Mode surcouche Hektor, Modelo, Apimo** (NX-264) — Lève le premier frein des réseaux (migration) et positionne NXT en couche neutre face aux bundles.
+6. **Mode surcouche Hektor, Modelo, Apimo** (NX-264) — Lève le premier frein des réseaux (migration) et positionne Jaspe en couche neutre face aux bundles.
 7. **L9 extraction des PV d’AG avec citation de page** (NX-040) — La preuve page par page crée la confiance du vendeur et du notaire, là où l’IA générique hallucine.
 8. **Audit « ventes manquées » à l’onboarding** (NX-116) — Démontre la valeur dès la première heure en chiffrant le manque à gagner caché du fichier.
 9. **Simulation vocale D4 liée au dossier** (NX-166) — Le coaching sur le vrai dossier du lendemain n’existe nulle part en France.
@@ -55,7 +55,7 @@ Conventions : **Phase** P0 pilote → P3 expansion · **Effort** S < 1 sem., M 1
 
 ### 1.3 Dix quick wins design
 
-1. **Palette de commandes ⌘K** (NX-334) — déjà maquettée : ajouter le mode « Demander à NXT » et les actions récentes.
+1. **Palette de commandes ⌘K** (NX-334) — déjà maquettée : ajouter le mode « Demander à Jaspe » et les actions récentes.
 2. **Annulation possible pendant 6 secondes** (NX-345) — toast avec compte à rebours sur toute action automatique ; rassure sur l’autonomie.
 3. **États vides qui proposent l’action suivante** (NX-344) — une phrase + un bouton par écran ; zéro écran mort pendant le pilote.
 4. **Respect de la préférence « réduire les animations »** (NX-342) — un `@media (prefers-reduced-motion)` global et une bascule dans Réglages.
@@ -317,7 +317,7 @@ Conventions : **Phase** P0 pilote → P3 expansion · **Effort** S < 1 sem., M 1
 | NX-198 | Valorisation des progrès plutôt que palmarès | Met en avant les progrès individuels au lieu d’un classement punitif. | P2 | S | 2 | ux | proposé |
 | NX-199 | Part de marché locale de l’agence | Part de l’agence dans les ventes DVF de chaque secteur. | P2 | M | 4 | data | proposé |
 | NX-200 | Délégation et intérim de direction | Un directeur absent délègue ses validations pour une période définie. | P1 | S | 3 | feature | proposé |
-| NX-201 | Déploiement par vagues avec agences témoins | Mesure l’effet réel de NXT entre agences pilotes et témoins. | P2 | M | 4 | data | proposé |
+| NX-201 | Déploiement par vagues avec agences témoins | Mesure l’effet réel de Jaspe entre agences pilotes et témoins. | P2 | M | 4 | data | proposé |
 | NX-202 | Alertes de dérive d’activité | Signale une baisse anormale d’activité ou de qualité sur 4 semaines. | P2 | S | 3 | automation | proposé |
 | NX-203 | Export financier pour la direction | Honoraires encaissés, prévisionnels et rétrocessions exportés. | P2 | M | 3 | data | proposé |
 
@@ -365,7 +365,7 @@ Conventions : **Phase** P0 pilote → P3 expansion · **Effort** S < 1 sem., M 1
 | NX-236 | Questions chiffrées sur ses propres données | « Combien de mandats exclusifs ce trimestre ? » est répondu avec le calcul visible. | P1 | M | 4 | feature | proposé |
 | NX-237 | Dictée mains libres en voiture | Le conseiller dicte son débrief en conduisant, sans regarder l’écran. | P1 | M | 4 | feature | maquette |
 | NX-238 | Distinction visuelle fait / suggestion IA | Les contenus générés restent marqués jusqu’à leur validation. | P0 | S | 5 | compliance | proposé |
-| NX-239 | Serveur MCP NXT | Le conseiller interroge ses dossiers depuis Claude ou ChatGPT, sous contrôle. | P2 | L | 4 | data | proposé |
+| NX-239 | Serveur MCP Jaspe | Le conseiller interroge ses dossiers depuis Claude ou ChatGPT, sous contrôle. | P2 | L | 4 | data | proposé |
 | NX-240 | Routage des modèles selon la tâche | Modèle rapide pour le tri, modèle expert pour l’estimation. | P1 | M | 3 | data | proposé |
 | NX-241 | Évaluation sur dossiers de référence | Chaque nouvelle version IA est testée sur 50 dossiers témoins avant déploiement. | P1 | M | 4 | data | proposé |
 | NX-242 | Aucun chiffre sans source calculée | Tout nombre d’un livrable provient d’un calcul déterministe tracé. | P0 | M | 5 | compliance | proposé |
@@ -400,7 +400,7 @@ Conventions : **Phase** P0 pilote → P3 expansion · **Effort** S < 1 sem., M 1
 
 | ID | Titre | Bénéfice | Phase | Effort | Impact | Type | Statut |
 |---|---|---|---|---|---|---|---|
-| NX-264 | Mode surcouche Hektor, Modelo, Apimo | NXT s’ajoute au CRM existant sans double saisie. | P0 | XL | 5 | data | proposé |
+| NX-264 | Mode surcouche Hektor, Modelo, Apimo | Jaspe s’ajoute au CRM existant sans double saisie. | P0 | XL | 5 | data | proposé |
 | NX-265 | Import CRM avec correspondance des champs | Migration assistée champ par champ avec rapport d’écarts. | P0 | L | 5 | data | proposé |
 | NX-266 | Synchronisation agenda Google et Outlook | Un RDV créé dans l’agenda déclenche automatiquement la préparation. | P0 | M | 5 | data | maquette |
 | NX-267 | Messagerie Gmail et Outlook reliée | Les mails clients sont rattachés au bon dossier automatiquement. | P1 | M | 4 | data | proposé |
@@ -413,7 +413,7 @@ Conventions : **Phase** P0 pilote → P3 expansion · **Effort** S < 1 sem., M 1
 | NX-274 | Connecteur téléphonie d’entreprise | Les appels sont journalisés au dossier, avec consentement. | P2 | M | 3 | data | proposé |
 | NX-275 | Connecteur logiciel comptable | Les factures d’honoraires partent vers la comptabilité sans ressaisie. | P2 | M | 3 | data | proposé |
 | NX-276 | Centre des connexions par agence | État, dernier succès et erreurs de chaque intégration. | P1 | S | 4 | data | maquette |
-| NX-277 | Journal des conflits de synchronisation | Montre les écarts entre NXT et le CRM et qui doit trancher. | P1 | M | 4 | data | proposé |
+| NX-277 | Journal des conflits de synchronisation | Montre les écarts entre Jaspe et le CRM et qui doit trancher. | P1 | M | 4 | data | proposé |
 | NX-278 | Export complet en formats ouverts | L’agence récupère toutes ses données à tout moment. | P0 | S | 4 | data | proposé |
 | NX-279 | Dictionnaire métier partagé | Une seule définition de « mandat actif » pour tout le réseau. | P1 | S | 3 | data | proposé |
 | NX-280 | Annonces concurrentes du secteur | Les biens en vente ailleurs alimentent l’analyse de positionnement. | P2 | M | 4 | data | proposé |
@@ -535,7 +535,7 @@ Conventions : **Phase** P0 pilote → P3 expansion · **Effort** S < 1 sem., M 1
 | NX-371 | Présence aux salons et fédérations | Visibilité auprès des réseaux au moment du choix des outils. | P2 | S | 3 | growth | proposé |
 | NX-372 | Score de santé client anti-résiliation | Détecte une agence qui décroche avant qu’elle ne résilie. | P2 | M | 4 | growth | proposé |
 | NX-373 | Prix annoncé avant chaque génération payante | La confiance naît d’un coût connu à l’avance. | P1 | S | 3 | growth | proposé |
-| NX-374 | Rapport de valeur trimestriel à l’agence | Temps gagné, mandats signés et livrables produits grâce à NXT. | P1 | S | 4 | growth | proposé |
+| NX-374 | Rapport de valeur trimestriel à l’agence | Temps gagné, mandats signés et livrables produits grâce à Jaspe. | P1 | S | 4 | growth | proposé |
 
 ### Sécurité (12)
 

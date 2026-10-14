@@ -118,7 +118,7 @@ export function DelivSection({ code, ctx, gate, beforeValidate, children, aside 
                 <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.04] px-2 py-0.5 text-[10.5px] text-mist ring-1 ring-white/[0.07]">{ext ? <Globe size={11} /> : <LockSimple size={11} />}{ext ? `Externe · ${META[code].audience}` : 'Interne'}</span>
               </span>
               <span className="mt-1.5 block text-[12px] text-mist">
-                {doc ? <>Version <span className="num text-bone/80">{doc.version}</span> · {doc.edited ? 'modifiée' : 'préparée'} le {dt(doc.editedAt ?? doc.createdAt)} · <span className="num">{doc.sources?.length ?? 0}</span> source{(doc.sources?.length ?? 0) > 1 ? 's' : ''}{doc.validatedAt && <> · validée le {dt(doc.validatedAt)}</>}</> : state === 'done' ? 'Validé avant NXT — aucun aperçu conservé' : `Entrées : ${META[code].inputs}`}
+                {doc ? <>Version <span className="num text-bone/80">{doc.version}</span> · {doc.edited ? 'modifiée' : 'préparée'} le {dt(doc.editedAt ?? doc.createdAt)} · <span className="num">{doc.sources?.length ?? 0}</span> source{(doc.sources?.length ?? 0) > 1 ? 's' : ''}{doc.validatedAt && <> · validée le {dt(doc.validatedAt)}</>}</> : state === 'done' ? 'Validé avant Jaspe — aucun aperçu conservé' : `Entrées : ${META[code].inputs}`}
               </span>
             </span>
             <CaretDown size={16} className={clsx('mt-2 shrink-0 text-mist transition-transform duration-500 ease-silk group-hover:text-bone', open && 'rotate-180')} />
@@ -142,7 +142,7 @@ export function DelivSection({ code, ctx, gate, beforeValidate, children, aside 
                 {!doc && state !== 'running' && (
                   <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center md:p-10">
                     <Sparkle size={22} className="mx-auto text-champagne" />
-                    <p className="mx-auto mt-3 max-w-md text-[13.5px] text-bone/60">{state === 'done' ? 'Ce livrable a été validé avant l’arrivée du dossier dans NXT. Générer un aperçu crée une nouvelle version, à revalider.' : `Le copilote prépare ce livrable à partir de : ${META[code].inputs.toLowerCase()}. Chaque chiffre sera sourcé et daté.`}</p>
+                    <p className="mx-auto mt-3 max-w-md text-[13.5px] text-bone/60">{state === 'done' ? 'Ce livrable a été validé avant l’arrivée du dossier dans Jaspe. Générer un aperçu crée une nouvelle version, à revalider.' : `Le copilote prépare ce livrable à partir de : ${META[code].inputs.toLowerCase()}. Chaque chiffre sera sourcé et daté.`}</p>
                     <div className="mt-5"><SoftBtn tone="gold" icon={<Sparkle size={13} weight="fill" />} onClick={generate} disabled={!!busy}>{busy === 'gen' ? 'Génération…' : state === 'done' ? 'Générer un aperçu' : 'Générer maintenant'}</SoftBtn></div>
                   </div>
                 )}

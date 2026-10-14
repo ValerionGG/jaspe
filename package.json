@@ -1,5 +1,5 @@
 {
-  "name": "nxt-agent",
+  "name": "jaspe",
   "private": true,
   "scripts": {
     "install:all": "npm --prefix server install && npm --prefix app install",

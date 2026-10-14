@@ -1,4 +1,4 @@
-// Serveur NXT Agent : API REST + actions métier + flux SSE + fichiers + application compilée.
+// Serveur Jaspe : API REST + actions métier + flux SSE + fichiers + application compilée.
 import { createServer } from 'node:http'
 import { readFile, writeFile, stat, mkdir } from 'node:fs/promises'
 import { join, extname, normalize, dirname } from 'node:path'
@@ -15,7 +15,7 @@ const FILES = join(here, 'data', 'files')
 const MAX_BODY = 12 * 1024 * 1024
 const TICK_MS = Number(process.env.NXT_TICK_MS ?? 60_000)
 
-export function createApp({ dbPath = join(here, 'data', 'nxt.sqlite'), filesDir = FILES, delay } = {}) {
+export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDir = FILES, delay } = {}) {
   const db = openDb(dbPath)
   const clients = new Set()
   const emit = (col, id, op = 'put') => { const msg = `data: ${JSON.stringify({ col, id, op })}\n\n`; for (const c of clients) c.write(msg) }
@@ -121,7 +121,7 @@ export function createApp({ dbPath = join(here, 'data', 'nxt.sqlite'), filesDir 
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === normalize(process.argv[1])) {
   const { server, engine, copilot } = createApp()
-  server.listen(PORT, '127.0.0.1', () => console.log(`NXT Agent — API sur http://127.0.0.1:${PORT} · copilote : ${copilot.mode}`))
+  server.listen(PORT, '127.0.0.1', () => console.log(`Jaspe — API sur http://127.0.0.1:${PORT} · copilote : ${copilot.mode}`))
   setTimeout(() => engine.tick(), 5000)
   setInterval(() => engine.tick(), TICK_MS)
 }

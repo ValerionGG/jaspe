@@ -45,7 +45,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
           <div className="flex h-16 items-center justify-between border-b border-white/[0.06] px-5">
             <div className="flex items-center gap-3">
               <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-champagne to-champagne-700 text-ink"><Sparkle size={16} weight="fill" /><span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-sage ring-2 ring-ink-850" /></span>
-              <div><div className="text-[14px] font-medium">Copilote NXT</div><div className="text-[11px] text-mist">Lit vos données en direct · n’envoie rien sans vous</div></div>
+              <div><div className="text-[14px] font-medium">Copilote Jaspe</div><div className="text-[11px] text-mist">Lit vos données en direct · n’envoie rien sans vous</div></div>
             </div>
             <button onClick={onClose} aria-label="Fermer" className="flex h-8 w-8 items-center justify-center rounded-full text-mist hover:bg-white/[0.06] hover:text-bone"><X size={16} /></button>
           </div>
