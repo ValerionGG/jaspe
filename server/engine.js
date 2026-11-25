@@ -46,7 +46,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
     doc.checks = issues
     put('documents', doc)
     // Temps gagné : une nouvelle version repart de la référence manuelle, sauf régénération d’un document déjà corrigé.
-    if (!prev) assist.logTime({ kind: code, dossierId, ref: `doc-${dossierId}-${code}` })
+    if (!prev) assist.logTime({ kind: code, dossierId, ref: `doc-${dossierId}-${code}`, pending: true })
     setDeliv(dossierId, code, issues.length ? 'blocked' : code === 'L9' && doc.items?.some((i) => i.state === 'missing') ? 'blocked' : 'review')
     enqueueReview(doc, c.dossier)
     if (!quiet) activity('Copilote', `a préparé ${code} · ${NAMES[code]} pour ${c.dossier.seller}`, 'ai', `/app/dossiers/${dossierId}`)
@@ -76,7 +76,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
     'deliverable.generateAll': ({ dossierId, codes }) => generateAll(dossierId, codes),
     'deliverable.validate': ({ dossierId, code, by = 'Claire Delmas', reviewSec }) => {
       const c = ctx(dossierId)
-      assist.addSpent(`doc-${dossierId}-${code}`, reviewSec ? Math.round(reviewSec / 6) / 10 : REVIEW_MIN)
+      assist.addSpent(`doc-${dossierId}-${code}`, reviewSec ? Math.round(reviewSec / 6) / 10 : REVIEW_MIN, false, { settle: true })
       const doc = db.get('documents', `${dossierId}-${code}`)
       if (doc) patch('documents', doc.id, { status: 'validated', validatedAt: new Date().toISOString(), validatedBy: by })
       setDeliv(dossierId, code, 'done')

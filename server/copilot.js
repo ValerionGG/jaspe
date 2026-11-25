@@ -54,8 +54,8 @@ export function createCopilot(db) {
       if (!client) return { ...rules(db, question), mode: 'rules' }
       try {
         const res = await client.beta.messages.create({
-          model: 'claude-opus-5-5',
-          max_tokens: 16000,
+          model: process.env.JASPE_COPILOT_MODEL ?? 'claude-sonnet-5-5', // Opus réservé aux audits : à 9,90 €/mois, la marge l’exige
+          max_tokens: Number(process.env.JASPE_COPILOT_MAX_TOKENS ?? 4000),
           betas: ['server-side-fallback-2026-07-01'],
           fallbacks: 'default',
           output_config: { effort: 'low' },

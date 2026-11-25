@@ -149,3 +149,34 @@ test('brief → plan → actions, temps gagné corrections comprises, conformit�
   const runs = await engine.tick(['AUT-121', 'AUT-122'], true)
   assert.ok(runs.every((r) => r.status !== 'fail'), JSON.stringify(runs))
 })
+
+test('panel clients : portugais, offre, signaux LCB-FT, dates locales, faux positifs, gain non relu', async () => {
+  const { planFromBrief, parseDue } = await import('./assist.js')
+  // Mercredi 25/11/2026 à 23:50 heure locale : « vendredi » doit rester vendredi 27.
+  const late = new Date(2026, 10, 25, 23, 50)
+  assert.equal(parseDue('je rappelle vendredi', late), '2026-11-27')
+  assert.equal(parseDue('ce soir', late), '2026-11-25')
+  assert.equal(parseDue('ligar na sexta-feira', late), '2026-11-27')
+  assert.equal(parseDue('amanhã', late), '2026-11-26')
+
+  const pt = planFromBrief('Ligar ao vendedor na sexta-feira depois do certificado energético. O comprador fez uma proposta de 1,65 milhões até sexta. Os fundos vêm de Angola, pagamento parcial em numerário.', late)
+  const t = pt.map((i) => i.type)
+  assert.ok(t.includes('relance'), 'relance en portugais')
+  assert.ok(pt.some((i) => i.type === 'tache' && /offre de 1,65 milh/.test(i.label)), 'offre détectée avec montant')
+  assert.ok(t.includes('conformite'), 'numerário / Angola → vigilance BCFT')
+
+  const fr = planFromBrief('Bel appartement de 4 pièces. L’acquéreur paiera une partie en espèces via une société aux BVI.', late)
+  assert.ok(!fr.some((i) => i.code === 'L9'), '« 4 pièces » ne déclenche pas L9')
+  assert.ok(fr.some((i) => i.type === 'conformite'), 'espèces / BVI → vigilance LCB-FT')
+
+  // Un brouillon généré ne compte aucun gain tant qu’il n’est pas relu et validé.
+  const { db, engine } = createApp({ dbPath: ':memory:', delay: now })
+  db.put('properties', { id: 'p1', title: 'Villa', type: 'Villa', city: 'Antibes', surface: 200, price: 3e6, dpe: 'C' })
+  db.put('dossiers', { id: 'd1', seller: 'Famille Test', propertyId: 'p1', agentId: 'a1', stage: 'post', deliverables: {} })
+  await engine.actions['deliverable.generate']({ dossierId: 'd1', code: 'L7' })
+  let e = db.list('timelog').find((x) => x.ref === 'doc-d1-L7')
+  assert.equal(e.net, 0); assert.equal(e.pending, true)
+  engine.actions['deliverable.validate']({ dossierId: 'd1', code: 'L7' })
+  e = db.list('timelog').find((x) => x.ref === 'doc-d1-L7')
+  assert.equal(e.pending, false); assert.equal(e.net, 42)
+})

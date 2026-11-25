@@ -61,48 +61,60 @@ const PHASE_STAGE = {
 /** Un point devient exigible quand le dossier atteint sa phase. */
 export const isDue = (item, stage) => STAGE_ORDER.indexOf(stage) >= STAGE_ORDER.indexOf(PHASE_STAGE[item.phase] ?? 'prep')
 
-/* ——— Brief libre → plan d'action ——— */
-const DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
+/* ——— Brief libre → plan d'action (français et portugais) ——— */
+const DAYS = [['dimanche', 'domingo'], ['lundi', 'segunda'], ['mardi', 'terça', 'terca'], ['mercredi', 'quarta'], ['jeudi', 'quinta'], ['vendredi', 'sexta'], ['samedi', 'sábado', 'sabado']]
 const DOC_RULES = [
-  [/estimation|avis de valeur|prix de vente/i, 'L7'], [/compte[- ]rendu|remerci/i, 'L1'], [/s[ée]lection|acqu[ée]reurs? (?:potentiels|compatibles)|avant-premi/i, 'L3'],
-  [/voisin/i, 'L5'], [/r[ée]seaux sociaux|instagram|facebook|linkedin/i, 'L4'], [/diagnostic|copro|pi[èe]ces/i, 'L9'], [/book|pr[ée]sentation agence/i, 'L6'],
+  [/estimation|avis de valeur|prix de vente|avalia[çc][ãa]o|estudo de mercado/i, 'L7'], [/compte[- ]rendu|remerci|relat[óo]rio|agradec/i, 'L1'], [/s[ée]lection|acqu[ée]reurs? (?:potentiels|compatibles)|avant-premi|sele[çc][ãa]o de (?:im[óo]veis|compradores)/i, 'L3'],
+  [/voisin|vizinh/i, 'L5'], [/r[ée]seaux sociaux|redes sociais|instagram|facebook|linkedin/i, 'L4'],
+  // « 4 pièces » décrit un bien : seules les pièces à obtenir déclenchent L9.
+  [/diagnostic|copro|condom[íi]nio|pi[èe]ces (?:manquantes|à demander|a demander|justificatives|du dossier)|documentos? em falta|certificado energ/i, 'L9'], [/book|pr[ée]sentation agence|apresenta[çc][ãa]o da ag[êe]ncia/i, 'L6'],
 ]
-const ymd = (d) => d.toISOString().slice(0, 10)
-/** Date d'échéance tirée d'une phrase (« vendredi », « demain », « dans 3 jours », « J+7 », « semaine prochaine »). */
+/** Date locale AAAA-MM-JJ (pas d’UTC : près de minuit, toISOString décalait d’un jour). */
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+/** Date d'échéance tirée d'une phrase (« vendredi », « demain », « dans 3 jours », « J+7 », « sexta-feira », « amanhã »…). */
 export function parseDue(text, now = new Date()) {
   const t = text.toLowerCase()
-  const d = new Date(now)
-  const j = t.match(/j\s*\+\s*(\d+)/) ?? t.match(/dans (\d+) jours?/)
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12)
+  const j = t.match(/j\s*\+\s*(\d+)/) ?? t.match(/dans (\d+) jours?/) ?? t.match(/(?:daqui a|em) (\d+) dias?/)
   if (j) { d.setDate(d.getDate() + Number(j[1])); return ymd(d) }
-  if (/apr[èe]s-demain/.test(t)) { d.setDate(d.getDate() + 2); return ymd(d) }
-  if (/demain/.test(t)) { d.setDate(d.getDate() + 1); return ymd(d) }
-  if (/semaine prochaine/.test(t)) { d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); return ymd(d) }
-  if (/aujourd|ce soir|tout de suite/.test(t)) return ymd(d)
-  const day = DAYS.findIndex((x) => new RegExp(`\\b${x}\\b`).test(t))
+  if (/apr[èe]s-demain|depois de amanh[ãa]/.test(t)) { d.setDate(d.getDate() + 2); return ymd(d) }
+  if (/demain|amanh[ãa]/.test(t)) { d.setDate(d.getDate() + 1); return ymd(d) }
+  if (/semaine prochaine|pr[óo]xima semana/.test(t)) { d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); return ymd(d) }
+  if (/aujourd|ce soir|tout de suite|hoje|esta noite/.test(t)) return ymd(d)
+  const day = DAYS.findIndex((alts) => new RegExp(`(?:^|[^a-zà-ÿ])(?:${alts.join('|')})(?:-feira)?(?![a-zà-ÿ])`).test(t))
   if (day >= 0) { d.setDate(d.getDate() + (((day - d.getDay()) + 7) % 7 || 7)); return ymd(d) }
   return null
 }
 const sentences = (text) => String(text).split(/(?<=[.!?;\n])\s+|\n+/).map((s) => s.trim()).filter(Boolean)
-const who = (s) => (/notaire/i.test(s) ? 'notaire' : /acqu[ée]reur|acheteur/i.test(s) ? 'acquéreur' : /syndic/i.test(s) ? 'syndic' : 'vendeur')
+const who = (s) => (/notaire|not[áa]rio/i.test(s) ? 'notaire' : /acqu[ée]reur|acheteur|comprador/i.test(s) ? 'acquéreur' : /syndic|administra[çc][ãa]o do condom/i.test(s) ? 'syndic' : 'vendeur')
+const amount = (s) => s.match(/\d[\d\s.,]*\s*(?:k€|m€|millions?|milh[õo]es|mil|€|euros?)/i)?.[0]
+/** Signaux de vigilance anti-blanchiment (LCB-FT / BCFT) : un indice suffit à proposer le contrôle, le conseiller décide. */
+const AML = /esp[èe]ces|\bcash\b|numer[áa]rio|dinheiro vivo|offshore|\bbvi\b|[îi]les vierges|panama|soci[ée]t[ée] [ée]cran|sociedade[- ]ecr[ãa]|pr[êe]te-nom|pay[ée] par un tiers|crypto|bitcoin|angola|pays (?:tiers|[àa] risque)|pa[íi]s de risco|origine des fonds|origem dos fundos|blanchiment|branqueamento|\blcb|tracfin|\baml\b|\bkyc\b|\bbcft\b|identit[ée]|identifica[çc][ãa]o|\bpep\b|politiquement expos|politicamente expost/i
 
-/** Lit un brief ou un débrief libre et propose des actions, chacune expliquée par la phrase qui l'a déclenchée. Rien n'est exécuté ici. */
+/** Lit un brief ou un débrief libre (FR ou PT) et propose des actions, chacune expliquée par la phrase qui l'a déclenchée. Rien n'est exécuté ici. */
 export function planFromBrief(text, now = new Date()) {
   const items = []
   const add = (it) => items.push({ id: `pl${items.length + 1}`, selected: true, ...it })
+  const later = (n) => ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + n, 12))
   for (const s of sentences(text)) {
     const due = parseDue(s, now)
-    if (/rappel|relanc|recontact|appeler|t[ée]l[ée]phoner|revenir vers/i.test(s)) {
-      const cond = s.match(/apr[èe]s (?:le |la |l’|l'|les )?([^,.]+)/i)?.[1]
-      add({ type: 'relance', label: `Relancer le ${who(s)}${cond ? ` après ${cond.trim()}` : ''}`, due: due ?? ymd(new Date(now.getTime() + 2 * 864e5)), source: s })
+    const offer = /\boffre|contre-offre|proposta|contraproposta|\boferta/i.test(s)
+    if (/rappel|relanc|recontact|appeler|t[ée]l[ée]phoner|revenir vers|ligar|telefonar|contactar|voltar a falar/i.test(s)) {
+      const cond = s.match(/(?:apr[èe]s|depois d[oa]s?) (?:le |la |l’|l'|les )?([^,.]+)/i)?.[1]
+      add({ type: 'relance', label: `Relancer le ${who(s)}${cond ? ` après ${cond.trim()}` : ''}`, due: due ?? later(2), source: s })
     }
-    for (const [re, code] of DOC_RULES) if (re.test(s) && /pr[ée]par|envoy|r[ée]dig|faire|refaire|mettre [àa] jour|transmettre|demander|monter/i.test(s) && !items.some((x) => x.code === code)) {
+    if (offer) {
+      const a = amount(s)
+      add({ type: 'tache', label: `Traiter l’offre${a ? ` de ${a.trim()}` : ''} : résumer prix, conditions et échéance, préparer la réponse au vendeur`, due: due ?? later(1), source: s })
+    }
+    for (const [re, code] of DOC_RULES) if (re.test(s) && /pr[ée]par|envoy|r[ée]dig|faire|refaire|mettre [àa] jour|transmettre|demander|monter|preparar|enviar|fazer|pedir|atualizar/i.test(s) && !items.some((x) => x.code === code)) {
       add({ type: 'document', code, label: `Préparer : ${KIND_LABELS[code]}`, due, source: s })
     }
-    if (/veille|surveill|comparable|baisse de prix|concurren|march[ée]/i.test(s)) add({ type: 'veille', label: 'Activer la veille comparables et baisses de prix', source: s })
-    if (/(prix|montant|surface|date).{0,25}(confirmer|v[ée]rifier|valider)|(confirmer|v[ée]rifier).{0,25}(prix|montant|surface)/i.test(s)) add({ type: 'point', label: `Point ouvert : ${s.replace(/\s+/g, ' ').slice(0, 120)}`, source: s })
-    if (/factur|commission|honoraires? (?:à|a) encaisser/i.test(s)) add({ type: 'facture', label: 'Préparer la facture de commission', source: s })
-    if (/identit[ée]|origine des fonds|blanchiment|lcb|tracfin|aml|kyc/i.test(s)) add({ type: 'conformite', label: 'Compléter les contrôles d’identité et d’origine des fonds', source: s })
-    if (/visite|rendez-vous|rdv/i.test(s) && due && !/rappel|relanc/i.test(s)) add({ type: 'tache', label: `Organiser : ${s.replace(/\s+/g, ' ').slice(0, 90)}`, due, source: s })
+    if (/veille|surveill|comparable|baisse de prix|concurren|march[ée]|compar[áa]veis|baixa de pre[çc]o|acompanhar o mercado/i.test(s)) add({ type: 'veille', label: 'Activer la veille comparables et baisses de prix', source: s })
+    if (/(prix|montant|surface|date|pre[çc]o|valor|área).{0,25}(confirmer|v[ée]rifier|valider|confirmar|validar)|(confirmer|v[ée]rifier|confirmar).{0,25}(prix|montant|surface|pre[çc]o|valor)/i.test(s)) add({ type: 'point', label: `Point ouvert : ${s.replace(/\s+/g, ' ').slice(0, 120)}`, source: s })
+    if (/factur|commission|honoraires? (?:à|a) encaisser|fatura|comiss[ãa]o/i.test(s)) add({ type: 'facture', label: 'Préparer la facture de commission', source: s })
+    if (AML.test(s) && !items.some((x) => x.type === 'conformite')) add({ type: 'conformite', label: 'Vigilance LCB-FT : vérifier identité, bénéficiaire effectif et origine des fonds, consigner l’analyse de risque', source: s })
+    if (/visite|rendez-vous|\brdv|visita|reuni[ãa]o|contre-visite/i.test(s) && due && !/rappel|relanc|ligar|telefonar/i.test(s) && !offer) add({ type: 'tache', label: `Organiser : ${s.replace(/\s+/g, ' ').slice(0, 90)}`, due, source: s })
   }
   return items
 }
@@ -116,16 +128,18 @@ export function createAssist(db, { put, patch, activity, notify, run, generate, 
   const baselines = () => ({ ...BASELINES, ...(db.get('settings', 'time-baselines')?.values ?? {}) })
 
   /** Consigne un gain de temps : référence manuelle − temps réellement passé (relecture, corrections). */
-  const logTime = ({ kind, dossierId, ref, spent = 0, label, demo }) => {
+  const logTime = ({ kind, dossierId, ref, spent = 0, label, demo, pending = false }) => {
     const baseline = baselines()[kind] ?? 5
-    return put('timelog', { at: new Date().toISOString(), kind, label: label ?? KIND_LABELS[kind] ?? kind, dossierId, ref, baseline, spent, net: Math.max(0, baseline - spent), corrections: 0, demo }, { front: true })
+    // `pending` : brouillon pas encore relu, le gain n’est compté qu’à la validation (relecture comprise).
+    return put('timelog', { at: new Date().toISOString(), kind, label: label ?? KIND_LABELS[kind] ?? kind, dossierId, ref, baseline, spent, net: pending ? 0 : Math.max(0, baseline - spent), corrections: 0, demo, pending }, { front: true })
   }
   /** Ajoute du temps passé à la dernière entrée du même livrable (relecture, correction) : le gain net baisse. */
-  const addSpent = (ref, minutes, correction = false) => {
+  const addSpent = (ref, minutes, correction = false, { settle = false } = {}) => {
     const e = db.list('timelog').find((x) => x.ref === ref)
     if (!e) return null
     const spent = Math.round((e.spent + minutes) * 10) / 10
-    return patch('timelog', e.id, { spent, net: Math.max(0, e.baseline - spent), corrections: e.corrections + (correction ? 1 : 0) })
+    const pending = !!e.pending && !settle
+    return patch('timelog', e.id, { spent, net: pending ? 0 : Math.max(0, e.baseline - spent), corrections: e.corrections + (correction ? 1 : 0), pending })
   }
 
   /* ——— Conformité ——— */
@@ -232,7 +246,7 @@ export function createAssist(db, { put, patch, activity, notify, run, generate, 
           ? ['Documento de preparação : a fatura legal deve ser emitida num programa de faturação certificado pela AT (ATCUD e código QR).', `IVA à taxa normal de ${rate * 100} %.`]
           : ['Honoraires dus au titre du mandat, exigibles à la réalisation de la vente (loi Hoguet, art. 6).', `TVA ${rate * 100} % sur les encaissements.`, 'Facturation électronique : réception obligatoire depuis le 1er septembre 2026, émission obligatoire pour les TPE-PME au 1er septembre 2027.'],
       }, { front: true })
-      logTime({ kind: 'facture', dossierId: tx.dossier, ref: `inv-${inv.id}`, spent: REVIEW_MIN })
+      logTime({ kind: 'facture', dossierId: tx.dossier, ref: `inv-${inv.id}`, pending: true })
       activity('Copilote', `a préparé la facture de commission — ${tx.seller} → ${tx.buyer}`, 'ai', '/app/factures')
       return inv
     },
@@ -250,6 +264,7 @@ export function createAssist(db, { put, patch, activity, notify, run, generate, 
       if (!inv) throw new HttpError(404, 'Facture introuvable')
       if (inv.status !== 'brouillon') return inv
       const number = nextNumber()
+      addSpent(`inv-${id}`, REVIEW_MIN, false, { settle: true })
       activity('Claire Delmas', `a validé la facture ${number} (${inv.ttc.toLocaleString('fr-FR')} € TTC)`, 'win', '/app/factures')
       return patch('invoices', id, { number, status: 'validée', validatedAt: new Date().toISOString() })
     },
