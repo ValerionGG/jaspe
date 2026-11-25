@@ -4,7 +4,7 @@ import { useEffect, useState, lazy, Suspense, type ComponentType } from 'react'
 import clsx from 'clsx'
 import {
   House, Sparkle, CalendarBlank, CheckSquare, Kanban, Buildings, UsersThree, AddressBook, Handshake, PenNib, ChartLineUp, MapTrifold,
-  ChartBar, Lightning, Target, GearSix, MagnifyingGlass, CaretUpDown, SidebarSimple, ArrowLeft, Lightbulb, BookOpenText, ChatsCircle, GraduationCap,
+  ChartBar, Lightning, Target, GearSix, MagnifyingGlass, CaretUpDown, SidebarSimple, ArrowLeft, Lightbulb, BookOpenText, ChatsCircle, GraduationCap, Timer, Scales, Receipt,
 } from '@phosphor-icons/react'
 import { Logo } from '../landing/chrome'
 import { Avatar, EXPO } from '../ui/kit'
@@ -17,6 +17,8 @@ import { Bootstrap, ApiStatus, NotificationsMenu } from './Notifications'
 import { Toaster } from './forms'
 import { TourHost } from './tour/Tour'
 import { useConversations, useQueue, useDossiers } from '../data/collections'
+import { BriefComposer, openBrief } from './BriefComposer'
+import { FeedbackButton } from './Feedback'
 
 const page = (f: () => Promise<{ default: ComponentType }>) => lazy(f)
 const P = {
@@ -40,6 +42,9 @@ const P = {
   etude: page(() => import('./pages/Etude')),
   messages: page(() => import('./pages/Messages')),
   aide: page(() => import('./pages/Aide')),
+  temps: page(() => import('./pages/TempsGagne')),
+  conformite: page(() => import('./pages/Conformite')),
+  factures: page(() => import('./pages/Factures')),
 }
 
 export const NAV = [
@@ -55,6 +60,8 @@ export const NAV = [
     { to: 'acquereurs', label: 'Acquéreurs', icon: UsersThree },
     { to: 'contacts', label: 'Contacts', icon: AddressBook },
     { to: 'transactions', label: 'Transactions', icon: Handshake },
+    { to: 'factures', label: 'Factures & commissions', icon: Receipt },
+    { to: 'conformite', label: 'Conformité & veille légale', icon: Scales },
   ] },
   { group: 'Production', items: [
     { to: 'studio', label: 'Studio livrables', icon: PenNib },
@@ -62,6 +69,7 @@ export const NAV = [
     { to: 'prospection', label: 'Prospection', icon: MapTrifold },
   ] },
   { group: 'Pilotage', items: [
+    { to: 'temps', label: 'Temps gagné', icon: Timer },
     { to: 'pilotage', label: 'Agence & réseau', icon: ChartBar },
     { to: 'automatisations', label: 'Automatisations', icon: Lightning },
     { to: 'coaching', label: 'Coaching', icon: Target },
@@ -72,7 +80,7 @@ export const NAV = [
 ]
 
 /** Mode simple : navigation réduite à l’essentiel du conseiller (mémorisé localement). */
-const SIMPLE = new Set(['', 'messages', 'agenda', 'taches', 'dossiers', 'biens', 'acquereurs', 'studio', 'aide'])
+const SIMPLE = new Set(['', 'messages', 'agenda', 'taches', 'dossiers', 'biens', 'acquereurs', 'studio', 'aide', 'temps', 'conformite', 'factures'])
 /** Édition Essentiel : CRM épuré pour conseiller indépendant (activée par /essentiel/app). */
 export const isEssentiel = () => { try { return localStorage.getItem('nxt-edition') === 'essentiel' } catch { return false } }
 export const setEdition = (e: 'essentiel' | 'complet') => { try { localStorage.setItem('nxt-edition', e) } catch { /* indisponible */ } }
@@ -171,8 +179,12 @@ function Topbar({ onSearch, onCopilot, copilot }: { onSearch: () => void; onCopi
         <MagnifyingGlass size={14} /><span className="hidden md:inline">Biens, contacts, dossiers, actions…</span><kbd className="num ml-auto hidden rounded bg-white/[0.06] px-1.5 text-[10px] md:inline">⌘K</kbd>
       </button>
       <ApiStatus />
+      <FeedbackButton />
       <ThemeToggle />
       <NotificationsMenu />
+      <button onClick={openBrief} className="hidden items-center gap-2 rounded-full bg-white/[0.04] px-3.5 py-1.5 text-[13px] ring-1 ring-white/10 transition hover:bg-white/[0.08] sm:flex" title="Dicter ou écrire un brief : l’assistant propose relances, documents, veille">
+        <Lightning size={14} className="text-champagne-300" />Brief
+      </button>
       <button onClick={onCopilot} data-tour="copilot" className={clsx('group flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-[13px] ring-1 transition-all duration-500 ease-silk', copilot ? 'bg-champagne text-ink ring-champagne' : 'bg-white/[0.04] ring-white/10 hover:bg-white/[0.08]')}>
         <span className={clsx('flex h-6 w-6 items-center justify-center rounded-full', copilot ? 'bg-ink/10' : 'bg-champagne/20 text-champagne-300')}><Sparkle size={13} weight="fill" /></span>Copilote
       </button>
@@ -237,6 +249,9 @@ export default function CrmApp() {
                   <Route path="etude" element={<P.etude />} />
                   <Route path="messages" element={<P.messages />} />
                   <Route path="aide" element={<P.aide />} />
+                  <Route path="temps" element={<P.temps />} />
+                  <Route path="conformite" element={<P.conformite />} />
+                  <Route path="factures" element={<P.factures />} />
                 </Routes>
               </motion.div>
             </AnimatePresence>
@@ -245,6 +260,7 @@ export default function CrmApp() {
       </div>
       <Bootstrap />
       <TourHost />
+      <BriefComposer />
       <Toaster />
       <MobileNav />
       <CommandPalette open={palette} onClose={() => setPalette(false)} onCopilot={() => { setPalette(false); setCopilot(true) }} />

@@ -6,7 +6,8 @@ import { Card, Stat, Stagger, SoftBtn, DELIV_TONE } from '../ui'
 import { Avatar, Ring, Spark, EXPO } from '../../ui/kit'
 import { prop, me, eur } from '../../data/mock'
 import { NOW } from '../../data/ops'
-import { useTasks, useActivity, useDossiers, useEvents, useQueue, useReminders, useConversations } from '../../data/collections'
+import { useTasks, useActivity, useDossiers, useEvents, useQueue, useReminders, useConversations, useTimelog } from '../../data/collections'
+import { openBrief } from '../BriefComposer'
 import { action, useCollection } from '../../data/store'
 import { startTour, type TutDoc } from '../tour/tours'
 import { CH, rel, until } from '../messages/shared'
@@ -24,6 +25,9 @@ export default function Today() {
   const [reminders] = useReminders()
   const [convs] = useConversations()
   const [tuts] = useCollection<TutDoc>('tutorials')
+  const [timelog] = useTimelog()
+  const week = timelog.filter((e) => Date.now() - Date.parse(e.at) < 7 * 864e5)
+  const weekNet = week.reduce((n, e) => n + e.net, 0), weekCorr = week.filter((e) => e.corrections > 0).length
   const todayStr = new Date().toDateString()
   const remToday = reminders.filter((r) => r.status === 'programmé' && new Date(r.dueAt).toDateString() === todayStr).sort((a, b) => a.dueAt.localeCompare(b.dueAt))
   const unread = convs.filter((c) => c.unread > 0 && c.status !== 'done').sort((a, b) => b.lastAt.localeCompare(a.lastAt))
@@ -43,7 +47,7 @@ export default function Today() {
   return (
     <div className="space-y-6">
       {/* Salut + brief */}
-      <div className="grid gap-6 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
         <Stagger className="lg:col-span-7">
           <div className="text-[11px] uppercase tracking-eyebrow text-mist">{dateLabel} · {NOW.label} · Antibes 19°</div>
           <h1 className="display mt-2 text-5xl md:text-6xl">Bonjour {me.name.split(' ')[0]}<span className="text-champagne">.</span></h1>
@@ -60,6 +64,7 @@ export default function Today() {
               <div className="mt-5 flex flex-wrap gap-2">
                 <Link to="/app/studio"><SoftBtn tone="gold" icon={<CheckCircle size={14} />}>Tout valider dans l’ordre</SoftBtn></Link>
                 <Link to="/app/dossiers/d5"><SoftBtn icon={<FileText size={14} />}>Ouvrir le brief de 11 h</SoftBtn></Link>
+                <SoftBtn icon={<Lightning size={14} />} onClick={openBrief}>Dicter un brief</SoftBtn>
               </div>
             </div>
           </div>
@@ -70,6 +75,14 @@ export default function Today() {
               <SoftBtn icon={<ArrowRight size={14} />} onClick={() => startTour('onboarding')}>Lancer la visite</SoftBtn>
             </div>
           )}
+          <Link to="/app/temps" className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-sage/[0.07] p-3 pr-4 ring-1 ring-sage/20 transition hover:bg-sage/[0.1]">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage/15 text-sage"><Clock size={17} weight="light" /></span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-medium"><span className="num">{Math.floor(weekNet / 60)} h {String(Math.round(weekNet % 60)).padStart(2, '0')}</span> gagnées sur 7 jours, corrections comprises</div>
+              <div className="text-[11.5px] text-bone/55">{week.length} travaux préparés par l’assistant · {weekCorr} corrigé{weekCorr > 1 ? 's' : ''} · détail et méthode</div>
+            </div>
+            <ArrowRight size={14} className="text-mist" />
+          </Link>
         </Stagger>
         <Stagger i={1} className="grid min-w-0 grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:col-span-5">
           <Stat label="CA signé · octobre" value="168 k€" delta="+22 %" hint="Objectif 240 k€"><Ring value={70} size={46}><span className="num text-[10px]">70%</span></Ring></Stat>
@@ -79,7 +92,7 @@ export default function Today() {
         </Stagger>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
         {/* Agenda timeline */}
         <Stagger i={2} className="lg:col-span-5">
           <Card title="Agenda du jour" kicker={`${TODAY.length} événements`} action={<Link to="/app/agenda" className="text-[12px] text-mist hover:text-bone">Semaine →</Link>} className="h-full">
@@ -184,7 +197,7 @@ export default function Today() {
         </Card>
       </Stagger>
 
-      <div className="grid gap-6 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
         {/* Livrables à valider */}
         <Stagger i={5} className="lg:col-span-8">
           <Card title="Livrables en attente de vous" kicker="Centre de validation" action={<Link to="/app/studio" className="text-[12px] text-mist hover:text-bone">Studio →</Link>}>

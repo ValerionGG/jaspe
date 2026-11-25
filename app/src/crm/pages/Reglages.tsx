@@ -5,13 +5,13 @@ import clsx from 'clsx'
 import {
   UserCircle, TreeStructure, UsersThree, PaintBrush, PlugsConnected, ShieldCheck, BellSimple, CreditCard, LockKey,
   Lock, LockOpen, CaretRight, Plus, EnvelopeSimple, CheckCircle, Warning, ArrowsClockwise, DownloadSimple, UploadSimple,
-  Sparkle, Moon, Sun, Desktop, DeviceMobile, SignOut, Key, Fingerprint, Buildings, Globe, X, Info, Scales, Trash, FloppyDisk, Plugs,
+  Sparkle, Moon, Sun, Desktop, DeviceMobile, SignOut, Key, Fingerprint, Buildings, Globe, X, Info, Scales, Trash, FloppyDisk, Plugs, ChatTeardropText,
 } from '@phosphor-icons/react'
 import { PageHeader, Card, Tabs, SoftBtn, Stagger, IconBtn, Empty } from '../ui'
 import { Avatar, EXPO } from '../../ui/kit'
 import { me, img, type Agent } from '../../data/mock'
-import { useSettings, useAgents, useIntegrations, useConsents, useActivity, type Activity } from '../../data/collections'
-import { uploadFile, type Doc } from '../../data/store'
+import { useSettings, useAgents, useIntegrations, useConsents, useActivity, useFeedback, type Activity } from '../../data/collections'
+import { uploadFile, action, type Doc } from '../../data/store'
 import { useTheme } from '../../ui/theme'
 import { Modal, Field, Input, Select, AsyncForm, toast, errText } from '../forms'
 import {
@@ -19,7 +19,7 @@ import {
   type Integration,
 } from '../../data/pilot'
 
-type Section = 'profil' | 'reseau' | 'equipe' | 'marque' | 'integrations' | 'conformite' | 'notifications' | 'facturation' | 'securite'
+type Section = 'profil' | 'reseau' | 'equipe' | 'marque' | 'integrations' | 'conformite' | 'notifications' | 'facturation' | 'securite' | 'beta'
 const SECTIONS: { id: Section; label: string; icon: typeof UserCircle; hint: string }[] = [
   { id: 'profil', label: 'Profil', icon: UserCircle, hint: 'Identité, thème, copilote' },
   { id: 'reseau', label: 'Agence & réseau', icon: TreeStructure, hint: 'Hiérarchie et héritage' },
@@ -30,6 +30,7 @@ const SECTIONS: { id: Section; label: string; icon: typeof UserCircle; hint: str
   { id: 'notifications', label: 'Notifications', icon: BellSimple, hint: 'Canaux, horaires calmes' },
   { id: 'facturation', label: 'Facturation', icon: CreditCard, hint: 'Plan, sièges, IA' },
   { id: 'securite', label: 'Sécurité', icon: LockKey, hint: 'MFA, SSO, sessions' },
+  { id: 'beta', label: 'Retours bêta', icon: ChatTeardropText, hint: 'Ce que disent les testeurs' },
 ]
 const HOME = 'Antibes Vieille-Ville'
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -218,6 +219,22 @@ function Reseau() {
         }}>
           <Field label="Nom commercial *"><Input name="agencyName" defaultValue={ag.agencyName} maxLength={80} /></Field>
         </AsyncForm>
+      </Card>
+      <Card title="Pays et mentions légales" kicker="Checklists de conformité, TVA et mentions des factures">
+        <div className="space-y-4">
+          <Field label="Pays d’exercice" hint="Change la checklist de conformité (France ou Portugal), le taux de TVA/IVA et les mentions des factures">
+            <Select value={(ag as { country?: string }).country ?? 'FR'} onChange={(e) => action('settings.country', { country: e.target.value }).then(() => { toast(e.target.value === 'PT' ? 'Pays : Portugal' : 'Pays : France'); audit(`a changé le pays d’exercice (${e.target.value})`) }, (x) => toast(errText(x), 'error'))}>
+              <option value="FR">France</option><option value="PT">Portugal</option>
+            </Select>
+          </Field>
+          <AsyncForm key={`${(ag as { carte?: string }).carte}-${(ag as { ami?: string }).ami}`} submitLabel="Enregistrer les mentions" success="Mentions légales enregistrées" onSubmit={async (v) => {
+            if (!(await save({ carte: v.carte?.trim(), ami: v.ami?.trim() } as Partial<typeof AGENCY>))) throw new Error('Enregistrement impossible')
+            audit('a mis à jour les mentions légales des factures')
+          }}>
+            <Field label="France : carte professionnelle, garantie, RCS" hint="Reporté sur chaque facture de commission"><Input name="carte" defaultValue={(ag as { carte?: string }).carte ?? ''} placeholder="Carte T n° CPI 0601 2026 000 000 000 · Garantie Galian 120 000 € · RCS Antibes 000 000 000" maxLength={200} /></Field>
+            <Field label="Portugal : licence AMI, NIF"><Input name="ami" defaultValue={(ag as { ami?: string }).ami ?? ''} placeholder="Licença AMI n.º 00000 · NIF 500 000 000" maxLength={200} /></Field>
+          </AsyncForm>
+        </div>
       </Card>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.1fr]">
         <Card title="Hiérarchie" kicker="Réseau → agences → équipes">
@@ -783,8 +800,31 @@ function Securite() {
   )
 }
 
+const MOOD: Record<string, string> = { bloque: 'Bloqué', lent: 'Trop long', idee: 'Idée', top: 'Ça aide' }
+function Beta() {
+  const [items] = useFeedback()
+  const exp = () => download('retours-beta-jaspe.csv', csv([['Date', 'Ressenti', 'Page', 'Retour'], ...items.map((f) => [new Date(f.at).toLocaleString('fr-FR'), MOOD[f.mood ?? ''] ?? '', f.page ?? '', f.text])]))
+  return (
+    <div className="space-y-6">
+      <Card title="Retours des bêta-testeurs" kicker="Bouton bulle en haut de chaque écran" action={items.length > 0 && <SoftBtn icon={<DownloadSimple size={14} />} onClick={exp}>Exporter CSV</SoftBtn>}>
+        {items.length === 0 ? <Empty title="Aucun retour pour l’instant">Les testeurs envoient un retour depuis l’icône bulle de la barre du haut ; il est rattaché à l’écran utilisé.</Empty> : (
+          <ul className="divide-y divide-white/[0.06]">
+            {items.map((f) => (
+              <li key={f.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:gap-4">
+                <span className="num w-36 shrink-0 text-[11.5px] text-mist">{new Date(f.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="w-24 shrink-0 text-[12px] text-champagne-300">{MOOD[f.mood ?? ''] ?? '—'}</span>
+                <span className="min-w-0 flex-1 text-[13.5px] text-bone/85">{f.text}<span className="block text-[11px] text-mist">{f.page}</span></span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  )
+}
+
 const VIEWS: Record<Section, () => ReactNode> = {
-  profil: Profil, reseau: Reseau, equipe: Equipe, marque: Marque, integrations: Integrations, conformite: Conformite, notifications: Notifications, facturation: Facturation, securite: Securite,
+  profil: Profil, reseau: Reseau, equipe: Equipe, marque: Marque, integrations: Integrations, conformite: Conformite, notifications: Notifications, facturation: Facturation, securite: Securite, beta: Beta,
 }
 
 export default function Reglages() {

@@ -61,3 +61,12 @@ export const useConversations = c<Conversation & Doc>('conversations', CONVERSAT
 export const useMessages = c<Message & Doc>('messages', MESSAGES)
 export const useTemplates = c<Template & Doc>('templates', TEMPLATES)
 export const useReminders = c<Reminder & Doc>('reminders', REMINDERS)
+
+// ——— Assistant mesurable : temps gagné, conformité, factures, veille ———
+import { TIMELOG_SEED, REGWATCH_SEED, type TimeEntry, type Compliance, type Invoice, type RegWatch, type Feedback } from './assist'
+export const useTimelog = c<TimeEntry & Doc>('timelog', TIMELOG_SEED)
+export const useCompliance = c<Compliance & Doc>('compliance', [])
+export const useInvoices = c<Invoice & Doc>('invoices', [])
+export const useRegwatch = c<RegWatch & Doc>('regwatch', REGWATCH_SEED)
+export const useWatches = c<{ id: string; dossierId?: string; active: boolean; criteria: string; last?: { comps: number; ppm: number; med: number; gap: number } } & Doc>('watches', [])
+export const useFeedback = c<Feedback & Doc>('feedback', [])

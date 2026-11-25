@@ -42,6 +42,14 @@ Création/édition/suppression persistées sur toutes les pages (dossiers, biens
 - Aide & tutoriels : visite guidée interactive (6 parcours), leçons, glossaire, FAQ, checklist de prise en main.
 - Offre Essentiel (page commerciale + calculateur), édition CRM Essentiel, mode simple, portail des raccourcis.
 
+## Nouveautés (phase 4 — retours bêta, novembre 2026)
+Réponse aux retours des testeurs (étude complète : `research/05-etude-concurrentielle-2026-11.md`, aussi dans le CRM, page « Étude & benchmark »).
+- **Temps gagné** (`/app/temps`) : gain net = référence manuelle − (relecture + corrections), par semaine et par type, calibrage au chrono, valeur en €, export CSV. Journalisé par le moteur (`server/assist.js`, collection `timelog`).
+- **Conformité & veille légale** (`/app/conformite`) : checklists FR (Hoguet, LCB-FT, DPE, ERP…) et PT (Lei 15/2013, Lei 83/2017, IMPIC…), points bloquants par étape, preuve obligatoire, veille sourcée ; routine AUT-122.
+- **Brief → plan d’action** (bouton « Brief ») : texte ou dictée → relances datées, brouillons, veille (AUT-121), facture, contrôles ; chaque action cite sa phrase et n’est lancée qu’une fois cochée (AUT-120).
+- **Factures & commissions** (`/app/factures`) : brouillon depuis la transaction, validation (numéro FA-AAAA-NNNN figé), envoi consigné, encaissement ; TVA 20 % (FR) ou IVA 23 % (PT, document de préparation à émettre dans un logiciel certifié AT).
+- **Retours bêta** : bouton bulle sur chaque écran, lecture et export dans Réglages ; pays d’exercice et mentions légales dans Réglages › Agence & réseau.
+
 ## Limites assumées
 - Aucun envoi externe réel : e-mails, SMS, courriers, portails, signature, synchro agendas sont **consignés** (« connecteur non configuré »).
 - Pas d’authentification ni de multi-utilisateur : poste local de démonstration (Claire Delmas).

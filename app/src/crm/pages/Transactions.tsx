@@ -1,8 +1,8 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { Handshake, Seal, Bank, Vault, Coins, DownloadSimple, Plus, CheckCircle, Circle, Warning, HourglassMedium, PaperPlaneTilt, FileText, Scales, ArrowRight, Sparkle, Check, PencilSimple, CaretRight } from '@phosphor-icons/react'
+import { Handshake, Seal, Bank, Vault, Coins, DownloadSimple, Plus, CheckCircle, Circle, Warning, HourglassMedium, PaperPlaneTilt, FileText, Scales, ArrowRight, Sparkle, Check, PencilSimple, CaretRight, Receipt } from '@phosphor-icons/react'
 import { PageHeader, Card, Stagger, SoftBtn, Empty, IconBtn } from '../ui'
 import { EXPO } from '../../ui/kit'
 import { prop, eur, fmt, agent, type Dossier } from '../../data/mock'
@@ -235,6 +235,11 @@ function Detail({ tx, now, d, update, relance, ask, advance }: {
   const [editing, setEditing] = useState<Cond | 'new' | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const go = async (k: string, f: () => Promise<void>) => { setBusy(k); try { await f() } finally { setBusy(null) } }
+  const navigate = useNavigate()
+  const invoice = async () => {
+    try { await action('invoice.fromTransaction', { txId: tx.id }); toast('Facture de commission prête à relire'); navigate('/app/factures') }
+    catch (e) { toast(errText(e), 'error') }
+  }
   const p = prop(tx.propertyId), c = split(signTs(tx) - now)
   const doneIdx = tx.milestones.filter((m) => m.s === 'done').length
   const missing = tx.pieces.filter((x) => x.s === 'manquante').map((x) => x.l)
@@ -260,6 +265,7 @@ function Detail({ tx, now, d, update, relance, ask, advance }: {
               <div className="mt-5 flex flex-wrap gap-2">
                 {next && <SoftBtn icon={<CaretRight size={13} />} onClick={() => go('adv', advance)}>{busy === 'adv' ? 'Mise à jour…' : `Passer à « ${next.label} »`}</SoftBtn>}
                 {d && <Link to={`/app/dossiers/${d.id}`}><SoftBtn icon={<FileText size={13} weight="light" />}>Dossier {d.ref}</SoftBtn></Link>}
+                <SoftBtn icon={<Receipt size={13} weight="light" />} disabled={busy === 'inv'} onClick={() => go('inv', invoice)}>{busy === 'inv' ? 'Préparation…' : 'Facture de commission'}</SoftBtn>
               </div>
             </div>
           </div>

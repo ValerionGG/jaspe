@@ -1,6 +1,7 @@
 // Actions métier et moteur de routines. Chaque effet est journalisé (runs, activity) et diffusé (SSE).
 import { buildDocument, qualityCheck, NAMES, EXTERNAL } from './templates.js'
 import { createMessaging } from './messaging.js'
+import { createAssist, REVIEW_MIN, CORRECTION_MIN } from './assist.js'
 
 const L_CODES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9']
 const hhmm = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -44,6 +45,8 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
     const issues = qualityCheck(doc)
     doc.checks = issues
     put('documents', doc)
+    // Temps gagné : une nouvelle version repart de la référence manuelle, sauf régénération d’un document déjà corrigé.
+    if (!prev) assist.logTime({ kind: code, dossierId, ref: `doc-${dossierId}-${code}` })
     setDeliv(dossierId, code, issues.length ? 'blocked' : code === 'L9' && doc.items?.some((i) => i.state === 'missing') ? 'blocked' : 'review')
     enqueueReview(doc, c.dossier)
     if (!quiet) activity('Copilote', `a préparé ${code} · ${NAMES[code]} pour ${c.dossier.seller}`, 'ai', `/app/dossiers/${dossierId}`)
@@ -64,13 +67,16 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
   }
 
   const messaging = createMessaging(db, { put, patch, activity, notify, run })
+  const assist = createAssist(db, { put, patch, activity, notify, run, generate: (...a) => generate(...a), HttpError })
 
   const actions = {
     ...messaging.actions,
+    ...assist.actions,
     'deliverable.generate': ({ dossierId, code }) => generate(dossierId, code),
     'deliverable.generateAll': ({ dossierId, codes }) => generateAll(dossierId, codes),
-    'deliverable.validate': ({ dossierId, code, by = 'Claire Delmas' }) => {
+    'deliverable.validate': ({ dossierId, code, by = 'Claire Delmas', reviewSec }) => {
       const c = ctx(dossierId)
+      assist.addSpent(`doc-${dossierId}-${code}`, reviewSec ? Math.round(reviewSec / 6) / 10 : REVIEW_MIN)
       const doc = db.get('documents', `${dossierId}-${code}`)
       if (doc) patch('documents', doc.id, { status: 'validated', validatedAt: new Date().toISOString(), validatedBy: by })
       setDeliv(dossierId, code, 'done')
@@ -81,9 +87,10 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       return { ok: true, outbox }
     },
     'deliverable.reject': ({ dossierId, code, reason }) => { setDeliv(dossierId, code, 'blocked'); activity('Claire Delmas', `a renvoyé ${code} en correction : ${reason ?? 'sans motif'}`, 'warn'); return { ok: true } },
-    'deliverable.edit': ({ dossierId, code, body, subject }) => {
+    'deliverable.edit': ({ dossierId, code, body, subject, editSec }) => {
       const doc = db.get('documents', `${dossierId}-${code}`)
       if (!doc) throw new HttpError(404, 'Document introuvable')
+      assist.addSpent(`doc-${dossierId}-${code}`, editSec ? Math.round(editSec / 6) / 10 : CORRECTION_MIN, true)
       const history = [...(doc.history ?? []).filter((h) => h.v !== doc.version), { v: doc.version, at: doc.createdAt, subject: doc.subject, body: doc.body, by: doc.edited ? 'édition' : 'copilote' }]
       return patch('documents', doc.id, { body: body ?? doc.body, subject: subject ?? doc.subject, version: doc.version + 1, edited: true, history, createdAt: new Date().toISOString() })
     },
@@ -136,6 +143,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       const day = new Date().toISOString().slice(0, 10)
       if (db.get('documents', `brief-${day}`)) return ['skip', 'Brief du jour déjà prêt']
       const tasks = db.list('tasks').filter((t) => !t.done), q = db.list('queue')
+      assist.logTime({ kind: 'brief', ref: `brief-${day}` })
       put('documents', { id: `brief-${day}`, code: 'BRIEF', title: 'Brief du matin', kind: 'report', createdAt: new Date().toISOString(), body: [`${q.length} décision(s) en attente, ${tasks.length} tâche(s) ouvertes.`, ...q.slice(0, 3).map((x) => `• ${x.title}`)], sources: [{ label: 'Tâches, file de validation, agenda', date: day }] })
       return ['ok', `Brief prêt : ${q.length} validations, ${tasks.length} tâches`]
     },
@@ -177,7 +185,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       return [late.length ? 'ok' : 'skip', `${late.length} lead(s) en retard`]
     },
   }
-  Object.assign(RULES, messaging.rules)
+  Object.assign(RULES, messaging.rules, assist.rules)
   const ENGINE_IDS = Object.keys(RULES)
   // Routines propres au moteur : déclarées en base si absentes (sans écraser un réglage utilisateur).
   const OWN = [
