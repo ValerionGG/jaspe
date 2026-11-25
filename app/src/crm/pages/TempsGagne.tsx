@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useMemo, useState, type FormEvent } from 'react'
 import clsx from 'clsx'
-import { Timer, DownloadSimple, ArrowCounterClockwise, Info, ArrowSquareOut } from '@phosphor-icons/react'
+import { Timer, DownloadSimple, ArrowCounterClockwise, Info, ArrowSquareOut, Copy, Printer, Hourglass } from '@phosphor-icons/react'
 import { PageHeader, Card, Stat, SoftBtn, Stagger, Empty } from '../ui'
 import { Pill } from '../../ui/kit'
 import { useTimelog, useSettings, useDossiers } from '../../data/collections'
@@ -15,6 +15,9 @@ const DAY = 864e5
 const WEEKS = 4
 const BASE = BASELINES as Record<string, number>
 const NAMES = KIND_LABELS as Record<string, string>
+type TE = TimeEntry & { pending?: boolean }
+type CrDossier = { id: string; seller: string; rdvEndedAt?: string; crSentAt?: string; crDelayH?: number }
+const median = (a: number[]) => { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2 }
 type Calib = { values?: Record<string, number>; samples?: Record<string, number[]> }
 
 const nf1 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 })
@@ -31,6 +34,7 @@ const RATE_KEY = 'jaspe.temps.rate', SUB_KEY = 'jaspe.temps.subscription'
 function readNum(k: string, d: number) { try { const v = Number(localStorage.getItem(k)); return v > 0 ? v : d } catch { return d } }
 function writeNum(k: string, v: number) { try { localStorage.setItem(k, String(v)) } catch { /* stockage indisponible */ } }
 const eur = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+const eur2 = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 function writeDemo(v: boolean) { try { localStorage.setItem(DEMO_KEY, v ? '1' : '0') } catch { /* stockage indisponible : préférence non mémorisée */ } }
 
 export default function TempsGagne() {
@@ -42,12 +46,15 @@ export default function TempsGagne() {
   const [minutes, setMinutes] = useState('')
   const [busy, setBusy] = useState(false)
   const [rate, setRate] = useState(() => String(readNum(RATE_KEY, 60)))
-  const [sub, setSub] = useState(() => String(readNum(SUB_KEY, 49)))
+  const [sub, setSub] = useState(() => String(readNum(SUB_KEY, 9.9)))
 
   const calib = (settings.find((s) => s.id === 'time-baselines') ?? {}) as Calib
   const dossierOf = (id?: string) => (id ? dossiers.find((d) => d.id === id) : undefined)
 
-  const entries = useMemo(() => (log as TimeEntry[]).filter((e) => withDemo || !e.demo).sort((a, b) => +new Date(b.at) - +new Date(a.at)), [log, withDemo])
+  const visible = useMemo(() => (log as TE[]).filter((e) => withDemo || !e.demo).sort((a, b) => +new Date(b.at) - +new Date(a.at)), [log, withDemo])
+  // Brouillons pas encore relus : affichés à part, jamais comptés dans les gains.
+  const drafts = visible.filter((e) => e.pending)
+  const entries = useMemo(() => visible.filter((e) => !e.pending), [visible])
   const demoCount = (log as TimeEntry[]).filter((e) => e.demo).length
 
   const now = Date.now()
@@ -78,6 +85,41 @@ export default function TempsGagne() {
   const subPeriod = subN * (WEEKS * 7) / 30.44 // abonnement ramené à 4 semaines
   const onRate = (v: string) => { setRate(v); const n = Number(v.replace(',', '.')); if (n > 0) writeNum(RATE_KEY, n) }
   const onSub = (v: string) => { setSub(v); const n = Number(v.replace(',', '.')); if (n > 0) writeNum(SUB_KEY, n) }
+  // Compte rendu vendeur : fin du RDV → validation L1.
+  const crs = dossiers as unknown as CrDossier[]
+  const measured = crs.filter((d) => d.crSentAt && typeof d.crDelayH === 'number').sort((a, b) => +new Date(b.crSentAt!) - +new Date(a.crSentAt!))
+  const delays = measured.map((d) => d.crDelayH!)
+  const crMedian = median(delays)
+  const crUnder = delays.filter((h) => h < 24).length
+  const crPct = delays.length ? crUnder / delays.length : 0
+  const crWaiting = crs.filter((d) => d.rdvEndedAt && !d.crSentAt).map((d) => ({ ...d, sinceH: Math.max(0, (now - +new Date(d.rdvEndedAt!)) / 36e5) })).sort((a, b) => b.sinceH - a.sinceH)
+  // Valeur rendue · 7 jours glissants.
+  const weekStart = now - 7 * DAY
+  const weekEntries = entries.filter((e) => +new Date(e.at) > weekStart)
+  const weekH = sum(weekEntries, 'net') / 60
+  const weekValue = weekH * rateN
+  const weekSub = subN * 7 / 30.44
+  const weekCr = measured.filter((d) => +new Date(d.crSentAt!) > weekStart)
+  const weekCrUnder = weekCr.filter((d) => d.crDelayH! < 24).length
+  const weekRelances = weekEntries.filter((e) => e.kind === 'relance').length
+  const summary = () => [
+    `Jaspe · valeur rendue du ${dShort(weekStart + DAY)} au ${dShort(now)}`,
+    `- Heures nettes gagnées : ${nf1.format(weekH)} h (${weekEntries.length} travaux validés)`,
+    `- Valeur : ${eur.format(weekValue)} au taux de ${eur.format(rateN)}/h`,
+    `- Abonnement : ${eur2.format(subN)}/mois, soit ${eur2.format(weekSub)} pour 7 jours${weekSub > 0 ? ` (valeur ${nf1.format(weekValue / weekSub)} fois le coût)` : ''}`,
+    `- Comptes rendus vendeur envoyés en moins de 24 h : ${weekCrUnder} sur ${weekCr.length}`,
+    `- Relances faites : ${weekRelances}`,
+    ...(drafts.length ? [`- ${drafts.length} brouillon${drafts.length > 1 ? 's' : ''} en attente de relecture, gain non compté`] : []),
+    'Méthode : gain net = référence manuelle − temps de relecture et de correction.',
+  ].join('\n')
+  const copySummary = async () => {
+    const text = summary()
+    try { await navigator.clipboard.writeText(text); toast('Résumé copié dans le presse-papier') } catch {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select()
+      const ok = document.execCommand('copy'); ta.remove()
+      if (ok) toast('Résumé copié dans le presse-papier'); else toast('Copie impossible dans ce navigateur', 'error')
+    }
+  }
   const toggleDemo = () => { const v = !withDemo; setWithDemo(v); writeDemo(v) }
 
   const calibrate = async (ev: FormEvent) => {
@@ -191,6 +233,84 @@ export default function TempsGagne() {
           </Stagger>
         </div>
       </>)}
+
+      {drafts.length > 0 && (
+        <Stagger i={3} className="mt-4">
+          <div className="flex gap-2.5 rounded-xl bg-white/[0.03] px-4 py-3 text-[13px] text-bone/70 ring-1 ring-white/[0.06]">
+            <Hourglass size={16} className="mt-0.5 shrink-0 text-champagne" />
+            <div className="min-w-0"><span className="num text-bone">{drafts.length}</span> brouillon{drafts.length > 1 ? 's' : ''} en attente de relecture, gain non compté. <span className="text-bone/50">{drafts.slice(0, 4).map((e) => e.label).join(' · ')}{drafts.length > 4 ? '…' : ''}</span></div>
+          </div>
+        </Stagger>
+      )}
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+        <Stagger i={3}>
+          <Card title="Compte rendu vendeur" kicker="Fin du RDV → envoi L1 · objectif < 24 h" className="h-full">
+            {!measured.length ? (
+              <p className="text-[13px] text-bone/55">Aucun compte rendu mesuré pour l’instant : validez L1 après un rendez-vous.</p>
+            ) : (<>
+              <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
+                <div className="rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-white/[0.06]">
+                  <div className="text-[12px] text-mist">Délai médian</div>
+                  <div className={clsx('mt-1 display text-[1.8rem] leading-none', crMedian < 24 ? 'text-sage' : 'text-coral')}>{big(nf1.format(crMedian), 'h')}</div>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-white/[0.06]">
+                  <div className="text-[12px] text-mist">Envoyés en &lt; 24 h</div>
+                  <div className="mt-1 display text-[1.8rem] leading-none">{big(nf0.format(crPct * 100), '%')}</div>
+                  <div className="mt-1 text-[11.5px] text-bone/50">{crUnder} sur {delays.length}</div>
+                </div>
+              </div>
+              <div className="mb-1 mt-4 text-[11px] uppercase tracking-eyebrow text-mist">5 derniers</div>
+              <ul className="divide-y divide-white/[0.05]">{measured.slice(0, 5).map((d) => (
+                <li key={d.id} className="flex items-center gap-3 py-2 text-[13px]">
+                  <span role="img" className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', d.crDelayH! < 24 ? 'bg-sage' : 'bg-coral')} aria-label={d.crDelayH! < 24 ? 'moins de 24 h' : '24 h ou plus'} />
+                  <Link to={`/app/dossiers/${d.id}`} className="min-w-0 flex-1 truncate text-bone hover:underline">{d.seller}</Link>
+                  <span className="num hidden shrink-0 text-[12px] text-mist sm:inline">{dFull(d.crSentAt!)}</span>
+                  <span className={clsx('num shrink-0 text-right', d.crDelayH! < 24 ? 'text-sage' : 'text-coral')}>{nf1.format(d.crDelayH!)} h</span>
+                </li>
+              ))}</ul>
+            </>)}
+            {crWaiting.length > 0 && (
+              <div className="mt-4">
+                <div className="mb-1 text-[11px] uppercase tracking-eyebrow text-mist">En attente de compte rendu</div>
+                <ul className="divide-y divide-white/[0.05]">{crWaiting.slice(0, 5).map((d) => (
+                  <li key={d.id} className="flex items-center gap-3 py-2 text-[13px]">
+                    <Link to={`/app/dossiers/${d.id}`} className="min-w-0 flex-1 truncate text-bone hover:underline">{d.seller}</Link>
+                    <span className={clsx('num shrink-0', d.sinceH < 24 ? 'text-bone/70' : 'text-coral')}>depuis {nf1.format(d.sinceH)} h</span>
+                  </li>
+                ))}</ul>
+              </div>
+            )}
+          </Card>
+        </Stagger>
+
+        <Stagger i={3}>
+          <Card title="Valeur rendue cette semaine" kicker={`Du ${dShort(weekStart + DAY)} au ${dShort(now)} · à transmettre à votre manager`} className="h-full">
+            <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
+              <div className="rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-white/[0.06]">
+                <div className="text-[12px] text-mist">Heures nettes gagnées</div>
+                <div className="mt-1 display text-[1.8rem] leading-none">{big(nf1.format(weekH), 'h')}</div>
+                <div className="mt-1 text-[11.5px] text-bone/50">{weekEntries.length} travaux validés</div>
+              </div>
+              <div className="rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-white/[0.06]">
+                <div className="text-[12px] text-mist">Valeur</div>
+                <div className="mt-1 display truncate text-[1.8rem] leading-none"><span className="num">{eur.format(weekValue)}</span></div>
+                <div className="mt-1 text-[11.5px] text-bone/50">à {eur.format(rateN)}/h</div>
+              </div>
+            </div>
+            <ul className="mt-4 space-y-2 text-[13px] text-bone/70">
+              <li className="flex flex-wrap justify-between gap-x-3"><span>Abonnement {eur2.format(subN)}/mois, soit sur 7 jours</span><span className="num text-bone">{eur2.format(weekSub)}{weekSub > 0 && <span className={clsx('ml-2', weekValue >= weekSub ? 'text-sage' : 'text-coral')}>{weekValue >= weekSub ? `× ${nf1.format(weekValue / weekSub)}` : 'non couvert'}</span>}</span></li>
+              <li className="flex flex-wrap justify-between gap-x-3"><span>Comptes rendus envoyés en &lt; 24 h</span><span className="num text-bone">{weekCrUnder} / {weekCr.length}</span></li>
+              <li className="flex flex-wrap justify-between gap-x-3"><span>Relances faites</span><span className="num text-bone">{weekRelances}</span></li>
+              {drafts.length > 0 && <li className="flex flex-wrap justify-between gap-x-3 text-bone/50"><span>Brouillons non relus (non comptés)</span><span className="num">{drafts.length}</span></li>}
+            </ul>
+            <div className="mt-4 flex flex-wrap gap-2 print:hidden">
+              <SoftBtn tone="gold" icon={<Copy size={15} />} onClick={copySummary}>Copier le résumé</SoftBtn>
+              <SoftBtn icon={<Printer size={15} />} onClick={() => window.print()}>Imprimer</SoftBtn>
+            </div>
+          </Card>
+        </Stagger>
+      </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <Stagger i={4}>

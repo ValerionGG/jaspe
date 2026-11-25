@@ -1,4 +1,5 @@
 // D5 · Mode entretien plein écran, débrief vocal (dictée + extraction) et photos du bien.
+import { markDay1 } from '../../ui/mode'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
@@ -143,7 +144,7 @@ export function Debrief({ journey, save, draft, setField }: { journey: Journey; 
           {rec ? <><Stop size={14} weight="fill" />Arrêter<span className="ml-1 flex h-3.5 items-end gap-[2px]">{[0, 1, 2, 3].map((k) => <span key={k} className="w-[2px] origin-bottom animate-wave rounded-full bg-coral" style={{ height: '100%', animationDelay: `${k * 0.12}s` }} />)}</span></> : <><Microphone size={14} />Dicter</>}
         </button>
         <button onClick={extract} disabled={!text.trim()} className="inline-flex items-center gap-2 rounded-full bg-champagne px-4 py-2 text-[13px] font-medium text-ink transition hover:bg-champagne-300 disabled:opacity-50"><MagicWand size={14} />Extraire les champs</button>
-        <button onClick={() => persist({ transcript: text, validated: !deb?.validated }).then(() => toast(deb?.validated ? 'Débrief remis en relecture' : 'Débrief validé'))} disabled={!text.trim()} className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] text-bone/70 ring-1 ring-white/[0.08] transition hover:bg-white/[0.05] disabled:opacity-40"><Check size={14} />{deb?.validated ? 'Annuler la validation' : 'Valider le débrief'}</button>
+        <button onClick={() => persist({ transcript: text, validated: !deb?.validated }).then(() => { if (!deb?.validated) markDay1('debrief'); toast(deb?.validated ? 'Débrief remis en relecture' : 'Débrief validé') })} disabled={!text.trim()} className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] text-bone/70 ring-1 ring-white/[0.08] transition hover:bg-white/[0.05] disabled:opacity-40"><Check size={14} />{deb?.validated ? 'Annuler la validation' : 'Valider le débrief'}</button>
       </div>
       <AnimatePresence>
         {cur && (

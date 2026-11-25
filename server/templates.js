@@ -24,7 +24,7 @@ function matchBuyers(p, buyers) {
     .sort((a, b) => b.score - a.score)
 }
 
-export function buildDocument(code, { dossier: d, property: p, agent: a, buyers = [], settings = {} }) {
+function draft(code, { dossier: d, property: p, agent: a, buyers = [], settings = {} }) {
   const agency = settings.agencyName ?? 'Maison Riviera · Antibes'
   const sign = `${a?.name ?? 'Votre conseiller'}\n${a?.role ?? ''} · ${agency}`
   const seller = d.seller
@@ -122,12 +122,75 @@ export function buildDocument(code, { dossier: d, property: p, agent: a, buyers 
   }
 }
 
-/** Contrôle qualité AUT-058 : rien d’inventé, pas de gabarit vide. */
-export function qualityCheck(doc) {
-  const text = JSON.stringify(doc)
+const has = (v) => v !== undefined && v !== null && v !== '' && !(typeof v === 'number' && !Number.isFinite(v))
+const dayOf = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : undefined)
+/** Un chiffre cité : valeur affichée, source réelle, date de la source ; `verified:false` si rien ne l’atteste. */
+const fig = (label, value, source, { date, verified = true } = {}) => (has(value)
+  ? { label, value: String(value), source, ...(date ? { date } : {}), verified }
+  : { label, value: '—', source: 'Non renseigné au dossier', verified: false })
+
+/**
+ * Chiffres utilisés par le livrable, avec leur provenance.
+ * Faits de la fiche (surface, pièces, prix demandé) : sourcés. Fourchette d’estimation : sourcée seulement si
+ * des comparables datés sont joints (`ctx.comparables`) ou si la fiche porte la source et la date de l’estimation.
+ */
+export function figuresOf(code, ctx, doc = {}) {
+  const { dossier: d, property: p } = ctx
+  const fiche = 'Fiche du bien'
+  const ficheDate = dayOf(p.updatedAt ?? p.createdAt)
+  const comps = (ctx.comparables ?? []).filter((c) => c?.date)
+  const estSource = comps.length ? `${comps.length} comparable(s) DVF · ventes datées` : p.estimateSource
+  const estDate = comps.length ? dayOf(comps.map((c) => c.date).sort().at(-1)) : dayOf(p.estimateDate)
+  const estOk = !!(estSource && estDate)
+  const estLabel = estSource ?? 'Estimation de la fiche — comparables non joints, non datée'
+  const range = has(p.estimateLow) && has(p.estimateHigh) ? `${eur(p.estimateLow)} – ${eur(p.estimateHigh)}` : undefined
+  const ppmOk = has(p.price) && has(p.surface) && p.surface > 0
+  const priceSrc = d.mandate ? `Mandat ${d.mandate.toLowerCase()} · prix de présentation` : `${fiche} · prix souhaité (saisie conseiller)`
+  const F = {
+    surface: () => fig('Surface', has(p.surface) ? `${fmt(p.surface)} m²` : undefined, fiche, { date: ficheDate }),
+    rooms: () => fig('Pièces', p.rooms, fiche, { date: ficheDate }),
+    land: () => (has(p.land) ? [fig('Terrain', `${fmt(p.land)} m²`, `${fiche} · cadastre`, { date: ficheDate })] : []),
+    price: () => fig('Prix de présentation', has(p.price) ? eur(p.price) : undefined, priceSrc, { date: ficheDate }),
+    ppm: () => fig('Prix au m²', ppmOk ? `${fmt(Math.round(p.price / p.surface))} €/m²` : undefined, 'Calcul : prix ÷ surface (fiche du bien)', { date: ficheDate }),
+    range: () => fig('Fourchette d’estimation', range, estLabel, { date: estDate, verified: estOk }),
+    rangePpm: () => fig('Fourchette au m²', range && ppmOk ? `${fmt(Math.round(p.estimateLow / p.surface))} – ${fmt(Math.round(p.estimateHigh / p.surface))} €/m²` : undefined, `Calcul : fourchette ÷ surface — ${estLabel}`, { date: estDate, verified: estOk }),
+    comps: () => (comps.length ? [fig('Comparables retenus', comps.length, 'DVF · Etalab (ventes datées)', { date: estDate })] : []),
+    dpe: () => fig('DPE', p.dpe, `${fiche} · diagnostic`, { date: ficheDate }),
+    timeline: () => fig('Horizon vendeur', d.timeline, 'Découverte vendeur · saisie conseiller'),
+  }
+  switch (code) {
+    case 'D1': return [F.surface(), F.rooms(), ...F.land(), F.timeline()]
+    case 'D2': return [F.price(), F.ppm(), F.range(), ...F.comps()]
+    case 'D4': return [F.timeline()]
+    case 'L2': return [F.surface(), F.rooms(), ...F.land(), F.dpe(), F.range(), F.timeline()]
+    case 'L3': return [F.surface(), F.rooms(), F.price(), fig('Acquéreurs compatibles', doc.matches?.length ?? 0, 'Recherches acquéreurs du CRM · critères déclarés', { date: today() })]
+    case 'L4': return [F.surface(), F.rooms(), F.dpe()]
+    case 'L7': return [F.range(), F.rangePpm(), F.price(), F.surface(), ...F.comps()]
+    case 'L9': return [fig('Pièces manquantes', (doc.items ?? []).filter((i) => i.state === 'missing').length, 'Pièces déposées au dossier', { date: today() })]
+    default: return []
+  }
+}
+
+export function buildDocument(code, ctx) {
+  const doc = draft(code, ctx)
+  return { ...doc, figures: figuresOf(code, ctx, doc) }
+}
+
+/** Chiffres sans source datée. */
+export const unverifiedFigures = (doc) => (doc.figures ?? []).filter((f) => !f.verified)
+
+/**
+ * Contrôle qualité AUT-058 : rien d’inventé, pas de gabarit vide.
+ * Les points bloquants sont toujours renvoyés ; `{ figures: true }` ajoute l’avertissement « N chiffre(s) non vérifié(s) »,
+ * non bloquant (la validation d’un livrable externe le fait confirmer explicitement).
+ */
+export function qualityCheck(doc, { figures = false } = {}) {
+  const text = JSON.stringify({ ...doc, figures: undefined })
   const issues = []
   if (/undefined|NaN|\{\{|null M€/.test(text)) issues.push('Champ vide ou invalide dans le texte')
   if (doc.kind === 'email' && !doc.to) issues.push('Destinataire manquant')
   if (!doc.sources?.length) issues.push('Aucune source citée')
+  const n = unverifiedFigures(doc).length
+  if (figures && n) issues.push(`${n} chiffre${n > 1 ? 's' : ''} non vérifié${n > 1 ? 's' : ''}`)
   return issues
 }

@@ -1,5 +1,7 @@
 import { motion } from 'motion/react'
+import { useState } from 'react'
 import clsx from 'clsx'
+import { isSimpleMode } from '../../ui/mode'
 import { CheckCircle, ArrowRight } from '@phosphor-icons/react'
 import { EXPO } from '../../ui/kit'
 import { DISCOVERY_BLOCKS, type Journey } from '../../data/dossier'
@@ -45,6 +47,22 @@ export function JourneyStepper({ dossier, journey, step, onStep }: { dossier: Do
   const prog = stepProgress(dossier, journey)
   const cur = STEPS.findIndex((s) => s.id === currentStep(dossier))
   const sel = STEPS.findIndex((s) => s.id === step)
+  const [full, setFull] = useState(() => !isSimpleMode())
+  if (!full) {
+    // Mode simple : une seule ligne, l’étape en cours et la suivante ; le parcours complet reste à un clic.
+    const s = STEPS[sel], next = STEPS[Math.min(sel + 1, STEPS.length - 1)]
+    return (
+      <div className="flex flex-wrap items-center gap-3 rounded-[1.4rem] bg-ink-800/80 px-4 py-3 shadow-bezel ring-1 ring-white/[0.06]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-champagne text-ink"><span className="num text-[13px]">{sel + 1}</span></span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[13.5px]">{s.label} <span className="num text-[11.5px] text-mist">· {prog[s.id]} %</span></div>
+          <div className="text-[11.5px] text-mist">Étape {sel + 1} sur {STEPS.length}{cur !== sel ? ` · en cours : ${STEPS[cur].label}` : ''}</div>
+        </div>
+        {sel < STEPS.length - 1 && <button onClick={() => onStep(next.id)} className="flex items-center gap-1.5 text-[12.5px] text-champagne-300 transition hover:gap-2.5">{next.label} <ArrowRight size={13} /></button>}
+        <button onClick={() => setFull(true)} className="text-[12px] text-bone/60 underline-offset-2 hover:text-bone hover:underline">Voir les {STEPS.length} étapes</button>
+      </div>
+    )
+  }
   return (
     <div className="rounded-[1.6rem] bg-white/[0.02] p-1 ring-1 ring-white/[0.06]">
       <div className="thin-scroll overflow-x-auto rounded-[calc(1.6rem-0.25rem)] bg-ink-800/80 px-4 py-5 shadow-bezel md:px-6">

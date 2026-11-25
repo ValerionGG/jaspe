@@ -2,6 +2,7 @@
 import { buildDocument, qualityCheck, NAMES, EXTERNAL } from './templates.js'
 import { createMessaging } from './messaging.js'
 import { createAssist, REVIEW_MIN, CORRECTION_MIN } from './assist.js'
+import { createImporter } from './importer.js'
 
 const L_CODES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9']
 const hhmm = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -72,6 +73,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
   const actions = {
     ...messaging.actions,
     ...assist.actions,
+    ...createImporter(db, { put, activity, HttpError }).actions,
     'deliverable.generate': ({ dossierId, code }) => generate(dossierId, code),
     'deliverable.generateAll': ({ dossierId, codes }) => generateAll(dossierId, codes),
     'deliverable.validate': ({ dossierId, code, by = 'Claire Delmas', reviewSec }) => {
@@ -84,6 +86,13 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       let outbox = null
       if (EXTERNAL.has(code) && doc) outbox = put('outbox', { dossierId, code, to: doc.to ?? c.dossier.seller, subject: doc.subject ?? NAMES[code], status: 'programmé', at: new Date().toISOString(), channel: doc.kind === 'letter' ? 'Courrier' : doc.kind === 'social' ? 'Réseaux sociaux' : 'E-mail' }, { front: true })
       activity(by, `a validé ${code} · ${NAMES[code]} — ${c.dossier.seller}${outbox ? ' (envoi programmé)' : ''}`, 'win', `/app/dossiers/${dossierId}`)
+      // Compte rendu vendeur (L1) : délai depuis la fin du RDV, mesuré une seule fois.
+      if (code === 'L1' && c.dossier.rdvEndedAt && !c.dossier.crSentAt) {
+        const sentAt = new Date()
+        const crDelayH = Math.max(0, Math.round((sentAt - new Date(c.dossier.rdvEndedAt)) / 36e5 * 10) / 10)
+        patch('dossiers', dossierId, { crSentAt: sentAt.toISOString(), crDelayH })
+        activity(by, `Compte rendu envoyé en ${String(crDelayH).replace('.', ',')} h — ${c.dossier.seller}`, crDelayH < 24 ? 'win' : 'warn', `/app/dossiers/${dossierId}`)
+      }
       return { ok: true, outbox }
     },
     'deliverable.reject': ({ dossierId, code, reason }) => { setDeliv(dossierId, code, 'blocked'); activity('Claire Delmas', `a renvoyé ${code} en correction : ${reason ?? 'sans motif'}`, 'warn'); return { ok: true } },
@@ -95,7 +104,9 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       return patch('documents', doc.id, { body: body ?? doc.body, subject: subject ?? doc.subject, version: doc.version + 1, edited: true, history, createdAt: new Date().toISOString() })
     },
     'dossier.move': ({ id, stage }) => {
-      const d = patch('dossiers', id, { stage })
+      const before = db.get('dossiers', id)
+      // Fin du rendez-vous vendeur : point de départ du délai « compte rendu < 24 h ».
+      const d = patch('dossiers', id, stage === 'post' && before && !before.rdvEndedAt ? { stage, rdvEndedAt: new Date().toISOString() } : { stage })
       if (!d) throw new HttpError(404, 'Dossier introuvable')
       activity('Claire Delmas', `a déplacé ${d.seller} vers « ${stage} »`, 'neutral', `/app/dossiers/${id}`)
       if (stage === 'post' && enabled('AUT-024')) generateAll(id).catch(() => {})

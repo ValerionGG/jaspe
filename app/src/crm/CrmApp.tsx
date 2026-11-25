@@ -4,7 +4,7 @@ import { useEffect, useState, lazy, Suspense, type ComponentType } from 'react'
 import clsx from 'clsx'
 import {
   House, Sparkle, CalendarBlank, CheckSquare, Kanban, Buildings, UsersThree, AddressBook, Handshake, PenNib, ChartLineUp, MapTrifold,
-  ChartBar, Lightning, Target, GearSix, MagnifyingGlass, CaretUpDown, SidebarSimple, ArrowLeft, Lightbulb, BookOpenText, ChatsCircle, GraduationCap, Timer, Scales, Receipt,
+  ChartBar, Lightning, Target, GearSix, MagnifyingGlass, CaretUpDown, SidebarSimple, ArrowLeft, Lightbulb, BookOpenText, ChatsCircle, GraduationCap, Timer, Scales, Receipt, UploadSimple,
 } from '@phosphor-icons/react'
 import { Logo } from '../landing/chrome'
 import { Avatar, EXPO } from '../ui/kit'
@@ -19,6 +19,7 @@ import { TourHost } from './tour/Tour'
 import { useConversations, useQueue, useDossiers } from '../data/collections'
 import { BriefComposer, openBrief } from './BriefComposer'
 import { FeedbackButton } from './Feedback'
+import { isSimpleMode, setSimpleMode, markDay1 } from '../ui/mode'
 
 const page = (f: () => Promise<{ default: ComponentType }>) => lazy(f)
 const P = {
@@ -45,6 +46,7 @@ const P = {
   temps: page(() => import('./pages/TempsGagne')),
   conformite: page(() => import('./pages/Conformite')),
   factures: page(() => import('./pages/Factures')),
+  import: page(() => import('./pages/Import')),
 }
 
 export const NAV = [
@@ -62,6 +64,7 @@ export const NAV = [
     { to: 'transactions', label: 'Transactions', icon: Handshake },
     { to: 'factures', label: 'Factures & commissions', icon: Receipt },
     { to: 'conformite', label: 'Conformité & veille légale', icon: Scales },
+    { to: 'import', label: 'Importer depuis mon CRM', icon: UploadSimple },
   ] },
   { group: 'Production', items: [
     { to: 'studio', label: 'Studio livrables', icon: PenNib },
@@ -80,14 +83,16 @@ export const NAV = [
 ]
 
 /** Mode simple : navigation réduite à l’essentiel du conseiller (mémorisé localement). */
-const SIMPLE = new Set(['', 'messages', 'agenda', 'taches', 'dossiers', 'biens', 'acquereurs', 'studio', 'aide', 'temps', 'conformite', 'factures'])
+// Premier jour en 3 écrans : Brief (Aujourd’hui), Débrief (Dossiers), Temps gagné ; plus la validation des brouillons, l’import et l’aide.
+const SIMPLE = new Set(['', 'taches', 'dossiers', 'temps', 'import', 'aide'])
 /** Édition Essentiel : CRM épuré pour conseiller indépendant (activée par /essentiel/app). */
 export const isEssentiel = () => { try { return localStorage.getItem('nxt-edition') === 'essentiel' } catch { return false } }
 export const setEdition = (e: 'essentiel' | 'complet') => { try { localStorage.setItem('nxt-edition', e) } catch { /* indisponible */ } }
 
 function useSimpleMode() {
-  const [simple, set] = useState(() => { try { return localStorage.getItem('nxt-simple') === '1' } catch { return false } })
-  const toggle = () => set((v) => { try { localStorage.setItem('nxt-simple', v ? '0' : '1') } catch { /* indisponible */ } return !v })
+  const [simple, set] = useState(isSimpleMode)
+  useEffect(() => { const o = () => set(isSimpleMode()); window.addEventListener('nxt:simple', o); return () => window.removeEventListener('nxt:simple', o) }, [])
+  const toggle = () => setSimpleMode(!simple)
   return { simple, toggle }
 }
 
@@ -215,7 +220,7 @@ export default function CrmApp() {
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [])
-  useEffect(() => { window.scrollTo(0, 0) }, [loc.pathname])
+  useEffect(() => { window.scrollTo(0, 0); if (loc.pathname.endsWith('/temps')) markDay1('temps') }, [loc.pathname])
   // Toute page peut ouvrir le copilote : window.dispatchEvent(new Event('nxt:copilot'))
   useEffect(() => { const o = () => setCopilot(true); window.addEventListener('nxt:copilot', o); return () => window.removeEventListener('nxt:copilot', o) }, [])
   return (
@@ -252,6 +257,7 @@ export default function CrmApp() {
                   <Route path="temps" element={<P.temps />} />
                   <Route path="conformite" element={<P.conformite />} />
                   <Route path="factures" element={<P.factures />} />
+                  <Route path="import" element={<P.import />} />
                 </Routes>
               </motion.div>
             </AnimatePresence>

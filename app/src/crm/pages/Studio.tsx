@@ -9,6 +9,7 @@ import { useDossiers, useDocuments, useOutbox, type Outbox } from '../../data/co
 import { action } from '../../data/store'
 import { STUDIO_CODES, FAN_CODES, EXTERNAL, checksOf, currentMeta, diffOf, type StudioCode, type StudioDocument, type Snapshot } from '../../data/studio'
 import { StudioDoc } from '../studio-docs'
+import { FigureList, UnverifiedConfirm, figuresOf, unverifiedOf, unverifiedText } from '../dossier/deliv-kit'
 import { Modal, AsyncForm, Field, Input, Textarea, toast, errText } from '../forms'
 
 const DOT: Record<DelivState, string> = { done: 'bg-sage', review: 'bg-champagne', running: 'animate-pulse bg-sea', waiting: 'bg-white/15', blocked: 'bg-coral' }
@@ -237,6 +238,11 @@ function Workbench({ sel, dossier, doc, out, busy, editing, setEditing, plan, se
   const hour = new Date(when).getHours()
   const quiet = hour < 8 || hour >= 20
   const sent = out && isSent(out)
+  const figures = figuresOf(doc)
+  const unverified = external ? unverifiedOf(doc).length : 0
+  // Livrable externe avec chiffres non vérifiés : confirmation explicite avant validation (ou validation + programmation).
+  const [asking, setAsking] = useState<null | 'ok' | 'plan'>(null)
+  const guard = (k: 'ok' | 'plan', go: () => void) => () => { if (unverified && state !== 'done') { setAsking(k); if (k === 'plan') setPlan(false) } else go() }
 
   return (
     <>
@@ -308,9 +314,10 @@ function Workbench({ sel, dossier, doc, out, busy, editing, setEditing, plan, se
           <Card>
             {hasFail && <div className="mb-3 flex gap-2 rounded-xl bg-coral/[0.08] p-3 text-[12px] text-coral ring-1 ring-coral/20"><ShieldCheck size={15} className="mt-px shrink-0" />Un contrôle échoue : vérifiez avant toute validation.</div>}
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={onValidate} disabled={!doc || state === 'done' || !!busy || editing} className="col-span-2 flex items-center justify-center gap-2 rounded-full bg-champagne py-2.5 text-[13px] font-medium text-ink shadow-glow transition-all duration-300 ease-silk hover:bg-champagne-300 active:scale-[0.98] disabled:opacity-40 disabled:shadow-none">
+              <button onClick={guard('ok', onValidate)} disabled={!doc || state === 'done' || !!busy || editing} className="col-span-2 flex items-center justify-center gap-2 rounded-full bg-champagne py-2.5 text-[13px] font-medium text-ink shadow-glow transition-all duration-300 ease-silk hover:bg-champagne-300 active:scale-[0.98] disabled:opacity-40 disabled:shadow-none">
                 <CheckCircle size={15} weight="fill" />{busy === 'ok' ? 'Validation…' : state === 'done' ? 'Validé' : hasFail ? 'Valider avec réserve' : 'Valider'}
               </button>
+              {asking && <div className="col-span-2"><UnverifiedConfirm count={unverified} busy={!!busy} onCancel={() => setAsking(null)} onConfirm={() => { const k = asking; setAsking(null); if (k === 'ok') onValidate(); else onSchedule() }} /></div>}
               <button onClick={() => setEditing(!editing)} disabled={!doc} className={`flex items-center justify-center gap-1.5 rounded-full py-2 text-[12.5px] ring-1 transition disabled:opacity-40 ${editing ? 'bg-champagne/15 text-champagne-300 ring-champagne/30' : 'bg-white/[0.04] ring-white/[0.08] hover:bg-white/[0.08]'}`}><PencilSimple size={14} />{editing ? 'Fermer' : 'Modifier'}</button>
               <button onClick={() => onGenerate(doc)} disabled={!!busy} className="flex items-center justify-center gap-1.5 rounded-full bg-white/[0.04] py-2 text-[12.5px] ring-1 ring-white/[0.08] transition hover:bg-white/[0.08] disabled:opacity-50"><ArrowsClockwise size={14} className={regen ? 'animate-spin' : ''} />Régénérer</button>
               <button onClick={onReject} disabled={state === 'done' || state === 'waiting'} className="col-span-2 flex items-center justify-center gap-1.5 rounded-full bg-white/[0.04] py-2 text-[12.5px] ring-1 ring-white/[0.08] transition hover:bg-coral/10 hover:text-coral disabled:opacity-40"><ArrowBendUpLeft size={14} />Renvoyer en correction</button>
@@ -324,7 +331,7 @@ function Workbench({ sel, dossier, doc, out, busy, editing, setEditing, plan, se
                       <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="num mt-2 w-full rounded-xl bg-white/[0.04] px-3 py-2 text-[13px] text-bone ring-1 ring-white/10 focus:outline-none focus:ring-champagne/40" />
                       <div className={`mt-2 text-[11px] ${quiet ? 'text-coral' : 'text-bone/50'}`}>{quiet ? 'Horaire dans la fenêtre calme (20 h → 8 h) : choisissez un autre créneau.' : `${state === 'done' ? 'Déjà validé' : 'Valide le livrable'}, puis consigne l’envoi vers ${doc?.to ?? 'le destinataire'}.`}</div>
                       <div className="mt-2 rounded-lg bg-white/[0.03] px-2.5 py-2 text-[11px] text-bone/55 ring-1 ring-white/[0.06]">Aucun connecteur d’envoi configuré : l’envoi est consigné dans la file, pas réellement émis.</div>
-                      <button onClick={onSchedule} disabled={quiet || !!busy} className="mt-3 w-full rounded-full bg-bone py-2 text-[12.5px] font-medium text-ink transition hover:bg-bone-50 disabled:opacity-40">{busy === 'plan' ? 'Programmation…' : 'Valider et programmer'}</button>
+                      <button onClick={guard('plan', onSchedule)} disabled={quiet || !!busy} className="mt-3 w-full rounded-full bg-bone py-2 text-[12.5px] font-medium text-ink transition hover:bg-bone-50 disabled:opacity-40">{busy === 'plan' ? 'Programmation…' : 'Valider et programmer'}</button>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -346,6 +353,13 @@ function Workbench({ sel, dossier, doc, out, busy, editing, setEditing, plan, se
                 </div>
               </Card>
             </Stagger>
+            {figures.length > 0 && (
+              <Stagger i={5}>
+                <Card title="Chiffres et sources" kicker={`${figures.length} chiffre(s) cité(s)`} action={<span className={`num text-[12px] ${unverifiedOf(doc).length ? 'text-coral' : 'text-sage'}`}>{unverifiedOf(doc).length ? unverifiedText(unverifiedOf(doc).length) : 'Tous sourcés'}</span>}>
+                  <FigureList figures={figures} />
+                </Card>
+              </Stagger>
+            )}
             <Stagger i={5}>
               <Card title="Sources citées" kicker={`${doc.sources?.length ?? 0} référence(s) datée(s)`} action={<BookOpenText size={16} weight="light" className="text-mist" />}>
                 <ol className="space-y-2">

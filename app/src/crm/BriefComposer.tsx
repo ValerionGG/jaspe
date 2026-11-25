@@ -9,6 +9,7 @@ import { SoftBtn } from './ui'
 import { useDossiers } from '../data/collections'
 import { action } from '../data/store'
 import type { PlanItem } from '../data/assist'
+import { markDay1 } from '../ui/mode'
 
 type Rec = { start: () => void; stop: () => void; onresult: ((e: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null; onend: (() => void) | null; onerror: ((e: { error: string }) => void) | null; lang: string; continuous: boolean; interimResults: boolean }
 const SR = () => { const w = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec }; return w.SpeechRecognition ?? w.webkitSpeechRecognition }
@@ -70,6 +71,7 @@ export function BriefComposer() {
     try {
       const r = await action<{ done: PlanItem[] }>('assistant.apply', { dossierId: dossierId || undefined, items, text })
       setDone(r.done)
+      markDay1('brief')
       toast(`${r.done.length} action(s) lancée(s)`)
     } catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
   }

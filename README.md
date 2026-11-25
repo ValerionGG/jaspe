@@ -50,6 +50,14 @@ Réponse aux retours des testeurs (étude complète : `research/05-etude-concurr
 - **Factures & commissions** (`/app/factures`) : brouillon depuis la transaction, validation (numéro FA-AAAA-NNNN figé), envoi consigné, encaissement ; TVA 20 % (FR) ou IVA 23 % (PT, document de préparation à émettre dans un logiciel certifié AT).
 - **Retours bêta** : bouton bulle sur chaque écran, lecture et export dans Réglages ; pays d’exercice et mentions légales dans Réglages › Agence & réseau.
 
+## Vague 1 (benchmark & panel clients, novembre 2026)
+- **Routage IA** (`server/copilot.js`) : Haiku 5.5 pour lire, Sonnet 5.5 pour rédiger, Opus 5.5 pour auditer (compromis, conformité) ; prompt système en cache ; coût de chaque appel journalisé (collection `aicalls`). Modèles surchargeables : `JASPE_MODEL_LIRE`, `JASPE_MODEL_REDIGER`, `JASPE_MODEL_AUDITER`.
+- **Import CSV eGO / Hektor** (`/app/import`, `server/importer.js`) : séparateur et source détectés, colonnes devinées puis corrigeables, prix/surfaces/typologies nettoyés, aucun doublon même en réimportant. Les en-têtes des exports réels restent à confirmer.
+- **Compte rendu vendeur < 24 h** : délai entre la fin du RDV (dossier passé en « post ») et la validation de L1, suivi sur la page Temps gagné, avec la carte « Valeur rendue cette semaine » à copier ou imprimer.
+- **Chiffres sourcés** : chaque livrable liste ses chiffres et leur source ; un chiffre sans source porte « non vérifié » et la validation d’un document client demande confirmation.
+- **Premier jour en 3 écrans** : mode simple par défaut (Aujourd’hui, Tâches, Dossiers, Temps gagné, Import, Aide), carte « Premier jour » (brief → débrief → temps gagné) et stepper compact.
+- Tests serveur : `npm test` (15 tests).
+
 ## Limites assumées
 - Aucun envoi externe réel : e-mails, SMS, courriers, portails, signature, synchro agendas sont **consignés** (« connecteur non configuré »).
 - Pas d’authentification ni de multi-utilisateur : poste local de démonstration (Claire Delmas).

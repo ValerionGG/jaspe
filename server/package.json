@@ -7,7 +7,7 @@
   },
   "scripts": {
     "start": "node --no-warnings index.js",
-    "test": "node --no-warnings --test test.js"
+    "test": "node --no-warnings --test test.js test-copilot.js test-cr24.js test-figures.js test-import.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.128.0"

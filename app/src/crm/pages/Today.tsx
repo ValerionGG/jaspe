@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import clsx from 'clsx'
 import { Sparkle, ArrowRight, CheckCircle, Circle, Phone, PaperPlaneTilt, FileText, ArrowsClockwise, MapPin, Clock, Lightning, Warning, Trophy, BellRinging, ChatsCircle, Compass } from '@phosphor-icons/react'
 import { Card, Stat, Stagger, SoftBtn, DELIV_TONE } from '../ui'
 import { Avatar, Ring, Spark, EXPO } from '../../ui/kit'
@@ -8,6 +9,43 @@ import { prop, me, eur } from '../../data/mock'
 import { NOW } from '../../data/ops'
 import { useTasks, useActivity, useDossiers, useEvents, useQueue, useReminders, useConversations, useTimelog } from '../../data/collections'
 import { openBrief } from '../BriefComposer'
+import { isSimpleMode, readDay1, markDay1 } from '../../ui/mode'
+
+/** Premier jour en 3 écrans : brief, débrief, temps gagné. Chaque étape se coche d’elle-même quand elle est faite. */
+function FirstDay() {
+  const [d1, setD1] = useState(readDay1)
+  const [dossiers] = useDossiers()
+  useEffect(() => { const o = () => setD1(readDay1()); window.addEventListener('nxt:day1', o); return () => window.removeEventListener('nxt:day1', o) }, [])
+  if (!isSimpleMode() || d1.dismissed) return null
+  const rdv = dossiers.find((d) => d.stage === 'rdv') ?? dossiers.find((d) => d.stage === 'prep')
+  const steps = [
+    { k: 'brief' as const, t: 'Dicter un brief', s: 'Une phrase suffit : « Je rappelle le vendeur vendredi après le diagnostic. »', go: () => openBrief() },
+    { k: 'debrief' as const, t: 'Faire le débrief d’un rendez-vous', s: 'Dictez ce qui a été dit ; Jaspe remplit la fiche et prépare les documents.', to: rdv ? `/app/dossiers/${rdv.id}` : '/app/dossiers' },
+    { k: 'temps' as const, t: 'Voir le temps gagné', s: 'Net de la relecture et des corrections, en heures et en euros.', to: '/app/temps' },
+  ]
+  const done = steps.filter((x) => d1[x.k]).length
+  return (
+    <div className="mt-4 rounded-2xl bg-champagne/[0.06] p-4 ring-1 ring-champagne/20">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[13px] font-medium">Premier jour · {done}/3</div>
+        <button onClick={() => markDay1('dismissed')} className="text-[11.5px] text-mist hover:text-bone">Masquer</button>
+      </div>
+      <ol className="mt-3 space-y-2">
+        {steps.map((x, i) => {
+          const body = (
+            <>
+              <span className={clsx('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px]', d1[x.k] ? 'bg-sage/15 text-sage' : 'bg-white/[0.06] text-bone/70')}>{d1[x.k] ? <CheckCircle size={15} weight="fill" /> : <span className="num">{i + 1}</span>}</span>
+              <span className="min-w-0 flex-1"><span className={clsx('block text-[13px]', d1[x.k] && 'text-bone/50 line-through')}>{x.t}</span><span className="block text-[11.5px] text-bone/55">{x.s}</span></span>
+              <ArrowRight size={13} className="shrink-0 text-mist" />
+            </>
+          )
+          const cls = 'flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-white/[0.04]'
+          return <li key={x.k}>{x.to ? <Link to={x.to} className={cls}>{body}</Link> : <button onClick={x.go} className={cls}>{body}</button>}</li>
+        })}
+      </ol>
+    </div>
+  )
+}
 import { action, useCollection } from '../../data/store'
 import { startTour, type TutDoc } from '../tour/tours'
 import { CH, rel, until } from '../messages/shared'
@@ -75,6 +113,7 @@ export default function Today() {
               <SoftBtn icon={<ArrowRight size={14} />} onClick={() => startTour('onboarding')}>Lancer la visite</SoftBtn>
             </div>
           )}
+          <FirstDay />
           <Link to="/app/temps" className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-sage/[0.07] p-3 pr-4 ring-1 ring-sage/20 transition hover:bg-sage/[0.1]">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage/15 text-sage"><Clock size={17} weight="light" /></span>
             <div className="min-w-0 flex-1">

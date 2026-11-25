@@ -9,7 +9,7 @@ import { action } from '../../data/store'
 import { toast, errText } from '../forms'
 import type { Dossier, Property, Agent, DelivState } from '../../data/mock'
 import type { Journey } from '../../data/dossier'
-import type { Outbox } from '../../data/collections'
+import type { Outbox, DocumentDoc } from '../../data/collections'
 import type { StudioDocument } from '../../data/studio'
 
 export const L_CODES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9'] as const
@@ -48,6 +48,48 @@ export type Ctx = {
   save: (patch: Partial<Journey>) => Promise<void>
   open: boolean; toggle: () => void
   openDeliverable: (code: string) => void
+}
+
+/** Chiffre cité par un livrable et sa provenance (server/templates.js · figuresOf). */
+export type Figure = { label: string; value: string; source: string; date?: string; verified: boolean }
+export const figuresOf = (doc?: DocumentDoc): Figure[] => (doc as (DocumentDoc & { figures?: Figure[] }) | undefined)?.figures ?? []
+export const unverifiedOf = (doc?: DocumentDoc) => figuresOf(doc).filter((f) => !f.verified)
+export const unverifiedText = (n: number) => `${n} chiffre${n > 1 ? 's' : ''} non vérifié${n > 1 ? 's' : ''}`
+
+/** Pastille de provenance : vert « sourcé », corail « non vérifié ». */
+export function FigurePill({ ok }: { ok: boolean }) {
+  return <span className={clsx('inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] ring-1', ok ? 'bg-sage/15 text-sage ring-sage/30' : 'bg-coral/15 text-coral ring-coral/30')}><span className={clsx('h-1.5 w-1.5 rounded-full', ok ? 'bg-sage' : 'bg-coral')} />{ok ? 'sourcé' : 'non vérifié'}</span>
+}
+
+/** Liste compacte « Chiffres et sources » : valeur, source, date, pastille. */
+export function FigureList({ figures }: { figures: Figure[] }) {
+  if (!figures.length) return <p className="text-[12px] text-mist">Aucun chiffre dans ce livrable.</p>
+  return (
+    <ul className="divide-y divide-white/[0.05]">
+      {figures.map((f, i) => (
+        <li key={`${f.label}-${i}`} className="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="flex flex-wrap items-baseline gap-x-2 text-[12.5px]"><span className="text-bone/60">{f.label}</span><span className="num break-words text-bone">{f.value}</span></div>
+            <div className={clsx('mt-0.5 break-words text-[11px]', f.verified ? 'text-mist' : 'text-coral/90')}>{f.source}{f.date && <> · <span className="num">{f.date}</span></>}</div>
+          </div>
+          <FigurePill ok={f.verified} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Bandeau de confirmation avant de valider un livrable externe contenant des chiffres non vérifiés. */
+export function UnverifiedConfirm({ count, onConfirm, onCancel, busy }: { count: number; onConfirm: () => void; onCancel: () => void; busy?: boolean }) {
+  return (
+    <div role="alertdialog" aria-label="Chiffres non vérifiés" className="flex flex-col gap-2.5 rounded-xl bg-coral/10 px-3.5 py-3 text-[12.5px] text-coral ring-1 ring-coral/20 sm:flex-row sm:items-center sm:justify-between">
+      <span className="flex items-start gap-2"><Warning size={15} weight="fill" className="mt-px shrink-0" />{unverifiedText(count)} : valider quand même ? Le document part chez le client.</span>
+      <span className="flex shrink-0 gap-2">
+        <button type="button" onClick={onCancel} className="rounded-full bg-white/[0.04] px-3 py-1.5 text-[12px] text-bone/80 ring-1 ring-white/10 transition hover:bg-white/[0.08]">Vérifier d’abord</button>
+        <button type="button" onClick={onConfirm} disabled={busy} className="rounded-full bg-coral/20 px-3 py-1.5 text-[12px] font-medium text-coral ring-1 ring-coral/40 transition hover:bg-coral/30 disabled:opacity-50">Valider quand même</button>
+      </span>
+    </div>
+  )
 }
 
 export const dt = (iso?: string) => (iso ? new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—')
@@ -104,7 +146,10 @@ export function DelivSection({ code, ctx, gate, beforeValidate, children, aside 
   const { busy, run } = useBusy()
   const ext = EXTERNAL.has(code)
   const generate = () => run('gen', () => action('deliverable.generate', { dossierId: d.id, code }), doc ? `${code} · version ${doc.version + 1} générée` : `${code} généré`)
-  const validate = () => run('ok', async () => { await beforeValidate?.(); return action('deliverable.validate', { dossierId: d.id, code }) }, ext ? `${code} validé — envoi consigné dans la file` : `${code} validé`)
+  const unverified = ext ? unverifiedOf(doc).length : 0
+  const [confirming, setConfirming] = useState(false)
+  const doValidate = () => { setConfirming(false); return run('ok', async () => { await beforeValidate?.(); return action('deliverable.validate', { dossierId: d.id, code }) }, ext ? `${code} validé — envoi consigné dans la file` : `${code} validé`) }
+  const validate = () => (unverified ? setConfirming(true) : doValidate())
   return (
     <section id={`deliv-${code}`} className="scroll-mt-36">
       <Card pad={false}>
@@ -147,6 +192,11 @@ export function DelivSection({ code, ctx, gate, beforeValidate, children, aside 
                   </div>
                 )}
                 {doc && children(doc)}
+                {doc && figuresOf(doc).length > 0 && (
+                  <Panel title="Chiffres et sources" className="mt-5" action={<span className={clsx('num text-[11px]', unverifiedOf(doc).length ? 'text-coral' : 'text-sage')}>{unverifiedOf(doc).length ? unverifiedText(unverifiedOf(doc).length) : 'Tous sourcés'}</span>}>
+                    <FigureList figures={figuresOf(doc)} />
+                  </Panel>
+                )}
 
                 {doc && (
                   <div className="mt-5 flex flex-col gap-4 border-t border-white/[0.05] pt-4 lg:flex-row lg:items-end lg:justify-between">
@@ -169,6 +219,7 @@ export function DelivSection({ code, ctx, gate, beforeValidate, children, aside 
                     </div>
                   </div>
                 )}
+                {doc && confirming && state !== 'done' && <div className="mt-3"><UnverifiedConfirm count={unverified} busy={!!busy} onCancel={() => setConfirming(false)} onConfirm={doValidate} /></div>}
                 {doc && state !== 'done' && (gate || state === 'blocked') && <p className="mt-2 text-right text-[11.5px] text-champagne-300">{state === 'blocked' ? 'Bloqué : corrigez les points signalés puis régénérez.' : gate}</p>}
               </div>
             </motion.div>
