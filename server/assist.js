@@ -174,6 +174,12 @@ export function createAssist(db, { put, patch, activity, notify, run, generate, 
       if (auto[def.id]) return { ...def, state: 'ok', auto: true, evidence: auto[def.id], due }
       return { ...def, state: due && def.required ? 'blocked' : 'todo', auto: false, evidence: '', due }
     })
+    // Pack Preuves : pièces et déclarations reçues par lien client, rattachées à leur point (le conseiller valide).
+    const proofs = db.list('proofs').filter((x) => x.dossierId === dossierId)
+    for (const i of items) {
+      const r = proofs.filter((x) => x.itemId === i.id).map((x) => ({ id: x.id, kind: x.kind, name: x.name, at: x.at, sha256: x.sha256, fileId: x.fileId, by: x.by }))
+      if (r.length) i.proofs = r; else delete i.proofs
+    }
     const blocking = items.filter((i) => i.state === 'blocked')
     const doc = put('compliance', { id, dossierId, country: c, stage: d.stage, items, score: Math.round((items.filter((i) => i.state === 'ok' || i.state === 'na').length / items.length) * 100), blocking: blocking.length, at: new Date().toISOString() })
     return doc
@@ -213,6 +219,9 @@ export function createAssist(db, { put, patch, activity, notify, run, generate, 
       if (state === 'ok' && !String(evidence).trim()) throw new HttpError(400, 'Indiquez la preuve ou la référence du document')
       const items = cur.items.map((i) => (i.id === itemId ? { ...i, state, evidence, auto: false, by: 'Claire Delmas', updatedAt: new Date().toISOString() } : i))
       put('compliance', { ...cur, items })
+      // Journal horodaté en ajout seul (export de contrôle du Pack Preuves).
+      const before = cur.items.find((i) => i.id === itemId)
+      put('cmplog', { dossierId, at: new Date().toISOString(), by: 'Claire Delmas', kind: 'checklist', itemId, from: before.state, to: state, what: `« ${before.label.split(' (')[0].slice(0, 80)} » : ${before.state} → ${state}${evidence ? ` — ${String(evidence).slice(0, 200)}` : ''}` })
       if (state === 'ok') logTime({ kind: 'conformite', dossierId, ref: `cmp-${dossierId}-${itemId}`, spent: 2, label: `Conformité : ${cur.items.find((i) => i.id === itemId).label.slice(0, 60)}` })
       return evaluate(dossierId)
     },
@@ -223,10 +232,13 @@ export function createAssist(db, { put, patch, activity, notify, run, generate, 
       return { country: c }
     },
 
-    'invoice.fromTransaction': ({ txId }) => {
+    // Deux modèles : « agence » (agence → client débiteur des honoraires) et « mandataire »
+    // (l'agent commercial indépendant facture sa quote-part au réseau ou à l'agence ; la créance vise le réseau).
+    'invoice.fromTransaction': ({ txId, template = 'agence', agentShare }) => {
       const tx = db.get('transactions', txId)
       if (!tx) throw new HttpError(404, 'Transaction introuvable')
-      const existing = db.list('invoices').find((i) => i.txId === txId && i.status !== 'annulée')
+      if (!['agence', 'mandataire'].includes(template)) throw new HttpError(400, 'Modèle de facture : agence ou mandataire')
+      const existing = db.list('invoices').find((i) => i.txId === txId && i.status !== 'annulée' && (i.template ?? 'agence') === template)
       if (existing) return existing
       const c = country(), s = settings()
       const rate = c === 'PT' ? 0.23 : 0.2
@@ -235,9 +247,58 @@ export function createAssist(db, { put, patch, activity, notify, run, generate, 
       const vat = Math.round(ht * rate * 100) / 100
       const ttc = Math.round((ht + vat) * 100) / 100
       const prop = db.get('properties', tx.propertyId) ?? {}
+      const where = `${prop.title ?? tx.propertyId}${prop.city ? `, ${prop.city}` : ''}`
+      if (template === 'mandataire') {
+        const cfg = db.get('settings', 'invoicing') ?? {}, ag = cfg.agent ?? {}, net = cfg.network ?? {}
+        // Quote-part : celle passée par le conseiller, sinon la ligne « mandataire / agent / consultor » de la répartition, sinon la première.
+        const pick = (tx.split ?? []).find((x) => /mandataire|agent|conseill|consultor/i.test(x.role ?? '')) ?? (tx.split ?? [])[0]
+        const share = Number(agentShare ?? pick?.pct ?? 100)
+        if (!(share > 0 && share <= 100)) throw new HttpError(400, 'Quote-part du mandataire : entre 0 et 100 %')
+        const regimeSet = c === 'PT' ? !!ag.ptVatRegime : !!ag.vatRegime
+        const exempt = c === 'PT' ? (ag.ptVatRegime ?? 'isencao53') === 'isencao53' : (ag.vatRegime ?? 'franchise') === 'franchise'
+        const mRate = exempt ? 0 : rate
+        const mHt = Math.round(ht * share) / 100
+        const mVat = Math.round(mHt * mRate * 100) / 100
+        const fmt = (n) => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        const inv = put('invoices', {
+          txId, dossierId: tx.dossier, country: c, template: 'mandataire', number: null, status: 'brouillon', createdAt: new Date().toISOString(),
+          client: net.name ?? s.agencyName ?? (c === 'PT' ? 'Rede / agência mandante' : 'Réseau / agence mandante'), payerRole: 'réseau',
+          object: c === 'PT'
+            ? `Comissão do consultor — ${share} % da comissão s/ IVA (${fmt(ht)} €) — venda ${where}`
+            : `Commission d’agent commercial — quote-part ${share.toLocaleString('fr-FR')} % des honoraires HT (${fmt(ht)} €) — vente ${where}`,
+          price: tx.price, ht: mHt, vatRate: mRate, vat: mVat, ttc: Math.round((mHt + mVat) * 100) / 100,
+          due: c === 'PT' ? 'A pagamento da comissão pela agência' : 'À l’encaissement des honoraires par le mandant, selon le contrat d’agent commercial',
+          share: { pct: share, base: ht, from: pick?.agency ?? null }, vatRegime: exempt ? (c === 'PT' ? 'isencao53' : 'franchise') : 'normal', regimeToConfirm: !regimeSet,
+          split: [],
+          issuer: {
+            name: ag.name ?? (c === 'PT' ? 'Consultor — nome a completar' : 'Mandataire — nom à compléter'),
+            legal: c === 'PT'
+              ? `Trabalhador independente (categoria B) · NIF ${ag.nif ?? 'a completar'}`
+              : `Agent commercial · RSAC ${ag.rsac ?? 'à compléter'} · SIREN ${ag.siren ?? 'à compléter'}${exempt ? '' : ` · TVA ${ag.vatId ?? 'à compléter'}`}`,
+          },
+          mentions: c === 'PT'
+            ? [
+                'Documento de preparação : emitir como fatura-recibo (recibo verde) no Portal das Finanças ou num programa certificado AT.',
+                exempt ? 'IVA — regime de isenção, art. 53.º do CIVA.' : `IVA à taxa normal de ${rate * 100} %.`,
+                'Retenção na fonte de IRS (art. 101.º CIRS) : taxa a confirmar conforme a situação do consultor.',
+                ...(regimeSet ? [] : ['Regime de IVA a confirmar nas definições de faturação.']),
+              ]
+            : [
+                `Agent commercial (C. com. art. L134-1 et s.) immatriculé au RSAC de ${ag.rsac ?? '… (à compléter)'}.`,
+                exempt ? 'TVA non applicable, art. 293 B du CGI.' : `TVA ${rate * 100} %.`,
+                'Commission due par le mandant au titre du contrat d’agent commercial : la créance vise le réseau, non le client final.',
+                'Pénalités de retard : trois fois le taux d’intérêt légal ; indemnité forfaitaire pour frais de recouvrement : 40 € (C. com. art. L441-10).',
+                'Facturation électronique : émission obligatoire pour les TPE-PME au 1er septembre 2027, via une plateforme agréée.',
+                ...(regimeSet ? [] : ['Régime de TVA à confirmer dans les réglages de facturation (franchise en base par défaut).']),
+              ],
+        }, { front: true })
+        logTime({ kind: 'facture', dossierId: tx.dossier, ref: `inv-${inv.id}`, pending: true })
+        activity('Copilote', `a préparé la facture du mandataire (${share} %) — ${tx.seller} → ${tx.buyer}`, 'ai', '/app/factures')
+        return inv
+      }
       const payer = tx.feePayer === 'vendeur' ? tx.seller : tx.buyer
       const inv = put('invoices', {
-        txId, dossierId: tx.dossier, country: c, number: null, status: 'brouillon', createdAt: new Date().toISOString(),
+        txId, dossierId: tx.dossier, country: c, template: 'agence', vatRegime: 'normal', number: null, status: 'brouillon', createdAt: new Date().toISOString(),
         client: payer, payerRole: tx.feePayer, object: `Honoraires de négociation — vente ${prop.title ?? tx.propertyId}${prop.city ? `, ${prop.city}` : ''} (prix ${tx.price.toLocaleString('fr-FR')} €)`,
         price: tx.price, ht, vatRate: rate, vat, ttc, due: 'À réception, au plus tard à la signature de l’acte',
         split: (tx.split ?? []).map((x) => ({ ...x, amount: Math.round(ht * x.pct) / 100 })),

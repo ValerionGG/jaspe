@@ -7,7 +7,7 @@ export type TimeKind = keyof typeof BASELINES
 
 export type TimeEntry = { id: string; at: string; kind: string; label: string; dossierId?: string; ref?: string; baseline: number; spent: number; net: number; corrections: number; demo?: boolean }
 export type CmpState = 'ok' | 'todo' | 'blocked' | 'na'
-export type CmpItem = { id: string; phase: string; side: string; label: string; law: string; required: boolean; state: CmpState; auto: boolean; evidence: string; due: boolean; by?: string; updatedAt?: string }
+export type CmpItem = { id: string; phase: string; side: string; label: string; law: string; required: boolean; state: CmpState; auto: boolean; evidence: string; due: boolean; by?: string; updatedAt?: string; proofs?: { id: string; kind: 'file' | 'declaration'; name: string; at: string; sha256: string; fileId?: string; by: string }[] }
 export type Compliance = { id: string; dossierId: string; country: 'FR' | 'PT'; stage: string; items: CmpItem[]; score: number; blocking: number; at: string }
 export type InvoiceStatus = 'brouillon' | 'validée' | 'envoyée' | 'payée' | 'annulée'
 export type Invoice = {
@@ -15,6 +15,23 @@ export type Invoice = {
   client: string; payerRole: string; object: string; price: number; ht: number; vatRate: number; vat: number; ttc: number; due: string
   split: { agency: string; pct: number; role?: string; amount: number }[]; issuer: { name: string; legal: string }; mentions: string[]
   validatedAt?: string; sentAt?: string; paidAt?: string; sendNote?: string; cancelNote?: string
+  /** « agence » : agence → client ; « mandataire » : agent commercial / consultor → réseau ou agence. */
+  template?: InvoiceTemplate; share?: { pct: number; base: number; from: string | null }
+  vatRegime?: 'normal' | 'franchise' | 'isencao53'; regimeToConfirm?: boolean
+  /** Émission par un logiciel certifié (PT) ou Factur-X figé (FR). */
+  legal?: InvoiceLegal; facturx?: { xml: string; filename: string }
+}
+export type InvoiceTemplate = 'agence' | 'mandataire'
+export type InvoiceLegal = {
+  provider: 'invoicexpress' | 'facturx'; state?: 'draft' | 'final'; externalId?: number; legalNumber?: string | null; atcud?: string | null
+  pdfUrl?: string | null; permalink?: string | null; pdfPending?: boolean; issuedAt?: string; note?: string; filename?: string; format?: string; transmission?: string
+}
+export type BillingParty = { name?: string; siren?: string; vatId?: string; address?: string; postcode?: string; city?: string; nif?: string; rsac?: string; vatRegime?: 'franchise' | 'assujetti'; ptVatRegime?: 'isencao53' | 'normal' }
+export type InvoicingConnector = {
+  country: 'FR' | 'PT'
+  invoicexpress: { configured: boolean; account: string | null; note: string }
+  facturx: { profile: string; note: string }
+  settings: { seller?: BillingParty; agent?: BillingParty; network?: BillingParty }
 }
 export type RegWatch = { id: string; country: 'FR' | 'PT' | 'UE'; date: string; title: string; summary: string; impact: string; action: string; source: string; sourceLabel: string; status: 'en vigueur' | 'à venir' | 'à surveiller'; verified: string }
 export type Feedback = { id: string; text: string; page?: string; mood?: string; at: string; by: string }

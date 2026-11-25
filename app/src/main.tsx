@@ -1,4 +1,4 @@
-import { StrictMode, lazy, Suspense } from 'react'
+import { StrictMode, lazy, Suspense, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
@@ -28,6 +28,12 @@ if (import.meta.env.VITE_STATIC === '1') {
 const CrmApp = lazy(() => import('./crm/CrmApp'))
 const Essentiel = lazy(() => import('./landing/Essentiel'))
 const Portail = lazy(() => import('./landing/Portail'))
+const Tarifs = lazy(() => import('./landing/Tarifs'))
+const Connexion = lazy(() => import('./landing/Compte').then((m) => ({ default: m.Connexion })))
+const Inscription = lazy(() => import('./landing/Compte').then((m) => ({ default: m.Inscription })))
+const Invitation = lazy(() => import('./landing/Compte').then((m) => ({ default: m.Invitation })))
+const DepotClient = lazy(() => import('./landing/DepotClient'))
+const page = (el: ReactNode) => <Suspense fallback={<div className="h-screen bg-ink" />}>{el}</Suspense>
 
 /** Entrée de l’édition Essentiel du CRM : mémorise l’édition puis ouvre le CRM. */
 function EssentielApp() {
@@ -45,6 +51,11 @@ const w = window as unknown as { __nxtRoot?: ReturnType<typeof createRoot> }
         <Route path="/essentiel/app" element={<EssentielApp />} />
         <Route path="/portail" element={<Suspense fallback={<div className="h-screen bg-ink" />}><Portail /></Suspense>} />
         <Route path="/essentiel" element={<Suspense fallback={<div className="h-screen bg-ink" />}><Essentiel /></Suspense>} />
+        <Route path="/tarifs" element={page(<Tarifs />)} />
+        <Route path="/connexion" element={page(<Connexion />)} />
+        <Route path="/inscription" element={page(<Inscription />)} />
+        <Route path="/invitation/:token" element={page(<Invitation />)} />
+        <Route path="/depot/:token" element={page(<DepotClient />)} />
         <Route path="/app/*" element={<Suspense fallback={<div className="h-screen bg-ink" />}><CrmApp /></Suspense>} />
       </Routes>
     </Router>

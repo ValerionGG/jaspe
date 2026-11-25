@@ -8,6 +8,7 @@ import { useCompliance, useRegwatch, useDossiers, useProperties, useSettings } f
 import type { Compliance, CmpItem, CmpState, RegWatch } from '../../data/assist'
 import { action } from '../../data/store'
 import { Modal, Field, Textarea, toast, errText } from '../forms'
+import { PreuvesPanel, ImpicPanel } from './conformite-preuves'
 
 type Country = 'FR' | 'PT'
 const STATE: Record<CmpState, { l: string; tone: 'green' | 'red' | 'neutral' | 'blue' }> = {
@@ -28,7 +29,8 @@ export default function Conformite() {
   const [watch] = useRegwatch()
   const [settings] = useSettings()
   const [local, setLocal] = useState<Record<string, Compliance>>({})
-  const [tab, setTab] = useState<'dossiers' | 'veille'>('dossiers')
+  const [tab, setTab] = useState<'dossiers' | 'veille' | 'impic'>('dossiers')
+  const [pane, setPane] = useState<'checklist' | 'preuves'>('checklist')
   const [selId, setSelId] = useState<string | null>(null)
   const [onlyDue, setOnlyDue] = useState(false)
   const [evaluating, setEvaluating] = useState(false)
@@ -99,7 +101,13 @@ export default function Conformite() {
     } catch (e) { toast(errText(e), 'error'); return false }
   }
 
-  const openModal = (item: CmpItem, mode: 'ok' | 'na') => { setEvidence(item.state === mode ? item.evidence : ''); setModal({ item, mode }) }
+  // Une pièce reçue par lien client pré-remplit la preuve : le conseiller la vérifie avant de valider.
+  const proofText = (item: CmpItem) => (item.proofs?.length ? `Reçu par lien client : ${item.proofs.map((p) => `${p.name} (${new Date(p.at).toLocaleDateString('fr-FR')}, SHA-256 ${p.sha256.slice(0, 12)}…)`).join(' ; ')}` : '')
+  const openModal = (item: CmpItem, mode: 'ok' | 'na') => { setEvidence(item.state === mode ? item.evidence : mode === 'ok' ? proofText(item) : ''); setModal({ item, mode }) }
+  const refreshSelected = async () => {
+    if (!selected) return
+    try { const doc = await action<Compliance>('compliance.evaluate', { dossierId: selected.d.id }); setLocal((m) => ({ ...m, [selected.d.id]: doc })) } catch { /* affichage existant conservé */ }
+  }
   const submitModal = async () => {
     if (!modal || !evidence.trim()) return
     setSaving(true)
@@ -142,6 +150,7 @@ export default function Conformite() {
         <Tabs id="conformite" value={tab} onChange={setTab} items={[
           { id: 'dossiers', label: 'Dossiers', count: totalBlocking || undefined },
           { id: 'veille', label: 'Veille réglementaire', count: watchList.length },
+          ...(country === 'PT' ? [{ id: 'impic' as const, label: 'IMPIC trimestral' }] : []),
         ]} />
       </div>
 
@@ -167,8 +176,20 @@ export default function Conformite() {
             )}
           </Card>
 
-          <div ref={detailRef} className="scroll-mt-6">
-            {!selected ? (
+          <div ref={detailRef} className="scroll-mt-6 space-y-4">
+            {selected && (
+              <div role="tablist" aria-label="Vue du dossier" className="flex gap-1 rounded-full bg-white/[0.03] p-1 ring-1 ring-white/[0.06] sm:w-max">
+                {([['checklist', 'Checklist'], ['preuves', 'Preuves']] as const).map(([k, l]) => (
+                  <button key={k} role="tab" aria-selected={pane === k} onClick={() => setPane(k)}
+                    className={clsx('flex-1 rounded-full px-4 py-1.5 text-[13px] transition', pane === k ? 'bg-white/[0.09] text-bone ring-1 ring-white/10' : 'text-bone/55 hover:text-bone')}>
+                    {l}{k === 'preuves' && <span className="ml-1.5 text-[10.5px] text-champagne-300">Pack Preuves</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {selected && pane === 'preuves' ? (
+              <PreuvesPanel dossierId={selected.d.id} onChecklistChange={() => void refreshSelected()} />
+            ) : !selected ? (
               <Card><Empty title="Choisissez un dossier">Le détail des points de contrôle s’affiche ici, groupé par phase.</Empty></Card>
             ) : !selected.c ? (
               <Card><Empty title="Évaluation en cours">Le dossier {selected.d.ref} est en cours d’analyse.</Empty></Card>
@@ -179,6 +200,8 @@ export default function Conformite() {
           </div>
         </div>
       )}
+
+      {tab === 'impic' && country === 'PT' && <ImpicPanel />}
 
       {tab === 'veille' && (
         <div className="space-y-4">
@@ -286,6 +309,17 @@ function Detail({ cmp, title, sub, onlyDue, setOnlyDue, onValidate, onNa, onTodo
                     </div>
                     <p className="mt-2 text-[13.5px] leading-snug">{i.label}</p>
                     <p className="mt-1 flex items-center gap-1.5 text-[11.5px] text-mist"><Scales size={12} />{i.law}</p>
+                    {i.proofs && i.proofs.length > 0 && (
+                      <ul className="mt-2 space-y-1">
+                        {i.proofs.map((p) => (
+                          <li key={p.id} className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-bone/70">
+                            <Pill tone="gold">{p.kind === 'file' ? 'Pièce reçue' : 'Déclaration'}</Pill>
+                            {p.fileId ? <a href={`/api/files/${p.fileId}/raw`} target="_blank" rel="noreferrer" className="break-all hover:underline">{p.name}</a> : <span>{p.name}</span>}
+                            <span className="text-mist">· {new Date(p.at).toLocaleDateString('fr-FR')} · SHA-256 {p.sha256.slice(0, 10)}…</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     {i.evidence && <p className="mt-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5 text-[12px] text-bone/70 ring-1 ring-white/[0.05]"><span className="text-mist">{i.state === 'na' ? 'Motif' : 'Preuve'} : </span>{i.evidence}{i.by && !i.auto && <span className="text-mist"> · {i.by}{i.updatedAt ? `, ${new Date(i.updatedAt).toLocaleDateString('fr-FR')}` : ''}</span>}</p>}
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {i.state !== 'ok' && <SoftBtn onClick={() => onValidate(i)} icon={<ShieldCheck size={13} />}>Valider</SoftBtn>}

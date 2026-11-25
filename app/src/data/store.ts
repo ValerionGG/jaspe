@@ -163,3 +163,47 @@ export function useApiStatus(): Status {
   useEffect(() => { connect() }, [])
   return useSyncExternalStore((f) => { statusSubs.add(f); return () => statusSubs.delete(f) }, () => status)
 }
+
+/* ——— Comptes (serveur lancé avec JASPE_AUTH=1) ——— */
+export type PlanId = 'decouverte' | 'solo' | 'agence'
+export type Me =
+  | { mode: 'static' | 'demo' | 'offline' }
+  | { mode: 'auth'; user: { id: string; name: string; email: string; role: 'owner' | 'conseiller' }; org: { id: string; name: string; country: string }
+      plan: { id: PlanId; label: string; subscribed: string; status: string; period?: string; options: string[]; seats: number; periodEnd?: string; cancelAtPeriodEnd: boolean; customer: boolean }
+      limits: { dossiers: number | null; seats: number }; usage: { dossiers: number; seats: number }; billing: { configured: boolean } }
+  | { mode: 'anonymous' }
+
+/** Appel brut vers l’API des comptes / de la facturation (erreurs → ApiError avec le message du serveur). */
+export const authCall = <T = unknown>(method: string, path: string, body?: unknown) => http<T>(method, path, body)
+
+const AUTH_FLAG = 'jaspe-auth'
+let me: Me | null = null
+let mePromise: Promise<Me> | null = null
+const meSubs = new Set<() => void>()
+export const authKnown = () => { try { return localStorage.getItem(AUTH_FLAG) === '1' } catch { return false } }
+function setMe(v: Me) {
+  me = v
+  try { if (v.mode === 'auth' || v.mode === 'anonymous') localStorage.setItem(AUTH_FLAG, '1'); else if (v.mode === 'demo') localStorage.removeItem(AUTH_FLAG) } catch { /* indisponible */ }
+  meSubs.forEach((f) => f())
+}
+export function refreshMe(): Promise<Me> {
+  if (STATIC) { setMe({ mode: 'static' }); return Promise.resolve(me!) }
+  mePromise = fetch('/api/me').then(async (r) => {
+    if (r.status === 401) return { mode: 'anonymous' } as Me
+    if (!r.ok) return { mode: 'offline' } as Me
+    return (await r.json()) as Me
+  }, () => ({ mode: 'offline' }) as Me).then((v) => { setMe(v); return v })
+  return mePromise
+}
+/** Compte courant : `null` tant que le serveur n’a pas répondu. */
+export function useMe(): Me | null {
+  useEffect(() => { if (!mePromise) refreshMe() }, [])
+  return useSyncExternalStore((f) => { meSubs.add(f); return () => meSubs.delete(f) }, () => me)
+}
+/** Après connexion / déconnexion : oublie le cache local (pour ne jamais mélanger deux agences). */
+export function resetLocalData() {
+  cache.clear(); loading.clear()
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith('nxt:col:')) localStorage.removeItem(k) } catch { /* indisponible */ }
+  stream?.close(); stream = null
+  mePromise = null
+}

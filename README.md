@@ -60,9 +60,21 @@ Réponse aux retours des testeurs (étude complète : `research/05-etude-concurr
 
 ## Limites assumées
 - Aucun envoi externe réel : e-mails, SMS, courriers, portails, signature, synchro agendas sont **consignés** (« connecteur non configuré »).
-- Pas d’authentification ni de multi-utilisateur : poste local de démonstration (Claire Delmas).
+- Sans `JASPE_AUTH=1` : pas d’authentification ni de multi-utilisateur, poste local de démonstration (Claire Delmas).
 - Données de démonstration synthétiques ; certaines séries historiques (pilotage) sont des amorces étiquetées.
 - Pinterest inaccessible sans compte pendant la recherche visuelle.
+- Contenus juridiques (checklists, grille LCB-FT, listes GAFI d’octobre 2025, mentions de facture, durées de conservation) : aide, pas un avis ; à faire relire par un juriste FR et un juriste PT.
+
+## Pack Preuves (vague 2)
+`server/evidence.js`, page Conformité › Preuves. Grille de risque LCB-FT/BCFT par partie (facteurs expliqués, signaux du brief pré-cochés, décision et justification du conseiller), lien client sans compte `/depot/:jeton` (14 jours, PDF/JPG/PNG vérifiés, 10 Mo, empreinte SHA-256, rattachement au point de checklist, déclaration d’origine des fonds), export de contrôle horodaté (HTML imprimable + JSON + empreinte), récapitulatif trimestriel IMPIC (Portugal, champs à confirmer). Avec les comptes, le jeton porte l’agence (`orgId.jeton`).
+
+## Factures émises par un logiciel certifié (vague 2)
+`server/invoicing.js`, page Factures. Deux modèles : agence → client et mandataire → réseau (franchise 293 B, recibo verde / art. 53.º CIVA selon réglage). Portugal : émission via l’API InvoiceXpress (`INVOICEXPRESS_API_KEY`, `INVOICEXPRESS_ACCOUNT`) qui renvoie numéro légal, ATCUD et PDF ; constantes de taxe marquées « à confirmer ». France : XML Factur-X EN 16931 (CII) à transmettre via une plateforme agréée ; pas de PDF/A-3 hybride.
+
+## Comptes et paiement (vague 2)
+Activer : `JASPE_AUTH=1` (comptes, une base par agence dans `server/data/orgs/<orgId>.sqlite`, comptes et abonnements dans `server/data/accounts.sqlite`). Paiement : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_SOLO_MONTH`, `STRIPE_PRICE_SOLO_YEAR`, `STRIPE_PRICE_AGENCE`, `STRIPE_PRICE_SEAT`, `STRIPE_PRICE_PREUVES`, `STRIPE_PRICE_DONNEES` ; option `JASPE_PUBLIC_URL` pour les URL de retour. Webhook Stripe : `POST /api/billing/webhook` (événements checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed). Sans clé : 503 « Paiement non configuré ». Pages publiques `/tarifs`, `/connexion`, `/inscription`, `/invitation/:token`. Remboursement 15 jours et garantie « 2 h gagnées » : traités à la main. Pas de réinitialisation de mot de passe par e-mail (aucun envoi réel).
+
+Tests serveur : `npm test` (41 tests, aucun appel réseau réel : Stripe et InvoiceXpress sont simulés).
 
 ## Recherche
 `research/` : inspiration (Dribbble/Behance/Awwwards/sites), motion (MotionSites & co), benchmark de ~55 acteurs, 398 idées + 100 routines — consultables dans le CRM, page « Étude & benchmark ».

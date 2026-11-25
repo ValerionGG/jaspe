@@ -3,6 +3,7 @@ import { buildDocument, qualityCheck, NAMES, EXTERNAL } from './templates.js'
 import { createMessaging } from './messaging.js'
 import { createAssist, REVIEW_MIN, CORRECTION_MIN } from './assist.js'
 import { createImporter } from './importer.js'
+import { createInvoicing } from './invoicing.js'
 
 const L_CODES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9']
 const hhmm = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -74,6 +75,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
     ...messaging.actions,
     ...assist.actions,
     ...createImporter(db, { put, activity, HttpError }).actions,
+    ...createInvoicing(db, { put, patch, activity, HttpError }).actions,
     'deliverable.generate': ({ dossierId, code }) => generate(dossierId, code),
     'deliverable.generateAll': ({ dossierId, codes }) => generateAll(dossierId, codes),
     'deliverable.validate': ({ dossierId, code, by = 'Claire Delmas', reviewSec }) => {
@@ -220,7 +222,13 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
     return out
   }
 
-  return { actions, tick, ENGINE_IDS, generate }
+  /** Branche un module qui a besoin d’API Node (preuves : empreintes, fichiers) sans les importer ici : ce fichier tourne aussi dans le navigateur. */
+  const extend = ({ actions: more = {}, rules: extra = {} } = {}) => {
+    Object.assign(actions, more)
+    for (const [id, rule] of Object.entries(extra)) { if (!RULES[id]) ENGINE_IDS.push(id); RULES[id] = rule }
+  }
+
+  return { actions, tick, ENGINE_IDS, generate, extend }
 }
 
 export class HttpError extends Error { constructor(status, message) { super(message); this.status = status } }

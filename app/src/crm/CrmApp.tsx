@@ -20,6 +20,7 @@ import { useConversations, useQueue, useDossiers } from '../data/collections'
 import { BriefComposer, openBrief } from './BriefComposer'
 import { FeedbackButton } from './Feedback'
 import { isSimpleMode, setSimpleMode, markDay1 } from '../ui/mode'
+import { useMe, authKnown } from '../data/store'
 
 const page = (f: () => Promise<{ default: ComponentType }>) => lazy(f)
 const P = {
@@ -223,6 +224,11 @@ export default function CrmApp() {
   useEffect(() => { window.scrollTo(0, 0); if (loc.pathname.endsWith('/temps')) markDay1('temps') }, [loc.pathname])
   // Toute page peut ouvrir le copilote : window.dispatchEvent(new Event('nxt:copilot'))
   useEffect(() => { const o = () => setCopilot(true); window.addEventListener('nxt:copilot', o); return () => window.removeEventListener('nxt:copilot', o) }, [])
+  // Mode comptes (JASPE_AUTH=1) : sans session, direction la page de connexion. En démo, rien ne change.
+  const account = useMe()
+  const go = useNavigate()
+  useEffect(() => { if (account?.mode === 'anonymous') go(`/connexion?next=${encodeURIComponent(loc.pathname)}`, { replace: true }) }, [account, go, loc.pathname])
+  if (authKnown() && (!account || account.mode === 'anonymous')) return <div className="h-screen bg-ink" />
   return (
     <div className="min-h-screen bg-ink text-bone">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(1200px_600px_at_80%_-10%,var(--halo-a),transparent_60%),radial-gradient(900px_500px_at_0%_110%,var(--halo-b),transparent_60%)]" />
