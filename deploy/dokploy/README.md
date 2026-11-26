@@ -20,7 +20,7 @@ Sans le volume, chaque redéploiement efface les comptes. Ne jamais supprimer le
 
 | Fonction | Variables | Sans la clé |
 |---|---|---|
-| Copilote en langage libre, lecture des compromis PDF | `ANTHROPIC_API_KEY` | réponses et extraction par règles |
+| Copilote en langage libre, lecture des compromis PDF | `ANTHROPIC_API_KEY` **ou** `OPENROUTER_API_KEY` (option `OPENROUTER_MODEL`) | réponses et extraction par règles |
 | Envoi réel des e-mails (comptes rendus, invitations, mot de passe oublié) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_SECURE` | envois consignés, pas émis |
 | Débrief WhatsApp | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` ; webhook Meta : `https://<domaine>/api/whatsapp/webhook` | débrief dans l’app seulement |
 | Transcription des vocaux | `JASPE_STT_URL`, `JASPE_STT_KEY`, `JASPE_STT_MODEL` | vocaux refusés poliment |

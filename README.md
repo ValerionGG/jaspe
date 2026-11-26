@@ -2,6 +2,36 @@
 
 > **Développeurs : commencez par [REPRISE.md](REPRISE.md)** (état, architecture, démarrage, priorités).
 
+## À reprendre : ce qui manque (état au 26/11/2026)
+
+**Accès pour tester**
+- Production : https://jaspe.217-160-124-232.nip.io/inscription — chacun crée son propre compte (bêta gratuite, aucun paiement). Aucun identifiant partagé n’est stocké dans Git.
+- Back-office `/admin` : réservé aux e-mails de `JASPE_ADMIN_EMAILS` (Dokploy). Un administrateur peut en ajouter d’autres depuis le back-office › Administrateurs.
+- Démo sans compte : https://valeriongg.github.io/jaspe/ (données dans le navigateur).
+- En local : `npm install && npm start` (démo) ou `JASPE_AUTH=1 npm start` (comptes). Tests : `npm --prefix server test` (96 tests, aucun appel réseau réel).
+- Vérifier la production : `node server/verifier-en-ligne.js https://jaspe.217-160-124-232.nip.io`.
+
+**Clés à saisir dans Dokploy › Jaspe › app › Environment** (jamais dans Git) — sans elles, la fonction reste en mode règles ou « consignée » :
+- [ ] IA : `ANTHROPIC_API_KEY` **ou** `OPENROUTER_API_KEY` (option `OPENROUTER_MODEL`).
+- [ ] E-mails réels : `SMTP_*`.
+- [ ] WhatsApp Business : `WHATSAPP_*` + transcription `JASPE_STT_*`.
+- [ ] Comparables Portugal : `CASAFARI_*`.
+- [ ] Paiement : `STRIPE_*` (plus tard ; la bêta gratuite tourne sans).
+
+**Travail restant pour les développeurs**
+- [ ] Brancher un webhook GitHub → Dokploy si le déploiement auto ne se déclenche pas (sinon bouton « Deploy »).
+- [ ] Calibrer le temps gagné avec 3 à 5 vrais conseillers ; démo chronométrée.
+- [ ] Relecture juridique FR/PT de `docs/juridique/RELECTURE.md` par un avocat, puis afficher la date de relecture.
+- [ ] Tester l’import sur un vrai export eGO et Hektor ; ajouter Apimo, AC3, Netty.
+- [ ] Page Marché : estimation et carte encore simulées (étiquetées) → données réelles.
+- [ ] Portugais complet (livrables L1–L9) et livrables en anglais.
+- [ ] KYC : carte T (CCI) et licence AMI (IMPIC) vérifiées à la main ; automatiser si une API existe.
+- [ ] Réinitialisation du mot de passe : nécessite le SMTP.
+- [ ] Hébergement européen dédié + contrat de traitement (DPA) avant la vente ; le Dokploy M3 actuel est partagé.
+- [ ] Sauvegardes régulières du volume `jaspe-data`.
+
+**Connecter une IA externe à Jaspe** (Réglages › Intégrations) : Claude Desktop, Claude Code, Codex (CLI, app) et ChatGPT via MCP (`/mcp`, 12 outils, jeton par agence). OpenRouter sert de moteur d’IA côté serveur (voir ci-dessus).
+
 **En ligne :** https://valeriongg.github.io/jaspe/ — portail de tous les accès : https://valeriongg.github.io/jaspe/#/portail
 
 Landing animée + CRM/back-office complet, branchés sur une vraie API (Node 24 + SQLite natif), en mode **clair « Calcaire & Azur »** et **sombre « Nocturne Riviera »**. Aucun code repris des anciens ZIP ni de la v0.23.
@@ -17,7 +47,7 @@ Première fois : `npm run install:all` (depuis `design-v2/`).
 | Développement : front (HMR, proxy /api) | `npm run dev` | http://127.0.0.1:5317 |
 | Tests serveur (parcours métier) | `npm test` | — |
 
-Landing sur `/`, portail des raccourcis sur `/portail`, offre commerciale sur `/essentiel`, CRM complet sur `/app`, CRM Essentiel sur `/essentiel/app`. Base : `server/data/jaspe.sqlite` (supprimer le fichier pour repartir des données de démonstration). Copilote en langage libre : définir `ANTHROPIC_API_KEY` avant `npm start` (modèle `claude-opus-5-5`, repli serveur activé) ; sans clé, il répond par règles sur les données réelles.
+Landing sur `/`, portail des raccourcis sur `/portail`, offre commerciale sur `/essentiel`, CRM complet sur `/app`, CRM Essentiel sur `/essentiel/app`. Base : `server/data/jaspe.sqlite` (supprimer le fichier pour repartir des données de démonstration). Copilote en langage libre : définir `ANTHROPIC_API_KEY` (ou `OPENROUTER_API_KEY`) avant `npm start` (modèle `claude-opus-5-5`, repli serveur activé) ; sans clé, il répond par règles sur les données réelles.
 
 ## Architecture
 
@@ -90,12 +120,12 @@ Réponse aux retours des testeurs (étude complète : `research/05-etude-concurr
 - **Portugais européen** (`app/src/i18n`) : écrans du mode simple, brief, tâches, import, temps gagné ; livrables L1, L2, L3, L7, D1, D5 en pt-PT quand l’agence est au Portugal. Les autres écrans restent en français.
 
 ## Mise en production : ce qu’il reste à fournir
-Clés et comptes : Stripe (produits, prix, webhook), InvoiceXpress, SMTP, WhatsApp Business (Meta) et service de transcription, éventuellement Casafari et `ANTHROPIC_API_KEY`. Relecture juridique FR et PT (checklists, grille LCB-FT, mentions de factures, durées de conservation, échéance IMPIC). Confirmation des en-têtes d’export eGO / Hektor sur un vrai fichier.
+Clés et comptes : Stripe (produits, prix, webhook), InvoiceXpress, SMTP, WhatsApp Business (Meta) et service de transcription, éventuellement Casafari et `ANTHROPIC_API_KEY` ou `OPENROUTER_API_KEY`. Relecture juridique FR et PT (checklists, grille LCB-FT, mentions de factures, durées de conservation, échéance IMPIC). Confirmation des en-têtes d’export eGO / Hektor sur un vrai fichier.
 
 ## Comptes et paiement (vague 2)
 Activer : `JASPE_AUTH=1` (comptes, une base par agence dans `server/data/orgs/<orgId>.sqlite`, comptes et abonnements dans `server/data/accounts.sqlite`). Paiement : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_SOLO_MONTH`, `STRIPE_PRICE_SOLO_YEAR`, `STRIPE_PRICE_AGENCE`, `STRIPE_PRICE_SEAT`, `STRIPE_PRICE_PREUVES`, `STRIPE_PRICE_DONNEES` ; option `JASPE_PUBLIC_URL` pour les URL de retour. Webhook Stripe : `POST /api/billing/webhook` (événements checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed). Sans clé Stripe : **bêta gratuite** automatique (offre « Bêta gratuite », dossiers illimités, 7 conseillers, aucun prélèvement) ; `JASPE_BETA=0` force les quotas de l’offre Découverte, et les routes de paiement répondent 503 « Paiement non configuré ». Pages publiques `/tarifs`, `/connexion`, `/inscription`, `/invitation/:token`. Remboursement 15 jours et garantie « 2 h gagnées » : traités à la main. Pas de réinitialisation de mot de passe par e-mail (aucun envoi réel).
 
-Tests serveur : `npm test` (84 tests, aucun appel réseau réel : Stripe, InvoiceXpress, WhatsApp, SMTP, DVF et Claude sont simulés).
+Tests serveur : `npm test` (96 tests, aucun appel réseau réel : Stripe, InvoiceXpress, WhatsApp, SMTP, DVF, Claude et OpenRouter sont simulés).
 
 ## Recherche
 `research/` : inspiration (Dribbble/Behance/Awwwards/sites), motion (MotionSites & co), benchmark de ~55 acteurs, 398 idées + 100 routines — consultables dans le CRM, page « Étude & benchmark ».

@@ -1,5 +1,5 @@
 // Copilote : Claude (si une clé est configurée) avec un instantané des données ; sinon règles sur les données réelles.
-import Anthropic from '@anthropic-ai/sdk'
+import { createLlmClient, providerOf, apiStatus } from './llm.js'
 
 const SYSTEM = `Tu es le copilote de Jaspe, CRM d'une agence immobilière haut de gamme sur la Côte d'Azur.
 Réponds en français, de façon brève et actionnable (3 à 6 phrases maximum).
@@ -73,7 +73,7 @@ export function callCost(model, u = {}) {
 }
 
 export function createCopilot(db, { client: injected } = {}) {
-  const client = injected ?? (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN ? new Anthropic() : null)
+  const client = injected ?? createLlmClient()
   /** Journal par appel : palier, modèle, tokens, coût. Sert au plafond par plan et au suivi de la marge. */
   const logCall = (tier, model, usage, extra = {}) => {
     const cost = callCost(model, usage)
@@ -82,6 +82,7 @@ export function createCopilot(db, { client: injected } = {}) {
   }
   return {
     mode: client ? 'claude' : 'rules',
+    provider: providerOf(client),
     async ask(question, history = []) {
       if (!client) return { ...rules(db, question), mode: 'rules' }
       const tier = routeQuestion(question)
@@ -104,14 +105,15 @@ export function createCopilot(db, { client: injected } = {}) {
           ],
         })
         const model = res.model ?? t.model
-        const cost = logCall(tier, model, res.usage, { stop: res.stop_reason })
+        const cost = logCall(tier, model, res.usage, { stop: res.stop_reason, ...(res.provider ? { provider: res.provider, servedBy: res.servedBy } : {}) })
         if (res.stop_reason === 'refusal') return { text: 'Je ne peux pas répondre à cette demande.', mode: 'claude', tier, cost }
         const text = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim()
         return { text: text || 'Pas de réponse.', cites: ['Données du CRM · instantané'], mode: 'claude', tier, model, cost }
       } catch (e) {
-        if (e instanceof Anthropic.AuthenticationError) return { ...rules(db, question), mode: 'rules', warning: 'Clé API invalide — mode règles' }
-        if (e instanceof Anthropic.RateLimitError) return { ...rules(db, question), mode: 'rules', warning: 'Limite de débit atteinte — mode règles' }
-        if (e instanceof Anthropic.APIError) return { ...rules(db, question), mode: 'rules', warning: `Erreur API ${e.status} — mode règles` }
+        const st = apiStatus(e)
+        if (st === 401 || st === 403) return { ...rules(db, question), mode: 'rules', warning: 'Clé API invalide — mode règles' }
+        if (st === 429) return { ...rules(db, question), mode: 'rules', warning: 'Limite de débit atteinte — mode règles' }
+        if (st) return { ...rules(db, question), mode: 'rules', warning: `Erreur API ${st} — mode règles` }
         return { ...rules(db, question), mode: 'rules', warning: 'API injoignable — mode règles' }
       }
     },

@@ -90,6 +90,7 @@ Conventions à respecter :
 | Débrief WhatsApp (multi-agences) | fait ; nécessite un compte WhatsApp Business |
 | Factures (FR) et InvoiceXpress (PT) | fait ; émission certifiée via InvoiceXpress |
 | MCP : Claude, Codex, ChatGPT | fait, testé en production (Réglages › Intégrations) |
+| Moteur d’IA : Anthropic direct ou OpenRouter | fait (`server/llm.js`, testé avec réponses simulées ; à essayer avec une vraie clé) |
 | Back-office plateforme (`/admin`) : tarifs, modules, validation et KYC des agences, données, journal | fait (`server/admin.js`, `app/src/admin/`) ; administrateurs via `JASPE_ADMIN_EMAILS` |
 | Portugais | écrans principaux et fiche dossier ; reste : mode complet, livrables L1–L9 |
 | Page Marché | estimation et carte encore **simulées** (étiquetées comme telles) |
@@ -98,7 +99,7 @@ Conventions à respecter :
 
 Les clés sont saisies par le responsable du projet, jamais dans Git :
 - `JASPE_ADMIN_EMAILS` : e-mails des administrateurs du back-office (`/admin`).
-- `ANTHROPIC_API_KEY` : copilote et lecture des compromis.
+- `ANTHROPIC_API_KEY` **ou** `OPENROUTER_API_KEY` : copilote et lecture des compromis. Anthropic est prioritaire si les deux sont là. Avec OpenRouter, les modèles Claude sont appelés sous leur nom OpenRouter (`anthropic/claude-sonnet-5.5`…) ; `OPENROUTER_MODEL` force un autre modèle. Code : `server/llm.js`. Le moteur actif s’affiche dans Réglages › Intégrations et dans `/api/health` (`ia`).
 - `SMTP_*` : envois d’e-mails réels.
 - `WHATSAPP_*` et `JASPE_STT_*` : débrief WhatsApp et transcription des vocaux.
 - `CASAFARI_*` : comparables au Portugal.

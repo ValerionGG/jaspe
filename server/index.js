@@ -18,7 +18,7 @@ import { createWhatsApp, createWaRouter } from './whatsapp.js'
 import { createPlatform } from './admin.js'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { setActorSource } from './actor.js'
-import Anthropic from '@anthropic-ai/sdk'
+import { createLlmClient, providerOf } from './llm.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.PORT ?? 5318)
@@ -34,7 +34,7 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
   // SMTP (SMTP_HOST…) : sans configuration, les envois restent consignés comme avant.
   const mailer = createMailer({ env })
   // Client Claude partagé (lecture des compromis) ; sans clé, extraction par règles.
-  const anthropic = env.ANTHROPIC_API_KEY || env.ANTHROPIC_AUTH_TOKEN ? new Anthropic() : null
+  const anthropic = createLlmClient(env)
   // Un contexte = une base, son moteur, son copilote et ses clients SSE. Démo : un seul ; comptes : un par agence.
   const makeCtx = (dbFile, dir, orgId) => {
     const db = openDb(dbFile)
@@ -77,7 +77,7 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
       actions: { ...createMailActions(db, mailer), ...(mailer.configured ? { 'outbox.send': ({ id }) => sendOutbox(db, mailer, id, { patch: mp, activity: act }) } : {}) },
       rules: mailer.configured ? { 'AUT-MAIL': () => { sendDueOutbox(db, mailer, { patch: mp, activity: act }).catch(() => {}); return ['skip', 'Envois programmés traités'] } } : {},
     })
-    return { db, clients, emit, engine, evidence, wa, copilot: createCopilot(db), filesDir: dir, orgId }
+    return { db, clients, emit, engine, evidence, wa, copilot: createCopilot(db, { client: anthropic }), filesDir: dir, orgId }
   }
   const main = auth ? null : makeCtx(dbPath, filesDir)
   const { db, engine, copilot } = main ?? {}
@@ -132,7 +132,7 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
   async function api(req, res, parts, { db, engine, copilot, clients, emit, filesDir, orgId } = main) {
     const [head, a, b] = parts
     const m = req.method
-    if (head === 'health') return send(res, 200, { ok: true, copilot: copilot.mode, engine: engine.ENGINE_IDS, clients: clients.size })
+    if (head === 'health') return send(res, 200, { ok: true, copilot: copilot.mode, ia: providerOf(anthropic), engine: engine.ENGINE_IDS, clients: clients.size })
     if (head === 'stream') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
       res.write('retry: 3000\n\n'); clients.add(res)

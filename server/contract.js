@@ -4,7 +4,7 @@
 // `contract.extract` ne modifie jamais le dossier : le résultat va dans `extractions`. `contract.apply` n'applique
 // que les éléments cochés par le conseiller (transaction + tâches de relance J-7).
 // Aide à la lecture, pas un avis juridique : le conseiller et le notaire restent seuls juges du contrat.
-import Anthropic from '@anthropic-ai/sdk'
+import { createLlmClient, apiStatus } from './llm.js'
 import { callCost, TIERS } from './copilot.js'
 
 /* ——— Dates ——— */
@@ -247,7 +247,7 @@ export async function pdfText(bytes) {
 }
 
 export function createContractReader({ db, put, patch, activity, HttpError, client: injected, extractText = pdfText, readFileBytes, today = () => new Date().toISOString().slice(0, 10) }) {
-  const client = injected !== undefined ? injected : (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN ? new Anthropic() : null)
+  const client = injected !== undefined ? injected : createLlmClient()
   const tier = TIERS.auditer
 
   async function withClaude(text) {
@@ -289,7 +289,7 @@ export function createContractReader({ db, put, patch, activity, HttpError, clie
       let result, mode = 'rules', model, cost = 0, warning
       if (client) {
         try { ({ r: result, model, cost } = await withClaude(text)); mode = 'claude' } catch (e) {
-          warning = e?.message === 'refusal' ? 'Lecture refusée par le modèle — mode règles' : e instanceof Anthropic.APIError ? `Erreur API ${e.status} — mode règles` : 'Lecture IA indisponible — mode règles'
+          warning = e?.message === 'refusal' ? 'Lecture refusée par le modèle — mode règles' : apiStatus(e) ? `Erreur API ${apiStatus(e)} — mode règles` : 'Lecture IA indisponible — mode règles'
         }
       }
       if (!result) result = extractByRules(text, { today: today() })

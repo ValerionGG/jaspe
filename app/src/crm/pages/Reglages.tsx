@@ -629,8 +629,27 @@ function Integrations() {
           ))}
         </AnimatePresence>
       </motion.div>
+      <AiEngine />
       <McpAccess />
     </div>
+  )
+}
+
+/* ——— Moteur d’IA du serveur : Anthropic (Claude) en direct ou OpenRouter ——— */
+const IA_LABEL: Record<string, string> = { anthropic: 'Claude, clé Anthropic directe', openrouter: 'OpenRouter (Claude par défaut)', aucun: 'Aucun — mode règles locales' }
+function AiEngine() {
+  const [ia, setIa] = useState<string | null>(null)
+  useEffect(() => { fetch('/api/health').then((r) => r.json()).then((h) => setIa(h.ia ?? 'aucun'), () => setIa(null)) }, [])
+  return (
+    <Card>
+      <div className="flex items-start gap-3">
+        <Sparkle size={20} weight="light" className="mt-0.5 shrink-0 text-champagne" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 text-[15px] font-medium">Moteur d’IA de Jaspe{ia && <span className={clsx('rounded-full px-2 py-0.5 text-[11px] ring-1', ia === 'aucun' ? 'text-mist ring-white/10' : 'text-sage ring-sage/30')}>{IA_LABEL[ia] ?? ia}</span>}</div>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-bone/60">Le copilote et la lecture des compromis utilisent Claude. Deux façons de le brancher, côté hébergement (Dokploy › Environment) : <code className="num text-bone">ANTHROPIC_API_KEY</code> (clé Anthropic, prioritaire) ou <code className="num text-bone">OPENROUTER_API_KEY</code> (une seule clé OpenRouter, facturée par OpenRouter). Option : <code className="num text-bone">OPENROUTER_MODEL</code> pour imposer un autre modèle (ex. <code className="num">openai/gpt-5</code>). Sans clé, Jaspe répond en mode règles, sans IA.</p>
+        </div>
+      </div>
+    </Card>
   )
 }
 
