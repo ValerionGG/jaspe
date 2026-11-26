@@ -1,5 +1,7 @@
 # Jaspe — v2 fonctionnelle
 
+> **Développeurs : commencez par [REPRISE.md](REPRISE.md)** (état, architecture, démarrage, priorités).
+
 **En ligne :** https://valeriongg.github.io/jaspe/ — portail de tous les accès : https://valeriongg.github.io/jaspe/#/portail
 
 Landing animée + CRM/back-office complet, branchés sur une vraie API (Node 24 + SQLite natif), en mode **clair « Calcaire & Azur »** et **sombre « Nocturne Riviera »**. Aucun code repris des anciens ZIP ni de la v0.23.
