@@ -28,7 +28,7 @@ Positionnement retenu (retours terrain de Christophe) : « Votre CRM fait tourne
 | Production réelle | https://jaspe.217-160-124-232.nip.io (Dokploy M3, projet « Jaspe », application « app ») |
 | Démo statique | https://valeriongg.github.io/jaspe/ (branche `gh-pages`, données dans le navigateur) |
 
-La production Dokploy suit `main` (déploiement automatique à chaque push).
+La production Dokploy suit `main`, mais sans webhook GitHub : après chaque push, cliquer « Deploy » dans Dokploy.
 
 ## 3. Démarrer en local
 

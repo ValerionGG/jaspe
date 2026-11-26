@@ -19,7 +19,7 @@
 - [ ] Paiement : `STRIPE_*` (plus tard ; la bêta gratuite tourne sans).
 
 **Travail restant pour les développeurs**
-- [ ] Brancher un webhook GitHub → Dokploy si le déploiement auto ne se déclenche pas (sinon bouton « Deploy »).
+- [ ] Brancher un webhook GitHub → Dokploy : aujourd’hui un push sur `main` ne redéploie pas, il faut cliquer « Deploy » dans Dokploy.
 - [ ] Calibrer le temps gagné avec 3 à 5 vrais conseillers ; démo chronométrée.
 - [ ] Relecture juridique FR/PT de `docs/juridique/RELECTURE.md` par un avocat, puis afficher la date de relecture.
 - [ ] Tester l’import sur un vrai export eGO et Hektor ; ajouter Apimo, AC3, Netty.

@@ -118,7 +118,7 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
   // Back-office plateforme : tarifs, modules, validation et KYC des agences (registre public coupé pendant les tests).
   const platform = auth ? createPlatform(accounts, { env, plans: PLANS, options: OPTIONS, fetch: kycFetch ?? (process.env.NODE_TEST_CONTEXT || env.JASPE_KYC === 'off' ? null : globalThis.fetch) }) : null
   if (platform) accounts.platform = platform
-  const gate = auth ? createGate({ platform, dataDir, accounts, billing, openOrg, send, readBody, mailer, publicUrl: env.JASPE_PUBLIC_URL, beta: env.JASPE_BETA === '1' ? true : env.JASPE_BETA === '0' ? false : undefined }) : null
+  const gate = auth ? createGate({ ia: providerOf(anthropic), platform, dataDir, accounts, billing, openOrg, send, readBody, mailer, publicUrl: env.JASPE_PUBLIC_URL, beta: env.JASPE_BETA === '1' ? true : env.JASPE_BETA === '0' ? false : undefined }) : null
   // Mode comptes : nom de l’utilisateur de la requête ; routines et webhooks hors requête → « Jaspe ».
   const actorStore = new AsyncLocalStorage()
   if (auth) setActorSource(() => actorStore.getStore()?.name ?? 'Jaspe')

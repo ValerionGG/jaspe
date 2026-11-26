@@ -187,7 +187,7 @@ export function demoRoute(req, res, parts, send) {
  * Passerelle du mode comptes : traite /api/auth, /api/me, /api/team, /api/billing ;
  * pour le reste, résout l’agence de la session et renvoie son contexte {db, engine, copilot, clients, emit, filesDir}.
  */
-export function createGate({ accounts, billing, openOrg, send, readBody, mailer = null, publicUrl, beta: betaOpt, platform = null, dataDir = ':memory:' }) {
+export function createGate({ accounts, billing, openOrg, send, readBody, mailer = null, publicUrl, beta: betaOpt, platform = null, dataDir = ':memory:', ia = 'aucun' }) {
   // Bêta : sans paiement configuré, les quotas ne s’appliquent pas (JASPE_BETA=0 pour les forcer).
   const beta = () => (betaOpt ?? !billing.configured())
   const planOf = (org) => (beta() ? 'beta' : effectivePlan(org))
@@ -403,7 +403,7 @@ ${link}`, html: `<p>Bonjour,</p><p>${escHtml(s.user.name)} vous invite à rejoin
   /** Retourne le contexte de l’agence, ou null si la réponse a déjà été envoyée. */
   async function handle(req, res, parts) {
     const [head, a] = parts
-    if (head === 'health') { send(res, 200, { ok: true, auth: true, billing: billing.configured() }); return null }
+    if (head === 'health') { send(res, 200, { ok: true, auth: true, billing: billing.configured(), ia }); return null }
     if (head === 'auth') { await authRoute(req, res, parts); return null }
     if (head === 'billing' && a === 'webhook') { await billing.webhook(req, res, send); return null }
     // Tarifs publics (modifiables dans le back-office) : lisibles sans compte.
