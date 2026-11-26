@@ -92,7 +92,7 @@ test('CSV eGO : séparateur ;, BOM, guillemets, retour à la ligne, mapping et c
   assert.equal(a.district, 'Santo António')
   assert.equal(a.condition, 'Usado')
   assert.equal(a.status, 'Brouillon')
-  assert.equal(a.title, 'Appartement T3 — Santo António')
+  assert.equal(a.title, 'Apartamento T3 — Santo António')
   assert.deepEqual(a.importedFrom, { source: 'ego', file: 'ego.csv', at: '2026-11-26T10:00:00Z', ref: 'EGO-001' })
   assert.ok(Number.isFinite(a.lat) && Number.isFinite(a.lng) && a.geoApprox)
   assert.equal(b.surface, 210.5)

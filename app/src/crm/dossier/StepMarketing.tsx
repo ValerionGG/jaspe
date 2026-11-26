@@ -67,7 +67,7 @@ export default function StepMarketing({ dossier, journey, save, goTo }: StepProp
     const end = `${String(h + (v.kind === 'photo' ? 2 : 3)).padStart(2, '0')}:${String(mi).padStart(2, '0')}`
     if (diff.shootingEventId) await evOps.remove(diff.shootingEventId).catch(() => {})
     const label = v.kind === 'photo' ? 'Shooting photo' : v.kind === '3d' ? 'Visite 3D' : 'Shooting photo & visite 3D'
-    const ev = await evOps.create({ day: agendaDay(v.date), start: v.time || '09:00', end, title: `${label} — ${p.title}`, who: v.provider.trim(), place: `${p.address}, ${p.city}`, kind: 'interne', dossier: dossier.id, source: 'nxt' })
+    const ev = await evOps.create({ day: agendaDay(v.date), start: v.time || '09:00', end, title: `${label} — ${p.title}`, who: v.provider.trim(), place: [p.address, p.city].filter(Boolean).join(', '), kind: 'interne', dossier: dossier.id, source: 'nxt' })
     await setDiff({ shooting: v.date, shootingTime: v.time || '09:00', provider: v.provider.trim(), visit3d: v.kind !== 'photo', shootingKind: label, shootingEventId: ev.id })
     setShoot(false)
   }

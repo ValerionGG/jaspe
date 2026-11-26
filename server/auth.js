@@ -24,6 +24,8 @@ export const PLANS = {
   decouverte: { label: 'Découverte', dossiers: 1, seats: 1, price: 0 },
   solo: { label: 'Solo', dossiers: 8, seats: 1, price: 9.9, priceYear: 99 },
   agence: { label: 'Agence', dossiers: null, seats: 7, price: 49, seatPrice: 6 },
+  /** Bêta sans paiement (aucune clé Stripe) : tout ouvert, gratuit, jusqu’à l’ouverture des abonnements. */
+  beta: { label: 'Bêta gratuite', dossiers: null, seats: 7, price: 0 },
 }
 export const OPTIONS = { preuves: { label: 'Pack Preuves', price: 6 }, donnees: { label: 'Données marché', price: 9 } }
 const PAID_STATUS = new Set(['active', 'trialing'])
@@ -166,7 +168,11 @@ export function demoRoute(req, res, parts, send) {
  * Passerelle du mode comptes : traite /api/auth, /api/me, /api/team, /api/billing ;
  * pour le reste, résout l’agence de la session et renvoie son contexte {db, engine, copilot, clients, emit, filesDir}.
  */
-export function createGate({ accounts, billing, openOrg, send, readBody, mailer = null, publicUrl }) {
+export function createGate({ accounts, billing, openOrg, send, readBody, mailer = null, publicUrl, beta: betaOpt }) {
+  // Bêta : sans paiement configuré, les quotas ne s’appliquent pas (JASPE_BETA=0 pour les forcer).
+  const beta = () => (betaOpt ?? !billing.configured())
+  const planOf = (org) => (beta() ? 'beta' : effectivePlan(org))
+  const limits = (org) => (beta() ? { dossiers: null, seats: PLANS.beta.seats } : limitsFor(org))
   const attempts = new Map()
   const forgotHits = new Map()
   const base = String(publicUrl ?? mailer?.publicUrl ?? process.env.JASPE_PUBLIC_URL ?? 'http://127.0.0.1:5318').replace(/\/+$/, '')
@@ -200,11 +206,11 @@ export function createGate({ accounts, billing, openOrg, send, readBody, mailer 
     }
   }
   function me(user, org) {
-    const p = effectivePlan(org)
+    const p = planOf(org)
     return {
       mode: 'auth', user: pub(user), org: { id: org.id, name: org.name, country: org.country },
       plan: { id: p, label: PLANS[p].label, subscribed: org.plan, status: org.status, period: org.period, options: org.options, seats: org.seats, periodEnd: org.periodEnd, cancelAtPeriodEnd: org.cancelAtPeriodEnd, customer: !!org.customerId },
-      limits: limitsFor(org), usage: usage(org), billing: { configured: billing.configured() },
+      limits: limits(org), usage: usage(org), billing: { configured: billing.configured(), beta: beta() },
     }
   }
   const start = (req, res, user, status = 200) => {
@@ -235,7 +241,9 @@ export function createGate({ accounts, billing, openOrg, send, readBody, mailer 
       const user = accounts.createUser({ email, name, pass: await hashPassword(password), orgId: org.id, role: 'owner' })
       const { db } = openOrg(org.id)
       if (body.start === 'vide') for (const col of COLLECTIONS) if (!KEEP_SEEDED.has(col)) db.seed(col, [])
-      db.put('settings', { ...(db.get('settings', 'agency') ?? {}), id: 'agency', agencyName: orgName, country })
+      db.put('settings', { ...(db.get('settings', 'agency') ?? {}), id: 'agency', agencyName: orgName, country, signature: `${name} — ${orgName}` })
+      // Profil du compte : jamais celui de la démo (nom, courriel, téléphone).
+      db.put('settings', { ...(db.get('settings', 'profile') ?? {}), id: 'profile', name, email, phone: '', role: 'Responsable d’agence' })
       db.put('agents', { id: user.id, name, email, role: 'Responsable d’agence', agency: orgName, photo: '', mandats: 0, ca: 0, score: 0, status: 'actif' })
       return start(req, res, user, 201)
     }
@@ -299,9 +307,9 @@ Si vous n’êtes pas à l’origine de cette demande, ignorez ce message : votr
       if (Date.parse(inv.expiresAt) <= Date.now()) throw new HttpError(410, 'Invitation expirée : demandez un nouveau lien')
       const { email, name, password } = credentials(body)
       const org = accounts.getOrg(inv.orgId)
-      const lim = limitsFor(org).seats
+      const lim = limits(org).seats
       // L’invitation en cours compte déjà dans les sièges : on vérifie les seuls membres.
-      if (accounts.members(org.id).length >= lim) throw new HttpError(402, `Tous les sièges de l’offre ${PLANS[effectivePlan(org)].label} sont occupés (${lim}).`)
+      if (accounts.members(org.id).length >= lim) throw new HttpError(402, `Tous les sièges de l’offre ${PLANS[planOf(org)].label} sont occupés (${lim}).`)
       if (!accounts.useInvite(inv.id)) throw new HttpError(404, 'Invitation déjà utilisée')
       const user = accounts.createUser({ email, name, pass: await hashPassword(password), orgId: org.id, role: inv.role === 'owner' ? 'conseiller' : inv.role })
       openOrg(org.id).db.put('agents', { id: user.id, name, email, role: 'Conseiller', agency: org.name, photo: '', mandats: 0, ca: 0, score: 0, status: 'actif' })
@@ -312,12 +320,12 @@ Si vous n’êtes pas à l’origine de cette demande, ignorez ce message : votr
 
   async function teamRoute(req, res, s, [, a, b]) {
     const m = req.method
-    if (!a && m === 'GET') return send(res, 200, { members: accounts.members(s.org.id), invites: accounts.pendingInvites(s.org.id), limits: limitsFor(s.org), usage: usage(s.org) })
+    if (!a && m === 'GET') return send(res, 200, { members: accounts.members(s.org.id), invites: accounts.pendingInvites(s.org.id), limits: limits(s.org), usage: usage(s.org) })
     ownerOnly(s)
     if (a === 'invite' && m === 'POST') {
-      const lim = limitsFor(s.org).seats, used = usage(s.org).seats
+      const lim = limits(s.org).seats, used = usage(s.org).seats
       if (used >= lim) throw new HttpError(402, lim <= 1
-        ? `L’offre ${PLANS[effectivePlan(s.org)].label} comprend un seul siège. Passez à l’offre Agence pour inviter des conseillers.`
+        ? `L’offre ${PLANS[planOf(s.org)].label} comprend un seul siège. Passez à l’offre Agence pour inviter des conseillers.`
         : `Les ${lim} sièges de votre offre sont occupés ou réservés. Ajoutez des sièges dans Réglages › Facturation.`)
       // Avec SMTP : l’invitation part aussi par e-mail si une adresse est fournie ; sinon lien à copier.
       const to = String((await readBody(req))?.email ?? '').trim().toLowerCase()
@@ -350,11 +358,11 @@ ${link}`, html: `<p>Bonjour,</p><p>${escHtml(s.user.name)} vous invite à rejoin
 
   /** Quota de dossiers : création refusée au-delà, dossiers en trop en lecture seule. */
   async function guard(req, [head, a], org, ctx) {
-    const lim = limitsFor(org).dossiers
+    const lim = limits(org).dossiers
     if (lim == null) return
     const m = req.method
     const active = ctx.db.list('dossiers').filter(isActiveDossier)
-    const label = PLANS[effectivePlan(org)].label
+    const label = PLANS[planOf(org)].label
     const hint = 'Passez à une offre supérieure dans Réglages › Facturation, ou archivez un dossier terminé.'
     if (head === 'dossiers' && !a && m === 'POST' && active.length >= lim) throw new HttpError(402, `Votre offre ${label} comprend ${lim} dossier${lim > 1 ? 's' : ''} actif${lim > 1 ? 's' : ''} (${active.length} en cours). ${hint}`)
     if (active.length <= lim) return

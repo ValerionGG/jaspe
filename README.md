@@ -86,9 +86,13 @@ Réponse aux retours des testeurs (étude complète : `research/05-etude-concurr
 Clés et comptes : Stripe (produits, prix, webhook), InvoiceXpress, SMTP, WhatsApp Business (Meta) et service de transcription, éventuellement Casafari et `ANTHROPIC_API_KEY`. Relecture juridique FR et PT (checklists, grille LCB-FT, mentions de factures, durées de conservation, échéance IMPIC). Confirmation des en-têtes d’export eGO / Hektor sur un vrai fichier.
 
 ## Comptes et paiement (vague 2)
-Activer : `JASPE_AUTH=1` (comptes, une base par agence dans `server/data/orgs/<orgId>.sqlite`, comptes et abonnements dans `server/data/accounts.sqlite`). Paiement : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_SOLO_MONTH`, `STRIPE_PRICE_SOLO_YEAR`, `STRIPE_PRICE_AGENCE`, `STRIPE_PRICE_SEAT`, `STRIPE_PRICE_PREUVES`, `STRIPE_PRICE_DONNEES` ; option `JASPE_PUBLIC_URL` pour les URL de retour. Webhook Stripe : `POST /api/billing/webhook` (événements checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed). Sans clé : 503 « Paiement non configuré ». Pages publiques `/tarifs`, `/connexion`, `/inscription`, `/invitation/:token`. Remboursement 15 jours et garantie « 2 h gagnées » : traités à la main. Pas de réinitialisation de mot de passe par e-mail (aucun envoi réel).
+Activer : `JASPE_AUTH=1` (comptes, une base par agence dans `server/data/orgs/<orgId>.sqlite`, comptes et abonnements dans `server/data/accounts.sqlite`). Paiement : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_SOLO_MONTH`, `STRIPE_PRICE_SOLO_YEAR`, `STRIPE_PRICE_AGENCE`, `STRIPE_PRICE_SEAT`, `STRIPE_PRICE_PREUVES`, `STRIPE_PRICE_DONNEES` ; option `JASPE_PUBLIC_URL` pour les URL de retour. Webhook Stripe : `POST /api/billing/webhook` (événements checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed). Sans clé Stripe : **bêta gratuite** automatique (offre « Bêta gratuite », dossiers illimités, 7 conseillers, aucun prélèvement) ; `JASPE_BETA=0` force les quotas de l’offre Découverte, et les routes de paiement répondent 503 « Paiement non configuré ». Pages publiques `/tarifs`, `/connexion`, `/inscription`, `/invitation/:token`. Remboursement 15 jours et garantie « 2 h gagnées » : traités à la main. Pas de réinitialisation de mot de passe par e-mail (aucun envoi réel).
 
 Tests serveur : `npm test` (84 tests, aucun appel réseau réel : Stripe, InvoiceXpress, WhatsApp, SMTP, DVF et Claude sont simulés).
 
 ## Recherche
 `research/` : inspiration (Dribbble/Behance/Awwwards/sites), motion (MotionSites & co), benchmark de ~55 acteurs, 398 idées + 100 routines — consultables dans le CRM, page « Étude & benchmark ».
+
+## Audit du 26 novembre 2026
+
+Test réel en mode comptes, note 53/100 avant et 75/100 après corrections : voir [docs/audit-2026-11/AUDIT.md](docs/audit-2026-11/AUDIT.md) (captures incluses).

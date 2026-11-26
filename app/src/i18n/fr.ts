@@ -30,6 +30,10 @@ const fr = {
   'day1.temps': 'Voir le temps gagné', 'day1.tempsSub': 'Net de la relecture et des corrections, en heures et en euros.',
 
   /* Aujourd’hui */
+  'today.briefLive': 'Brief du copilote · calculé à l’instant', 'today.briefSourcesReal': 'Sources : {d} dossiers, {q} décisions en file',
+  'today.realEmpty': 'Votre base est vide. Importez vos biens depuis eGO ou Hektor, ou créez un premier dossier vendeur : le copilote prépare ensuite vos rendez-vous.',
+  'today.realBrief': '{n} dossier actif ·|{n} dossiers actifs ·', 'today.realEvents': '{n} rendez-vous aujourd’hui|{n} rendez-vous aujourd’hui', 'today.importCta': 'Importer depuis mon CRM',
+  'today.kpiDossiers': 'Dossiers actifs', 'today.kpiDossiersHint': 'dont {n} en préparation|dont {n} en préparation', 'today.kpiConvHintReal': 'Mandats signés / dossiers ouverts',
   'today.hello': 'Bonjour {name}', 'today.briefBy': 'Brief du copilote · généré à {time}', 'today.briefSources': 'Sources : agenda, 8 dossiers, 2 routines',
   'today.brief1': 'Journée dense mais maîtrisée.', 'today.pending': '{n} décision en attente|{n} décisions en attente',
   'today.brief2': ', dont trois comptent avant 14 h : valider l’estimation de la Villa Martin, relire le débrief de M. Haddad, envoyer la contre-offre Dubreuil avant son expiration à 18 h. Votre rendez-vous de 11 h est',

@@ -5,10 +5,11 @@ import clsx from 'clsx'
 import { Sparkle, CheckCircle, Circle, Question, UserFocus, Seal, ChatCircleText, Warning, ArrowRight, Target, ChartLineUp, ShieldCheck, Lightbulb, Plus, X } from '@phosphor-icons/react'
 import { Card, SoftBtn } from '../ui'
 import { Avatar, Spark, EXPO } from '../../ui/kit'
-import { prop, agent, eur, fmt, AGENCIES, type DelivState } from '../../data/mock'
+import { prop, eur, fmt, AGENCIES, type DelivState } from '../../data/mock'
 import { DISCOVERY_BLOCKS } from '../../data/dossier'
 import { compsFor, priceSeries, meters } from '../../data/geo'
-import { useDocuments } from '../../data/collections'
+import { useDocuments, useAgents } from '../../data/collections'
+import { factSource, isDemoProperty, useCurrentUserName, useMeMode, type LooseProperty } from './facts'
 import { useCollection, action, type Doc } from '../../data/store'
 import { toast, errText } from '../forms'
 import type { StepProps } from './index'
@@ -113,13 +114,19 @@ type Base = { d: StepProps['dossier']; head: React.ReactNode; foot: React.ReactN
 
 /* ——— D1 · Brief relationnel ——— */
 function BriefPanel({ d, j, prep, savePrep, head, foot }: Base & { j: JourneyX; prep: PrepState; savePrep: (p: PrepState) => Promise<void> }) {
-  const p = prop(d.propertyId), a = agent(d.agentId), disc = j.discovery
+  const p = prop(d.propertyId) as LooseProperty, disc = j.discovery
+  const [agents] = useAgents()
+  const a = agents.find((x) => x.id === d.agentId)
+  const userName = useCurrentUserName(), mode = useMeMode()
+  const follower = a?.name ?? (mode === 'auth' ? userName : null)
+  const demo = isDemoProperty(p, mode)
+  const src = (legacy: string) => factSource(p, demo, legacy)
   const val = (k: string) => disc[k]?.v?.trim()
   const facts = [
-    { l: 'Surface habitable', v: `${p.surface} m²`, s: 'Plan géomètre' },
-    ...(p.land ? [{ l: 'Terrain', v: `${fmt(p.land)} m²`, s: 'Cadastre PCI' }] : []),
-    { l: 'Année de construction', v: String(p.year), s: 'Acte de propriété' },
-    { l: 'DPE', v: `Classe ${p.dpe}`, s: 'Observatoire ADEME' },
+    ...(p.surface ? [{ l: 'Surface habitable', v: `${p.surface} m²`, s: src('Plan géomètre') }] : []),
+    ...(p.land ? [{ l: 'Terrain', v: `${fmt(p.land)} m²`, s: src('Cadastre PCI') }] : []),
+    ...(p.year ? [{ l: 'Année de construction', v: String(p.year), s: src('Acte de propriété') }] : []),
+    ...(p.dpe ? [{ l: 'DPE', v: `Classe ${p.dpe}`, s: src('Observatoire ADEME') }] : []),
     ...Object.entries(disc).filter(([k, f]) => f?.v && (f.origin === 'pièce' || f.origin === 'vérifié') && !['surface', 'terrain', 'annee', 'dpe'].includes(k)).map(([k, f]) => ({ l: LABEL[k] ?? k, v: f.v, s: f.origin === 'pièce' ? 'Pièce déposée' : 'Vérifié' })),
   ]
   const toConfirm = [
@@ -133,7 +140,7 @@ function BriefPanel({ d, j, prep, savePrep, head, foot }: Base & { j: JourneyX; 
       {head}
       <div className="grid gap-4 lg:grid-cols-5">
         <Sub kicker="Contexte vendeur" className="lg:col-span-2">
-          <div className="flex items-center gap-3"><Avatar src={d.sellerPhoto ?? '/img/p-paul.webp'} size={44} /><div><div className="text-[15px]">{d.seller}</div><div className="text-[11.5px] text-mist">Suivi par {a.name}</div></div></div>
+          <div className="flex items-center gap-3"><Avatar src={d.sellerPhoto ?? (demo ? '/img/p-paul.webp' : undefined)} name={d.seller} size={44} /><div><div className="text-[15px]">{d.seller}</div>{follower && <div className="text-[11.5px] text-mist">Suivi par {follower}</div>}</div></div>
           <dl className="mt-4 space-y-2 text-[13px]">
             <div className="flex justify-between gap-3"><dt className="text-mist">Projet</dt><dd className="text-right">{val('motivation') ?? d.motivation}</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-mist">Horizon</dt><dd className="text-right">{val('horizon') ?? d.timeline}</dd></div>
@@ -141,7 +148,8 @@ function BriefPanel({ d, j, prep, savePrep, head, foot }: Base & { j: JourneyX; 
           </dl>
           <div className="mt-3 flex flex-wrap gap-1.5">{d.tags.map((t) => <span key={t} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[11px] ring-1 ring-white/[0.07]">{t}</span>)}</div>
         </Sub>
-        <Sub kicker="Faits sourcés" title={`${facts.length} faits vérifiables`} className="lg:col-span-3">
+        <Sub kicker="Faits sourcés" title={facts.length ? `${facts.length} fait${facts.length > 1 ? 's' : ''} vérifiable${facts.length > 1 ? 's' : ''}` : 'Aucun fait vérifiable'} className="lg:col-span-3">
+          {facts.length === 0 && <p className="text-[13px] text-mist">Surface, année et DPE non renseignés sur la fiche du bien.</p>}
           <ul className="divide-y divide-white/[0.05]">
             {facts.slice(0, 8).map((f) => <li key={f.l} className="flex items-center justify-between gap-3 py-2 text-[13px]"><span className="text-mist">{f.l}</span><span className="flex min-w-0 items-center gap-2"><span className="truncate">{f.v}</span><span className="shrink-0 rounded-full bg-sage/10 px-2 py-0.5 text-[10px] text-sage ring-1 ring-sage/20">{f.s}</span></span></li>)}
           </ul>
@@ -156,7 +164,7 @@ function BriefPanel({ d, j, prep, savePrep, head, foot }: Base & { j: JourneyX; 
           <ul className="space-y-2">{prefs.map((x) => <li key={x.k} className="text-[13px]"><div className="text-[11px] text-mist">{x.l}</div><div className={x.v ? 'text-bone/85' : 'text-mist italic'}>{x.v ?? 'À recueillir pendant l’entretien'}</div></li>)}</ul>
         </Sub>
         <Sub kicker="Identité & incertitude" title="Homonymie">
-          <p className="text-[13px] leading-relaxed text-bone/70">« {d.seller} » : plusieurs homonymes dans les annuaires publics du secteur. Seules la fiche dossier et les pièces fournies font foi ; aucune recherche sur la vie privée, aucun trait sensible déduit (RGPD, accès limité au dossier).</p>
+          <p className="text-[13px] leading-relaxed text-bone/70">« {d.seller} » : identité à confirmer avec les pièces fournies (aucune vérification automatique n’a été faite). Seules la fiche dossier et les pièces fournies font foi ; aucune recherche sur la vie privée, aucun trait sensible déduit (RGPD, accès limité au dossier).</p>
           <button onClick={() => savePrep({ identityConfirmed: !prep.identityConfirmed }).then(() => toast(prep.identityConfirmed ? 'Identité remise à confirmer' : 'Identité confirmée'))} className={clsx('mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] ring-1 transition', prep.identityConfirmed ? 'bg-sage/15 text-sage ring-sage/25' : 'bg-white/[0.04] text-bone/80 ring-white/[0.08] hover:bg-white/[0.08]')}>{prep.identityConfirmed ? <Seal size={14} weight="fill" /> : <UserFocus size={14} />}{prep.identityConfirmed ? 'Identité confirmée par le vendeur' : 'Marquer l’identité confirmée'}</button>
         </Sub>
         <Sub kicker="Questions à poser" title="Ouvertes, issues du guide D5">

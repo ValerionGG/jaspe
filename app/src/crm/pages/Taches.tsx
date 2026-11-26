@@ -7,7 +7,7 @@ import { PageHeader, Card, Tabs, SoftBtn, Stagger, Stat, IconBtn, Empty } from '
 import { Avatar, EXPO } from '../../ui/kit'
 import { prop, agent, type Dossier, type Task } from '../../data/mock'
 import { QKINDS, type QItem, type QKind } from '../../data/ops'
-import { useQueue, useTasks, useDossiers, useAgents, useSettings, type DocumentDoc } from '../../data/collections'
+import { useQueue, useTasks, useDossiers, useAgents, useSettings, useTimelog, type DocumentDoc } from '../../data/collections'
 import { action, useDoc, type Doc } from '../../data/store'
 import { Modal, Field, Input, Select, Textarea, AsyncForm, toast, errText } from '../forms'
 import { DocPaper } from './DossierDetail'
@@ -23,7 +23,6 @@ const BUCKETS = [{ id: 'today', l: 'Aujourd’hui' }, { id: 'week', l: 'Cette se
 const SNOOZE: [TKey, QItem['bucket']][] = [['tq.snooze.1h', 'today'], ['tq.snooze.tonight', 'today'], ['tq.snooze.tomorrow', 'week'], ['tq.snooze.monday', 'week'], ['tq.snooze.15d', 'later']]
 const TASK_KIND: Record<Task['kind'], string> = { valider: 'Valider', appeler: 'Appeler', envoyer: 'Envoyer', relancer: 'Relancer', document: 'Document' }
 const hm = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${String(m % 60).padStart(2, '0')}` : ''}` : `${m} min`)
-const BASE_SAVED = 460 // 7 h 40 déjà gagnées cette semaine avant ouverture de la file
 
 export default function Taches() {
   const [items, ops] = useQueue()
@@ -42,7 +41,9 @@ export default function Taches() {
   const { t: tr } = useT()
 
   const stats = settings.find((s) => s.id === 'queue-stats') as { saved?: number; done?: number } | undefined
-  const saved = BASE_SAVED + (stats?.saved ?? 0)
+  // Même source que la page Temps gagné : gains nets validés sur 7 jours (corrections déduites).
+  const [timelog] = useTimelog()
+  const saved = timelog.filter((e) => Date.now() - Date.parse(e.at) < 7 * 864e5).reduce((n, e) => n + e.net, 0)
   const list = queue.filter((q) => (kind === 'all' || q.kind === kind) && (dossier === 'all' || q.dossier === dossier))
   const selItems = queue.filter((q) => sel.includes(q.id))
   const safe = selItems.filter((q) => q.safe), unsafe = selItems.filter((q) => !q.safe)

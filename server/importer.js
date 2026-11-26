@@ -332,6 +332,8 @@ const today = (at) => new Date(at).toLocaleDateString('fr-FR', { day: '2-digit',
  * `meta` : { source, file, at, locate?(district, city) → [lng, lat] | null, center?: [lng, lat] }.
  * @returns {{ items: { row: number, doc: object }[], issues: { row: number, problem: string, level: 'erreur' | 'alerte' }[] }}
  */
+const PT_TYPE = { Maison: 'Moradia', Villa: 'Moradia', Appartement: 'Apartamento', Terrain: 'Terreno', Bien: 'Imóvel', Local: 'Loja', Bureau: 'Escritório' }
+
 export function convert(rows, mapping, kind, meta = {}) {
   if (!FIELDS[kind]) throw new Error(`Type d’import inconnu : ${kind}`)
   const source = meta.source ?? 'inconnu'
@@ -372,7 +374,10 @@ export function convert(rows, mapping, kind, meta = {}) {
       }
       const photos = g('photos').split(/[|,;\s]+/).filter((u) => /^https?:\/\//i.test(u))
       const where = district || city
-      const title = title0 || `${type}${ty ? ` T${ty.bedrooms}` : rooms ? ` ${rooms} pièces` : ''}${where ? ` — ${where}` : ''}`
+      // Titre généré dans la langue de l’agence (le type interne reste en français pour la logique).
+      const pt = (meta.country ?? country) === 'PT'
+      const label = pt ? (PT_TYPE[type] ?? type) : type
+      const title = title0 || `${label}${ty ? ` T${ty.bedrooms}` : rooms ? ` ${rooms} ${pt ? 'assoalhadas' : 'pièces'}` : ''}${where ? ` — ${where}` : ''}`
       const doc = {
         ref: ref || `IMP-${String(row).padStart(4, '0')}`, title, type, transaction: transaction(g('transaction')), status: st.status,
         address, postalCode: g('postalCode'), district, city, region: cap(g('region')),
@@ -484,7 +489,7 @@ export function createImporter(db, { put, activity, HttpError, locate } = {}) {
     const agency = db.get?.('settings', 'agency') ?? {}
     const center = Array.isArray(agency.center) ? agency.center : null
     const at = new Date().toISOString()
-    const { items, issues } = convert(rows, map, kind, { source, file: file ?? '', at, locate, center })
+    const { items, issues } = convert(rows, map, kind, { source, file: file ?? '', at, locate, center, country: agency.country === 'PT' || agency.country === 'FR' ? agency.country : undefined })
     const { fresh, duplicates } = dedupe(items, db.list(COL[kind]), kind)
     const missing = FIELDS[kind].filter((f) => f.req && !map[f.k] && !(kind === 'contacts' && f.k === 'name' && (map.lastName || map.firstName))).map((f) => f.l)
     return { source, sourceLabel: PRESETS[source]?.label ?? 'Source inconnue', separator, headers, mapping: map, fields: FIELDS[kind], rows: rows.length, fresh, duplicates, issues, missing }

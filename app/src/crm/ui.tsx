@@ -77,7 +77,7 @@ export function SoftBtn({ children, onClick, icon, tone = 'ghost', type = 'butto
 
 /** Entrée de page : fondu + montée, en cascade. */
 export function Stagger({ children, className, i = 0 }: { children: ReactNode; className?: string; i?: number }) {
-  return <motion.div className={className} initial={{ opacity: 0, y: 18, filter: 'blur(6px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ duration: 0.8, delay: 0.05 + i * 0.06, ease: EXPO }}>{children}</motion.div>
+  return <motion.div className={className} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.03 + i * 0.04, ease: EXPO }}>{children}</motion.div>
 }
 
 export const DELIV_TONE = {

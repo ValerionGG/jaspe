@@ -18,6 +18,7 @@ import { Modal, Field, Input, Select, AsyncForm, toast, errText } from '../forms
 import { MailSettings } from '../MailSettings'
 import { WhatsAppSettings } from '../WhatsAppSettings'
 import { LangPanel } from '../../i18n/LangSwitch'
+import { useIdentity } from '../../data/identity'
 import {
   NETWORK, INHERITED, ROLES, PERMS, PERM_MATRIX, RETENTION, SESSIONS, download, csv,
   type Integration,
@@ -117,7 +118,9 @@ const TONES = { chaleureux: 'Chaleureux', sobre: 'Sobre', factuel: 'Factuel' } a
 const PROFILE = { name: me.name, role: me.role, email: 'claire.delmas@maison-riviera.fr', phone: '+33 6 11 22 33 44', card: 'CPI 0605 2024 000 041 872', agency: HOME, photo: me.photo, copilotTone: 'sobre', briefTime: '07:30', prefs: { brief: true, relances: true, voice: true, weekly: false } as Record<string, boolean>, themeMode: 'system' as ThemeMode }
 
 function Profil() {
-  const [p, save] = useSetting('profile', PROFILE)
+  const who = useIdentity()
+  // Compte réel sans profil enregistré : partir de l’identité du compte, jamais du personnage de démo.
+  const [p, save] = useSetting('profile', who.real ? { ...PROFILE, name: who.name, role: who.role, email: '', phone: '', card: '', agency: who.orgName, photo: '' } : PROFILE)
   const { theme, setTheme } = useTheme()
   const audit = useAudit()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -824,12 +827,17 @@ function Facturation() {
           <span><strong className="font-medium">Mode démonstration : paiement non actif.</strong> Aucun compte ni abonnement sur ce poste. Les comptes et le paiement Stripe s’activent sur un serveur lancé avec <code className="num">JASPE_AUTH=1</code>. <a href="/tarifs" className="text-champagne-300 hover:underline">Voir les tarifs</a></span>
         </div>
       )}
-      {a && !a.billing.configured && (
+      {a && !a.billing.configured && (a.billing.beta ? (
+        <div className="flex items-start gap-3 rounded-2xl bg-sage/10 p-4 text-[13px] text-bone/80 ring-1 ring-sage/25">
+          <Info size={17} className="mt-0.5 shrink-0 text-sage" />
+          <span><strong className="font-medium">Bêta gratuite.</strong> Tout est ouvert pendant la bêta : dossiers illimités, jusqu’à 7 conseillers, aucune carte demandée. Les abonnements ouvriront plus tard ; vous serez prévenu avant tout prélèvement.</span>
+        </div>
+      ) : (
         <div className="flex items-start gap-3 rounded-2xl bg-coral/10 p-4 text-[13px] text-bone/80 ring-1 ring-coral/20">
           <Warning size={17} className="mt-0.5 shrink-0 text-coral" />
           <span><strong className="font-medium">Paiement non configuré sur ce serveur.</strong> Aucune somme ne peut être prélevée tant que la clé Stripe n’est pas renseignée. Vous restez sur votre offre actuelle.</span>
         </div>
-      )}
+      ))}
       {a && (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_1fr]">
           <div className="relative overflow-hidden rounded-[1.4rem] p-px">
@@ -877,7 +885,7 @@ function Facturation() {
                   {p.id !== 'decouverte' && !current && (
                     canPay && !subscribed
                       ? <SoftBtn tone="gold" onClick={() => !busy && go(p.id, 'billing/checkout', { plan: p.id, period: p.id === 'solo' ? period : 'month', options: opts, seats })}>{busy === p.id ? 'Redirection vers Stripe…' : `Passer à ${p.name}`}</SoftBtn>
-                      : <span className="text-[11.5px] text-mist">{!a ? 'Paiement non actif en démonstration' : !owner ? 'Réservé au responsable' : subscribed ? 'Via « Gérer ou résilier »' : 'Paiement non configuré'}</span>
+                      : <span className="text-[11.5px] text-mist">{!a ? 'Paiement non actif en démonstration' : !owner ? 'Réservé au responsable' : subscribed ? 'Via « Gérer ou résilier »' : a.billing.beta ? 'Inclus pendant la bêta' : 'Paiement non configuré'}</span>
                   )}
                 </div>
               </div>
@@ -1053,7 +1061,7 @@ export default function Reglages() {
                 </button>
               ))}
             </div>
-            <div className="mt-6 hidden rounded-2xl bg-white/[0.02] p-4 text-[11.5px] text-bone/50 ring-1 ring-white/[0.05] lg:block"><ShieldCheck size={16} weight="light" className="mb-2 text-sage" />Données hébergées en France (Scaleway, Paris). Chiffrement au repos et en transit.</div>
+            <div className="mt-6 hidden rounded-2xl bg-white/[0.02] p-4 text-[11.5px] text-bone/50 ring-1 ring-white/[0.05] lg:block"><ShieldCheck size={16} weight="light" className="mb-2 text-sage" />Données de l’agence dans une base séparée, mots de passe chiffrés (scrypt), session en cookie sécurisé. Hébergement de production : à confirmer avant ouverture.</div>
           </nav>
         </Stagger>
         <div className="min-w-0">

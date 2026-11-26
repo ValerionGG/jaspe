@@ -43,7 +43,7 @@ export function L6Section({ ctx }: { ctx: Ctx }) {
                         <div className="absolute inset-x-6 bottom-6 text-bone md:inset-x-8 md:bottom-8">
                           <div className="font-sans text-[10px] uppercase tracking-eyebrow text-champagne-300">Book de services · {d.ref}</div>
                           <div className="mt-2 text-[34px] leading-[1.02] md:text-[46px]">{head}</div>
-                          <div className="mt-2 font-sans text-[12px] text-bone/70">{p.title} · {p.address}, {p.city} · préparé par {a.name}</div>
+                          <div className="mt-2 font-sans text-[12px] text-bone/70">{p.title} · {[p.address, p.city].filter(Boolean).join(', ')} · préparé par {a.name}</div>
                         </div>
                       </div>
                     )}

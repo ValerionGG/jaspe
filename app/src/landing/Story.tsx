@@ -45,7 +45,7 @@ export function Manifesto() {
             {words.map((w, i) => <Word key={i} w={w} progress={scrollYProgress} range={[i / words.length, Math.min(1, (i + 2) / words.length)]} />)}
           </p>
           <div className="mt-16 grid grid-cols-2 gap-px overflow-hidden rounded-3xl bg-ink/10 md:grid-cols-4">
-            {[['−6 h', 'de saisie par conseiller et par semaine visées'], ['14', 'livrables préparés à partir d’un seul rendez-vous'], ['60', 'routines métier prêtes à activer'], ['100 %', 'des chiffres sourcés, datés, vérifiables']].map(([k, v], i) => (
+            {[['−6 h', 'de saisie par conseiller et par semaine visées'], ['14', 'documents par vendeur : 5 pour préparer le rendez-vous, 9 après'], ['60', 'routines métier prêtes à activer'], ['100 %', 'des chiffres sourcés, datés, vérifiables']].map(([k, v], i) => (
               <Reveal key={k} delay={i * 0.08} className="bg-bone-100 p-6 md:p-8">
                 <div className="display text-5xl md:text-6xl">{k}</div>
                 <div className="mt-3 text-[13px] leading-snug text-ink/55">{v}</div>

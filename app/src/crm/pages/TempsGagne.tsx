@@ -201,7 +201,7 @@ export default function TempsGagne() {
                 <div className="mt-2 display text-[2.6rem] leading-none"><span className="num">{eur.format(value4)}</span></div>
                 <div className="mt-2 text-[12.5px] text-bone/55">
                   {nf1.format(net4 / 60)} h × {eur.format(rateN)}/h
-                  {subN > 0 && <> · {t('tg.subLine', { sub: eur.format(subN), period: eur.format(subPeriod) })} {value4 >= subPeriod
+                  {subN > 0 && <> · {t('tg.subLine', { sub: eur2.format(subN), period: eur.format(subPeriod) })} {value4 >= subPeriod
                     ? <span className="text-sage">{t('tg.gainX', { x: nf1.format(value4 / subPeriod) })}</span>
                     : <span className="text-coral">{t('tg.gainLow')}</span>}</>}
                 </div>

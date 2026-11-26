@@ -6,6 +6,7 @@ import { PageHeader, Tabs, SoftBtn, Heat, Stagger, Card } from '../ui'
 import { Avatar, EXPO } from '../../ui/kit'
 import { STAGES, prop, agent, eur, DELIVERABLES, type Dossier, type Stage } from '../../data/mock'
 import { useDossiers, useProperties, useAgents } from '../../data/collections'
+import { useIdentity } from '../../data/identity'
 import { action } from '../../data/store'
 import { Modal, Field, Input, Select, Textarea, AsyncForm, toast, errText } from '../forms'
 import { useT } from '../../i18n'
@@ -50,7 +51,8 @@ export default function Dossiers() {
   const [scope, setScope] = useState<'mine' | 'agency'>('agency')
   const nav = useNavigate()
   const { t } = useT()
-  const list = scope === 'mine' ? items.filter((d) => d.agentId === 'a1') : items
+  const who = useIdentity()
+  const list = scope === 'mine' ? items.filter((d) => d.agentId === who.userId) : items
   const total = list.reduce((s, d) => s + prop(d.propertyId).price, 0)
 
   return (
@@ -133,24 +135,24 @@ export default function Dossiers() {
           if (propertyId === 'new') {
             if (!v.title || !v.address) throw new Error(t('dos.errTitle'))
             const price = Number(v.price) || 0, surface = Number(v.surface) || 0
-            const p = await propOps.create({ title: v.title, type: v.type, address: v.address, district: v.district || v.city, city: v.city || 'Antibes', surface, rooms: Number(v.rooms) || 0, price, estimateLow: Math.round(price * 0.94), estimateHigh: Math.round(price * 1.04), dpe: (v.dpe || 'D') as 'D', photo: '/img/house-garden.webp', gallery: ['/img/house-garden.webp'], lat: 43.58, lng: 7.12, features: [], year: 2000, status: 'Brouillon', portals: {}, stats: { views: 0, contacts: 0, visits: 0 } } as never)
+            const p = await propOps.create({ title: v.title, type: v.type, address: v.address, district: v.district || v.city, city: v.city || (who.real ? '' : 'Antibes'), surface, rooms: Number(v.rooms) || 0, price, estimateLow: Math.round(price * 0.94), estimateHigh: Math.round(price * 1.04), dpe: (v.dpe || 'D') as 'D', photo: who.real ? '' : '/img/house-garden.webp', gallery: who.real ? [] : ['/img/house-garden.webp'], lat: 43.58, lng: 7.12, features: [], year: who.real ? undefined : 2000, source: 'saisie', status: 'Brouillon', portals: {}, stats: { views: 0, contacts: 0, visits: 0 } } as never)
             propertyId = p.id
           }
           const n = items.length + 1
-          await ops.create({ ref: `VND-2026-${String(430 + n).padStart(4, '0')}`, seller: v.seller, propertyId, agentId: v.agentId, stage: 'prep', next: 'Préparer le rendez-vous de découverte', due: v.due || 'À planifier', heat: 2, progress: 5, deliverables: Object.fromEntries(DELIVERABLES.map((d) => [d.code, 'waiting'])), motivation: v.motivation || 'À préciser en découverte', timeline: v.timeline || 'À préciser', tags: [] } as never)
+          await ops.create({ ref: `VND-${new Date().getFullYear()}-${String((who.real ? 0 : 430) + n).padStart(4, '0')}`, seller: v.seller, propertyId, agentId: v.agentId, stage: 'prep', next: 'Préparer le rendez-vous de découverte', due: v.due || 'À planifier', heat: 2, progress: 5, deliverables: Object.fromEntries(DELIVERABLES.map((d) => [d.code, 'waiting'])), motivation: v.motivation || 'À préciser en découverte', timeline: v.timeline || 'À préciser', tags: [] } as never)
           setCreating(false)
         }}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('dos.f.seller')}><Input name="seller" required placeholder={t('dos.ph.seller')} /></Field>
-            <Field label={t('dos.f.agent')}><Select name="agentId" defaultValue="a1">{agents.filter((a) => a.mandats > 0).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
+            <Field label={t('dos.f.agent')}><Select name="agentId" defaultValue={who.real ? who.userId : 'a1'}>{agents.filter((a) => (who.real ? a.status !== 'invité' : a.mandats > 0)).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
           </div>
           <Field label={t('dos.f.property')}><Select name="propertyId" defaultValue="new" onChange={(e) => e.currentTarget.form?.querySelector<HTMLElement>('[data-newprop]')?.toggleAttribute('hidden', e.currentTarget.value !== 'new')}>
-            <option value="new">{t('dos.newProperty')}</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.title} — {p.district}</option>)}
+            <option value="new">{t('dos.newProperty')}</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.district && !p.title.includes(p.district) ? `${p.title} — ${p.district}` : p.title}</option>)}
           </Select></Field>
           <div data-newprop className="grid gap-4 rounded-2xl bg-white/[0.02] p-4 ring-1 ring-white/[0.06] sm:grid-cols-2">
             <Field label={t('dos.f.title')} className="sm:col-span-2"><Input name="title" placeholder={t('dos.ph.title')} /></Field>
             <Field label={t('dos.f.address')} className="sm:col-span-2"><Input name="address" placeholder="14 chemin des Nielles" /></Field>
-            <Field label={t('dos.f.city')}><Input name="city" defaultValue="Antibes" /></Field>
+            <Field label={t('dos.f.city')}><Input name="city" defaultValue={who.real ? '' : 'Antibes'} /></Field>
             <Field label={t('dos.f.district')}><Input name="district" placeholder="Cap d’Antibes" /></Field>
             <Field label={t('dos.f.type')}><Select name="type" defaultValue="Villa">{['Villa', 'Maison', 'Appartement'].map((t) => <option key={t}>{t}</option>)}</Select></Field>
             <Field label={t('dos.f.dpe')}><Select name="dpe" defaultValue="C">{'ABCDEFG'.split('').map((t) => <option key={t}>{t}</option>)}</Select></Field>

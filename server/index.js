@@ -110,7 +110,7 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
 
   const accounts = auth ? createAccounts(dataDir === ':memory:' ? ':memory:' : join(dataDir, 'accounts.sqlite')) : null
   const billing = auth ? createBilling({ accounts, env, ...(stripeFetch ? { fetch: stripeFetch } : {}) }) : null
-  const gate = auth ? createGate({ accounts, billing, openOrg, send, readBody, mailer, publicUrl: env.JASPE_PUBLIC_URL }) : null
+  const gate = auth ? createGate({ accounts, billing, openOrg, send, readBody, mailer, publicUrl: env.JASPE_PUBLIC_URL, beta: env.JASPE_BETA === '1' ? true : env.JASPE_BETA === '0' ? false : undefined }) : null
 
   async function api(req, res, parts, { db, engine, copilot, clients, emit, filesDir } = main) {
     const [head, a, b] = parts

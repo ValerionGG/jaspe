@@ -157,7 +157,8 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       const day = new Date().toISOString().slice(0, 10)
       if (db.get('documents', `brief-${day}`)) return ['skip', 'Brief du jour déjà prêt']
       const tasks = db.list('tasks').filter((t) => !t.done), q = db.list('queue')
-      assist.logTime({ kind: 'brief', ref: `brief-${day}` })
+      // Rien à résumer (base vide) : aucun temps gagné compté, sinon on gonfle la mesure.
+      if (q.length + tasks.length + db.list('dossiers').length > 0) assist.logTime({ kind: 'brief', ref: `brief-${day}` })
       put('documents', { id: `brief-${day}`, code: 'BRIEF', title: 'Brief du matin', kind: 'report', createdAt: new Date().toISOString(), body: [`${q.length} décision(s) en attente, ${tasks.length} tâche(s) ouvertes.`, ...q.slice(0, 3).map((x) => `• ${x.title}`)], sources: [{ label: 'Tâches, file de validation, agenda', date: day }] })
       return ['ok', `Brief prêt : ${q.length} validations, ${tasks.length} tâches`]
     },

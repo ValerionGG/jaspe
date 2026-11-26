@@ -8,7 +8,7 @@ import { createApp } from './index.js'
 const PW = 'motdepasse-solide'
 
 async function boot(opts = {}) {
-  const app = createApp({ auth: true, dataDir: ':memory:', filesDir: join(tmpdir(), 'jaspe-test-files'), delay: () => Promise.resolve(), env: {}, fetch: () => { throw new Error('aucun appel réseau attendu') }, ...opts })
+  const app = createApp({ auth: true, dataDir: ':memory:', filesDir: join(tmpdir(), 'jaspe-test-files'), delay: () => Promise.resolve(), env: { JASPE_BETA: '0' }, fetch: () => { throw new Error('aucun appel réseau attendu') }, ...opts })
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r))
   const base = `http://127.0.0.1:${app.server.address().port}/api`
   /** Client avec son propre cookie de session. */
@@ -200,4 +200,18 @@ test('mode démonstration inchangé : /api/me signale la démo, pas de comptes',
     assert.equal((await fetch(`${base}/billing/checkout`, { method: 'POST', body: '{}' })).status, 503)
     assert.equal((await fetch(`${base}/dossiers`)).status, 200, 'API ouverte comme avant')
   } finally { await new Promise((r) => app.server.close(r)) }
+})
+
+test('bêta sans paiement : sans clé Stripe, offre « Bêta gratuite » sans quota et profil au nom du compte', async () => {
+  const app = await boot({ env: {} })
+  try {
+    const c = app.client()
+    const r = await register(c, 'beta@x.fr')
+    assert.equal(r.status, 201)
+    assert.equal(r.json.plan.id, 'beta'); assert.equal(r.json.billing.beta, true); assert.equal(r.json.limits.dossiers, null)
+    for (const seller of ['Un', 'Deux', 'Trois']) assert.equal((await c.call('POST', '/dossiers', { seller, stage: 'prep' })).status < 300, true, `dossier ${seller}`)
+    const profile = (await c.call('GET', '/settings')).json.find((s) => s.id === 'profile')
+    assert.equal(profile.name, 'Anne Martin'); assert.equal(profile.email, 'beta@x.fr')
+    assert.doesNotMatch(JSON.stringify(profile), /Delmas/)
+  } finally { await app.close() }
 })

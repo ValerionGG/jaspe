@@ -165,12 +165,12 @@ export function useApiStatus(): Status {
 }
 
 /* ——— Comptes (serveur lancé avec JASPE_AUTH=1) ——— */
-export type PlanId = 'decouverte' | 'solo' | 'agence'
+export type PlanId = 'decouverte' | 'solo' | 'agence' | 'beta'
 export type Me =
   | { mode: 'static' | 'demo' | 'offline' }
   | { mode: 'auth'; user: { id: string; name: string; email: string; role: 'owner' | 'conseiller' }; org: { id: string; name: string; country: string }
       plan: { id: PlanId; label: string; subscribed: string; status: string; period?: string; options: string[]; seats: number; periodEnd?: string; cancelAtPeriodEnd: boolean; customer: boolean }
-      limits: { dossiers: number | null; seats: number }; usage: { dossiers: number; seats: number }; billing: { configured: boolean } }
+      limits: { dossiers: number | null; seats: number }; usage: { dossiers: number; seats: number }; billing: { configured: boolean; beta?: boolean } }
   | { mode: 'anonymous' }
 
 /** Appel brut vers l’API des comptes / de la facturation (erreurs → ApiError avec le message du serveur). */

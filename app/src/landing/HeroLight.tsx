@@ -65,7 +65,7 @@ export function HeroLight({ ready }: { ready: boolean }) {
             <Button size="lg" variant="ghost" href="/app">Explorer le CRM</Button>
           </motion.div>
           <motion.div initial={{ opacity: 0 }} animate={go ? { opacity: 1 } : {}} transition={{ delay: 1.4, duration: 1 }} className="mt-14 grid max-w-[34rem] grid-cols-3 gap-6 border-t border-white/10 pt-6">
-            {[['14', 'livrables par RDV'], ['60+', 'routines métier'], ['−6 h', 'de saisie / semaine*']].map(([k, v]) => (
+            {[['9', 'livrables après chaque RDV'], ['60+', 'routines métier'], ['−6 h', 'de saisie / semaine*']].map(([k, v]) => (
               <div key={v}><div className="display text-4xl">{k}</div><div className="mt-1 text-[12px] text-mist">{v}</div></div>
             ))}
           </motion.div>

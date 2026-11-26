@@ -1,16 +1,21 @@
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { useState } from 'react'
-import { Sparkle, MapPin, Ruler, Bed, Tree, Lightning, CheckCircle, Warning, FileText, Phone, EnvelopeSimple, ShareNetwork, DotsThree, X, ArrowsClockwise, Eye, PencilSimple, Printer, UploadSimple, Link as LinkIcon } from '@phosphor-icons/react'
+import { Sparkle, MapPin, Ruler, Bed, Tree, Lightning, CheckCircle, Warning, FileText, Phone, EnvelopeSimple, ShareNetwork, DotsThree, X, House, ArrowsClockwise, Eye, PencilSimple, Printer, UploadSimple, Link as LinkIcon } from '@phosphor-icons/react'
 import { Card, Tabs, SoftBtn, Stagger, DELIV_TONE, IconBtn } from '../ui'
 import { Avatar, Ring, EXPO } from '../../ui/kit'
-import { DOSSIERS, DELIVERABLES, prop, agent, eur, fmt, type DelivState } from '../../data/mock'
-import { useDossiers, useFiles, useActivity, useNotes, type DocumentDoc } from '../../data/collections'
+import { DOSSIERS, DELIVERABLES, prop, eur, fmt, type DelivState } from '../../data/mock'
+import { useDossiers, useFiles, useActivity, useNotes, useAgents, useBuyers, useContacts, type DocumentDoc } from '../../data/collections'
 import { useDoc, action, uploadFile, type Doc } from '../../data/store'
 import { AsyncForm, Field, Input, Textarea, toast, errText } from '../forms'
 import { JourneyStepper, currentStep, type StepId } from '../dossier/Stepper'
 import { StepView } from '../dossier'
 import { useJourney } from '../dossier/useJourney'
+import { factSource, isDemoProperty, joinParts, estimateRange, matchBuyers, useCurrentUserName, useMeMode, type LooseProperty } from '../dossier/facts'
+import { figuresOf } from '../dossier/deliv-kit'
+
+const ROLE_LABEL: Record<string, string> = { vendeur: 'Vendeur', acquereur: 'Acquéreur', notaire: 'Notaire', diagnostiqueur: 'Diagnostiqueur', syndic: 'Syndic', courtier: 'Courtier', photographe: 'Photographe' }
+type Fact = [string, string, string]
 
 const DPE_C = { A: '#3F8F5A', B: '#6BAF5B', C: '#B8C94A', D: '#F2D43A', E: '#F0A43A', F: '#E86F3A', G: '#D4402F' }
 
@@ -100,7 +105,34 @@ export default function DossierDetail() {
     setUploading(true)
     try { for (const f of Array.from(list)) { if (f.size > 8e6) throw new Error(`${f.name} dépasse 8 Mo`); await uploadFile(f, d.id) } toast(`${list.length} pièce(s) déposée(s)`) } catch (x) { toast(errText(x), 'error') } finally { setUploading(false) }
   }
-  const p = prop(d.propertyId), a = agent(d.agentId)
+  const p = prop(d.propertyId), lp = p as LooseProperty
+  const [agents] = useAgents()
+  const [buyers] = useBuyers()
+  const [contacts] = useContacts()
+  const a = agents.find((x) => x.id === d.agentId)
+  const mode = useMeMode()
+  const userName = useCurrentUserName()
+  const demo = isDemoProperty(lp, mode)
+  const src = (legacy: string) => factSource(lp, demo, legacy)
+  const gallery = (p.gallery ?? []).filter(Boolean)
+  const l7 = useDoc<DocumentDoc & Doc>('documents', `${d.id}-L7`)
+  const range = estimateRange(lp, l7?.range)
+  const compFig = figuresOf(l7 ?? undefined).find((f) => /^Compar/i.test(f.label))
+  const compCount = compFig ? Number(compFig.value) || 0 : demo ? 5 : 0
+  const people = [
+    { n: d.seller, r: 'Vendeurs · décideurs', ph: d.sellerPhoto ?? (demo ? '/img/p-paul.webp' : undefined) },
+    ...(a ? [{ n: a.name, r: `${a.role} · responsable`, ph: a.photo }] : []),
+    ...contacts.filter((c) => c.dossiers?.includes(d.id)).map((c) => ({ n: c.name, r: c.roles.map((x) => ROLE_LABEL[x] ?? x).join(' · ') || 'Contact', ph: c.photo })),
+  ].filter((x, i, xs) => x.n && xs.findIndex((y) => y.n === x.n) === i)
+  const matches = matchBuyers(buyers, lp).slice(0, 3)
+  const facts: Fact[] = [
+    ...(p.type ? [['Type', p.type, src('Mandat')] as Fact] : []),
+    ...(p.surface ? [['Surface habitable', `${p.surface} m²`, src('Plan géomètre')] as Fact] : []),
+    ...(p.land ? [['Terrain', `${fmt(p.land)} m²`, src('Cadastre PCI')] as Fact] : demo ? [['Terrain', '—', 'Cadastre PCI'] as Fact] : []),
+    ...(p.rooms ? [['Pièces', String(p.rooms), src('Découverte')] as Fact] : []),
+    ...(p.year ? [['Année', String(p.year), src('Acte')] as Fact] : []),
+    ...(demo ? [['Taxe foncière', '6 840 €', 'Avis 2025'] as Fact] : []),
+  ]
   const [tab, setTab] = useState<'parcours' | 'bien' | 'documents' | 'journal'>('parcours')
   const { journey, save } = useJourney(d.id)
   const [step, setStep] = useState<StepId>(() => currentStep(d))
@@ -113,17 +145,19 @@ export default function DossierDetail() {
       {/* Bandeau photo */}
       <Stagger>
         <div className="theme-dark relative -mx-4 -mt-8 h-[46vh] min-h-[360px] overflow-hidden md:mx-0 md:mt-0 md:rounded-[2rem]">
-          <AnimatePresence mode="popLayout"><motion.img key={photo} src={p.gallery[photo]} alt={p.title} initial={{ opacity: 0, scale: 1.06 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.1, ease: EXPO }} className="absolute inset-0 h-full w-full object-cover" /></AnimatePresence>
+          {gallery[photo] || p.photo
+            ? <AnimatePresence mode="popLayout"><motion.img key={photo} src={gallery[photo] ?? p.photo} alt={p.title} initial={{ opacity: 0, scale: 1.06 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.1, ease: EXPO }} className="absolute inset-0 h-full w-full object-cover" /></AnimatePresence>
+            : <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-ink-800 via-ink-850 to-champagne-700/40"><div className="flex flex-col items-center gap-2 pb-24 text-bone/35"><House size={56} weight="thin" /><span className="text-[11px] uppercase tracking-eyebrow">Aucune photo pour l’instant</span></div></div>}
           <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-ink/10" />
           <div className="absolute right-5 top-5 flex gap-2"><IconBtn label="Partager"><ShareNetwork size={15} /></IconBtn><IconBtn label="Plus"><DotsThree size={15} weight="bold" /></IconBtn></div>
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-5 p-6 md:flex-row md:items-end md:justify-between md:p-8">
             <div>
               <div className="flex flex-wrap items-center gap-2 text-[11px]"><span className="num rounded-full bg-ink/60 px-2.5 py-1 backdrop-blur">{d.ref}</span>{d.mandate && <span className="rounded-full bg-champagne px-2.5 py-1 font-medium text-ink">Mandat {d.mandate.toLowerCase()}</span>}{d.tags.map((t) => <span key={t} className="rounded-full bg-white/10 px-2.5 py-1 backdrop-blur">{t}</span>)}</div>
               <h1 className="display mt-3 text-4xl md:text-6xl">{p.title}</h1>
-              <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px] text-bone/70"><span className="flex items-center gap-1.5"><MapPin size={14} />{p.address}, {p.city}</span><span className="flex items-center gap-1.5"><Ruler size={14} />{p.surface} m²</span><span className="flex items-center gap-1.5"><Bed size={14} />{p.rooms} pièces</span>{p.land && <span className="flex items-center gap-1.5"><Tree size={14} />{fmt(p.land)} m²</span>}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px] text-bone/70"><span className="flex items-center gap-1.5"><MapPin size={14} />{joinParts(p.address, p.city) || 'Localisation non renseignée'}</span>{!!p.surface && <span className="flex items-center gap-1.5"><Ruler size={14} />{p.surface} m²</span>}{!!p.rooms && <span className="flex items-center gap-1.5"><Bed size={14} />{p.rooms} pièces</span>}{p.land && <span className="flex items-center gap-1.5"><Tree size={14} />{fmt(p.land)} m²</span>}</div>
             </div>
             <div className="flex items-end gap-4">
-              <div className="flex gap-1.5">{p.gallery.map((g, i) => <button key={g} onClick={() => setPhoto(i)} className={`h-12 w-16 overflow-hidden rounded-lg ring-2 transition ${i === photo ? 'ring-champagne' : 'ring-transparent opacity-60 hover:opacity-100'}`}><img src={g} alt="" className="h-full w-full object-cover" /></button>)}</div>
+              <div className="flex gap-1.5">{gallery.map((g, i) => <button key={g} onClick={() => setPhoto(i)} className={`h-12 w-16 overflow-hidden rounded-lg ring-2 transition ${i === photo ? 'ring-champagne' : 'ring-transparent opacity-60 hover:opacity-100'}`}><img src={g} alt="" className="h-full w-full object-cover" /></button>)}</div>
               <div className="text-right"><div className="text-[11px] text-mist">Prix de présentation</div><div className="display text-4xl">{eur(p.price)}</div></div>
             </div>
           </div>
@@ -145,12 +179,13 @@ export default function DossierDetail() {
                 <div className="grid gap-6 md:grid-cols-2">
                   <Card title="Caractéristiques" kicker="Origine et validation par champ">
                     <dl className="space-y-2.5 text-[13px]">
-                      {[['Type', p.type, 'Mandat'], ['Surface habitable', `${p.surface} m²`, 'Plan géomètre'], ['Terrain', p.land ? `${fmt(p.land)} m²` : '—', 'Cadastre PCI'], ['Pièces', String(p.rooms), 'Découverte'], ['Année', String(p.year), 'Acte'], ['Taxe foncière', '6 840 €', 'Avis 2025']].map(([k, v, s]) => <div key={k} className="flex items-center justify-between gap-4 border-b border-white/[0.04] pb-2.5 last:border-0"><dt className="text-mist">{k}</dt><dd className="flex items-center gap-2">{v}<span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] text-mist">{s}</span></dd></div>)}
+                      {facts.map(([k, v, s]) => <div key={k} className="flex items-center justify-between gap-4 border-b border-white/[0.04] pb-2.5 last:border-0"><dt className="text-mist">{k}</dt><dd className="flex items-center gap-2">{v}<span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] text-mist">{s}</span></dd></div>)}
+                      {!p.year && !demo && <div className="flex items-center justify-between gap-4 pt-0.5"><dt className="text-mist">Année</dt><dd className="italic text-mist">non renseigné</dd></div>}
                     </dl>
                   </Card>
-                  <Card title="Performance énergétique" kicker="DPE · valide jusqu’au 03/2032">
-                    <div className="space-y-1.5">{(Object.keys(DPE_C) as (keyof typeof DPE_C)[]).map((k, i) => <div key={k} className="flex items-center gap-3"><div className="flex h-7 items-center rounded-r-full pl-3 text-[12px] font-semibold text-ink" style={{ width: `${34 + i * 9}%`, background: DPE_C[k] }}>{k}</div>{p.dpe === k && <span className="num text-[12px] text-champagne-300">← 74 kWh/m²/an</span>}</div>)}</div>
-                    <div className="mt-4 flex flex-wrap gap-1.5">{p.features.map((f) => <span key={f} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[11.5px] ring-1 ring-white/[0.07]">{f}</span>)}</div>
+                  <Card title="Performance énergétique" kicker={demo ? 'DPE · valide jusqu’au 03/2032' : p.dpe ? `DPE · classe ${p.dpe} · ${src('')}` : 'DPE non renseigné'}>
+                    <div className="space-y-1.5">{(Object.keys(DPE_C) as (keyof typeof DPE_C)[]).map((k, i) => <div key={k} className="flex items-center gap-3"><div className="flex h-7 items-center rounded-r-full pl-3 text-[12px] font-semibold text-ink" style={{ width: `${34 + i * 9}%`, background: DPE_C[k] }}>{k}</div>{p.dpe === k && <span className="num text-[12px] text-champagne-300">{demo ? '← 74 kWh/m²/an' : '←'}</span>}</div>)}</div>
+                    <div className="mt-4 flex flex-wrap gap-1.5">{(p.features ?? []).map((f) => <span key={f} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[11.5px] ring-1 ring-white/[0.07]">{f}</span>)}</div>
                   </Card>
                 </div>
               )}
@@ -175,7 +210,7 @@ export default function DossierDetail() {
               )}
               {tab === 'journal' && (
                 <Card title="Journal du dossier" kicker="Chaque action, sa source, son auteur">
-                  <AsyncForm submitLabel="Ajouter la note" onSubmit={async (v) => { if (!v.text?.trim()) throw new Error('Note vide'); await noteOps.create({ dossierId: d.id, text: v.text.trim(), at: new Date().toISOString(), by: 'Claire Delmas' }); (document.getElementById('note-text') as HTMLTextAreaElement | null)?.form?.reset() }}>
+                  <AsyncForm submitLabel="Ajouter la note" onSubmit={async (v) => { if (!v.text?.trim()) throw new Error('Note vide'); await noteOps.create({ dossierId: d.id, text: v.text.trim(), at: new Date().toISOString(), by: userName ?? 'Conseiller' }); (document.getElementById('note-text') as HTMLTextAreaElement | null)?.form?.reset() }}>
                     <Textarea id="note-text" name="text" rows={2} placeholder="Consigner un échange, une décision du vendeur…" />
                   </AsyncForm>
                   <div className="mt-6">
@@ -201,19 +236,27 @@ export default function DossierDetail() {
           </Stagger>
           <Stagger i={4}>
             <Card title="Estimation" kicker="L7 · à valider">
-              <div className="display text-4xl">{eur(p.estimateLow)} – {eur(p.estimateHigh)}</div>
-              <div className="relative mt-4 h-1.5 rounded-full bg-white/10"><div className="absolute inset-y-0 rounded-full bg-gradient-to-r from-champagne-700 to-champagne" style={{ left: '20%', right: '15%' }} /><div className="absolute -top-1.5 h-4 w-0.5 rounded bg-bone" style={{ left: '58%' }} /></div>
-              <div className="mt-2 flex justify-between text-[11px] text-mist"><span>Prix présenté {eur(p.price)}</span><span>5 comparables</span></div>
+              {range ? (
+                <>
+                  <div className="display text-4xl">{eur(range[0])} – {eur(range[1])}</div>
+                  <div className="relative mt-4 h-1.5 rounded-full bg-white/10"><div className="absolute inset-y-0 rounded-full bg-gradient-to-r from-champagne-700 to-champagne" style={{ left: '20%', right: '15%' }} /><div className="absolute -top-1.5 h-4 w-0.5 rounded bg-bone" style={{ left: '58%' }} /></div>
+                </>
+              ) : (
+                <div><div className="display text-3xl text-bone/70">Estimation à préparer</div><p className="mt-2 text-[12.5px] text-mist">Aucune fourchette calculée : elle sera établie avec l’analyse L7 et des comparables datés.</p></div>
+              )}
+              <div className="mt-2 flex justify-between gap-3 text-[11px] text-mist"><span>{p.price ? `Prix présenté ${eur(p.price)}` : 'Prix non renseigné'}</span><span>{compCount ? `${compCount} comparable${compCount > 1 ? 's' : ''}` : 'Aucun comparable pour l’instant'}</span></div>
             </Card>
           </Stagger>
           <Stagger i={5}>
             <Card title="Personnes">
-              {[[d.seller, 'Vendeurs · décideurs', '/img/p-paul.webp'], [a.name, `${a.role} · responsable`, a.photo], ['Inès Morel', 'Coordination transaction', '/img/p-ines.webp'], ['Me Faure', 'Notaire vendeur', '/img/p-marc.webp']].map(([n, r, ph]) => <div key={n} className="flex items-center gap-3 border-b border-white/[0.04] py-2.5 last:border-0"><Avatar src={ph} size={34} /><div className="min-w-0 flex-1"><div className="truncate text-[13px]">{n}</div><div className="text-[11px] text-mist">{r}</div></div><LinkIcon size={14} className="text-mist" /></div>)}
+              {people.map(({ n, r, ph }) => <div key={n} className="flex items-center gap-3 border-b border-white/[0.04] py-2.5 last:border-0"><Avatar src={ph} name={n} size={34} /><div className="min-w-0 flex-1"><div className="truncate text-[13px]">{n}</div><div className="text-[11px] text-mist">{r}</div></div><LinkIcon size={14} className="text-mist" /></div>)}
             </Card>
           </Stagger>
           <Stagger i={6}>
             <Card title="Acquéreurs compatibles" kicker="L3 · matching expliqué">
-              {[['Family Office L.', 97], ['M. Keller', 81], ['M. Serrano', 64]].map(([n, v]) => <div key={n as string} className="flex items-center gap-3 py-2"><span className="flex-1 text-[13px]">{n}</span><div className="h-1 w-24 rounded-full bg-white/10"><div className="h-1 rounded-full bg-champagne" style={{ width: `${v}%` }} /></div><span className="num w-8 text-right text-[12px]">{v}</span></div>)}
+              {buyers.length === 0 && <p className="py-2 text-[13px] text-mist">Aucun acquéreur enregistré pour l’instant</p>}
+              {buyers.length > 0 && matches.length === 0 && <p className="py-2 text-[13px] text-mist">Aucun acquéreur compatible avec ce bien pour l’instant</p>}
+              {matches.map(({ b, score: v }) => <div key={b.id} className="flex items-center gap-3 py-2"><span className="flex-1 truncate text-[13px]">{b.name}</span><div className="h-1 w-24 rounded-full bg-white/10"><div className="h-1 rounded-full bg-champagne" style={{ width: `${v}%` }} /></div><span className="num w-8 text-right text-[12px]">{v}</span></div>)}
               <Link to="/app/acquereurs" className="mt-3 block text-[12px] text-champagne-300">Voir le matching →</Link>
             </Card>
           </Stagger>

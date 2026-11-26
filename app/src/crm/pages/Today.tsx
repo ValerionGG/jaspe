@@ -5,12 +5,13 @@ import clsx from 'clsx'
 import { Sparkle, ArrowRight, CheckCircle, Circle, Phone, PaperPlaneTilt, FileText, ArrowsClockwise, MapPin, Clock, Lightning, Warning, Trophy, BellRinging, ChatsCircle, Compass } from '@phosphor-icons/react'
 import { Card, Stat, Stagger, SoftBtn, DELIV_TONE } from '../ui'
 import { Avatar, Ring, Spark, EXPO } from '../../ui/kit'
-import { prop, me, eur } from '../../data/mock'
+import { prop, eur } from '../../data/mock'
 import { NOW } from '../../data/ops'
 import { useTasks, useActivity, useDossiers, useEvents, useQueue, useReminders, useConversations, useTimelog } from '../../data/collections'
 import { openBrief } from '../BriefComposer'
 import { isSimpleMode, readDay1, markDay1 } from '../../ui/mode'
 import { useT } from '../../i18n'
+import { useIdentity } from '../../data/identity'
 
 /** Premier jour en 3 écrans : brief, débrief, temps gagné. Chaque étape se coche d’elle-même quand elle est faite. */
 function FirstDay() {
@@ -67,6 +68,12 @@ export default function Today() {
   const [tuts] = useCollection<TutDoc>('tutorials')
   const [timelog] = useTimelog()
   const { t, locale } = useT()
+  const who = useIdentity()
+  const real = who.real
+  const clock = new Date()
+  // Jour du calendrier : en démo, le lundi 12 octobre 2026 figé ; en compte réel, aujourd’hui (jour compté depuis le 1er octobre 2026).
+  const dayIdx = real ? Math.round((Date.UTC(clock.getFullYear(), clock.getMonth(), clock.getDate()) - Date.UTC(2026, 9, 0)) / 864e5) : NOW.day
+  const clockLabel = real ? clock.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : NOW.label
   const week = timelog.filter((e) => Date.now() - Date.parse(e.at) < 7 * 864e5)
   const weekNet = week.reduce((n, e) => n + e.net, 0), weekCorr = week.filter((e) => e.corrections > 0).length
   const todayStr = new Date().toDateString()
@@ -75,13 +82,13 @@ export default function Today() {
   const unreadMsgs = unread.reduce((n, c) => n + c.unread, 0)
   // ponytail: « terminée » = doc tutorials `onboarding` / `tour-onboarding` (ou kind tour + tour: 'onboarding') marqué done.
   const onboarded = tuts.some((t) => (t.id === 'onboarding' || t.id === 'tour-onboarding' || t.tour === 'onboarding' || t.tourId === 'onboarding') && t.done)
-  const dateLabel = new Date(2026, 9, NOW.day).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, (c) => c.toUpperCase())
-  const TODAY = events.filter((e) => e.day === NOW.day).sort((a, b) => a.start.localeCompare(b.start)).map((e) => ({ ...e, time: e.start, ready: e.prep && Object.values(e.prep).every((v) => v >= 100) ? 100 : undefined }))
+  const dateLabel = new Date(2026, 9, dayIdx).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, (c) => c.toUpperCase())
+  const TODAY = events.filter((e) => e.day === dayIdx).sort((a, b) => a.start.localeCompare(b.start)).map((e) => ({ ...e, time: e.start, ready: e.prep && Object.values(e.prep).every((v) => v >= 100) ? 100 : undefined }))
   const TASKS = [...tasks].sort((a, b) => Number(!!a.done) - Number(!!b.done))
   const done = tasks.filter((t) => t.done).map((t) => t.id)
   const toggle = async (id: string) => { setBusy(id); try { await action('task.toggle', { id }) } finally { setBusy(null) } }
   const mandats = DOSSIERS.filter((d) => d.mandate).length
-  const now = NOW.h
+  const now = real ? clock.getHours() + clock.getMinutes() / 60 : NOW.h
   const toH = (t: string) => { const [h, m] = t.split(':').map(Number); return h + m / 60 }
   const review = DOSSIERS.flatMap((d) => Object.entries(d.deliverables).filter(([, s]) => s === 'review' || s === 'blocked').map(([c, s]) => ({ d, c, s })))
 
@@ -90,21 +97,25 @@ export default function Today() {
       {/* Salut + brief */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
         <Stagger className="lg:col-span-7">
-          <div className="text-[11px] uppercase tracking-eyebrow text-mist">{dateLabel} · {NOW.label} · Antibes 19°</div>
-          <h1 className="display mt-2 text-5xl md:text-6xl">{t('today.hello', { name: me.name.split(' ')[0] })}<span className="text-champagne">.</span></h1>
+          <div className="text-[11px] uppercase tracking-eyebrow text-mist">{dateLabel} · {clockLabel}{real ? '' : ' · Antibes 19°'}</div>
+          <h1 className="display mt-2 text-5xl md:text-6xl">{t('today.hello', { name: who.firstName })}<span className="text-champagne">.</span></h1>
           <div className="relative mt-6 overflow-hidden rounded-[1.6rem] p-px">
             <div className="absolute inset-0 rounded-[1.6rem] bg-[conic-gradient(from_180deg_at_50%_50%,rgb(var(--acc-500)_/_.5),rgb(var(--acc-500)_/_.05),rgb(var(--sea)_/_.35),rgb(var(--acc-500)_/_.05),rgb(var(--acc-500)_/_.5))]" />
             <div className="relative rounded-[calc(1.6rem-1px)] bg-ink-800 p-6">
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-[12px] text-champagne-300"><Sparkle size={14} weight="fill" /> {t('today.briefBy', { time: '07:30' })}</span>
-                <span className="text-[11px] text-mist">{t('today.briefSources')}</span>
+                <span className="flex items-center gap-2 text-[12px] text-champagne-300"><Sparkle size={14} weight="fill" /> {real ? t('today.briefLive') : t('today.briefBy', { time: '07:30' })}</span>
+                <span className="text-[11px] text-mist">{real ? t('today.briefSourcesReal', { d: DOSSIERS.length, q: queue.length }) : t('today.briefSources')}</span>
               </div>
               <p className="mt-4 text-[17px] leading-relaxed text-bone/90 md:text-lg">
-                {t('today.brief1')} <span className="text-champagne-300">{t('today.pending', { n: queue.length })}</span>{t('today.brief2')} <span className="text-sage">{t('today.ready100')}</span>.
+                {real ? (DOSSIERS.length === 0 ? t('today.realEmpty') : <>{t('today.realBrief', { n: DOSSIERS.length })} <span className="text-champagne-300">{t('today.pending', { n: queue.length })}</span>{' · '}{t('today.realEvents', { n: TODAY.length })}</>) : <>{t('today.brief1')} <span className="text-champagne-300">{t('today.pending', { n: queue.length })}</span>{t('today.brief2')} <span className="text-sage">{t('today.ready100')}</span>.</>}
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Link to="/app/studio"><SoftBtn tone="gold" icon={<CheckCircle size={14} />}>{t('today.validateAll')}</SoftBtn></Link>
-                <Link to="/app/dossiers/d5"><SoftBtn icon={<FileText size={14} />}>{t('today.openBrief11')}</SoftBtn></Link>
+                {real && DOSSIERS.length === 0 ? (
+                  <Link to="/app/import"><SoftBtn tone="gold" icon={<ArrowRight size={14} />}>{t('today.importCta')}</SoftBtn></Link>
+                ) : (
+                  <Link to={real ? '/app/taches' : '/app/studio'}><SoftBtn tone="gold" icon={<CheckCircle size={14} />}>{t('today.validateAll')}</SoftBtn></Link>
+                )}
+                {!real && <Link to="/app/dossiers/d5"><SoftBtn icon={<FileText size={14} />}>{t('today.openBrief11')}</SoftBtn></Link>}
                 <SoftBtn icon={<Lightning size={14} />} onClick={openBrief}>{t('day1.brief')}</SoftBtn>
               </div>
             </div>
@@ -127,10 +138,14 @@ export default function Today() {
           </Link>
         </Stagger>
         <Stagger i={1} className="grid min-w-0 grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:col-span-5">
-          <Stat label={t('today.kpiCa')} value="168 k€" delta="+22 %" hint={t('today.kpiCaHint')}><Ring value={70} size={46}><span className="num text-[10px]">70%</span></Ring></Stat>
-          <Stat label={t('today.kpiMandates')} value={String(mandats)} delta="+3" hint={t('today.kpiExclusive', { n: DOSSIERS.filter((d) => d.mandate === 'Exclusif').length })}><Spark data={[8, 9, 9, 11, 12, 12, 14]} w={70} h={30} /></Stat>
-          <Stat label={t('today.kpiTime')} value="7 h 40" hint={t('today.kpiTimeHint')} />
-          <Stat label={t('today.kpiConv')} value="38 %" delta="+5 pts" hint={t('today.kpiConvHint')} />
+          {real
+            ? <Stat label={t('today.kpiDossiers')} value={String(DOSSIERS.length)} hint={t('today.kpiDossiersHint', { n: DOSSIERS.filter((d) => d.stage === 'prep' || d.stage === 'rdv').length })} />
+            : <Stat label={t('today.kpiCa')} value="168 k€" delta="+22 %" hint={t('today.kpiCaHint')}><Ring value={70} size={46}><span className="num text-[10px]">70%</span></Ring></Stat>}
+          <Stat label={t('today.kpiMandates')} value={String(mandats)} delta={real ? undefined : '+3'} hint={t('today.kpiExclusive', { n: DOSSIERS.filter((d) => d.mandate === 'Exclusif').length })}>{!real && <Spark data={[8, 9, 9, 11, 12, 12, 14]} w={70} h={30} />}</Stat>
+          <Stat label={t('today.kpiTime')} value={`${Math.floor(weekNet / 60)} h ${String(Math.round(weekNet % 60)).padStart(2, '0')}`} hint={t('today.kpiTimeHint')} />
+          {real
+            ? <Stat label={t('today.kpiConv')} value={DOSSIERS.length ? `${Math.round((mandats / DOSSIERS.length) * 100)} %` : '—'} hint={t('today.kpiConvHintReal')} />
+            : <Stat label={t('today.kpiConv')} value="38 %" delta="+5 pts" hint={t('today.kpiConvHint')} />}
         </Stagger>
       </div>
 
@@ -144,7 +159,7 @@ export default function Today() {
                 const marker = toH(e.time) > now && (i === 0 || toH(TODAY[i - 1].time) <= now)
                 return (
                   <div key={e.time}>
-                  {marker && <div className="-mt-1 mb-3 flex items-center gap-2 pl-[4.4rem]"><span className="h-2 w-2 rounded-full bg-coral" /><span className="h-px flex-1 bg-coral/50" /><span className="num text-[10px] text-coral">{NOW.label}</span></div>}
+                  {marker && <div className="-mt-1 mb-3 flex items-center gap-2 pl-[4.4rem]"><span className="h-2 w-2 rounded-full bg-coral" /><span className="h-px flex-1 bg-coral/50" /><span className="num text-[10px] text-coral">{clockLabel}</span></div>}
                   <div className={`relative flex gap-4 pb-4 ${past ? 'opacity-45' : ''}`}>
                     <div className="w-12 shrink-0 pt-0.5 text-right"><div className="num text-[13px]">{e.time}</div><div className="num text-[10.5px] text-mist">{e.end}</div></div>
                     <div className="relative flex flex-col items-center">
@@ -271,7 +286,7 @@ export default function Today() {
                 )
               })}
             </div>
-            <div className="mt-5 flex items-center gap-2 border-t border-white/[0.06] pt-4 text-[11.5px] text-mist"><div className="flex -space-x-2">{['p-sofia', 'p-marc', 'p-paul'].map((p) => <Avatar key={p} src={`/img/${p}.webp`} size={22} />)}</div>{t('today.online', { n: 3 })}</div>
+            {!real && <div className="mt-5 flex items-center gap-2 border-t border-white/[0.06] pt-4 text-[11.5px] text-mist"><div className="flex -space-x-2">{['p-sofia', 'p-marc', 'p-paul'].map((p) => <Avatar key={p} src={`/img/${p}.webp`} size={22} />)}</div>{t('today.online', { n: 3 })}</div>}
           </Card>
         </Stagger>
       </div>
