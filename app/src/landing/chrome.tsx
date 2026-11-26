@@ -85,7 +85,7 @@ export function Cursor() {
   )
 }
 
-const LINKS = [['Parcours', '#parcours'], ['Produit', '#produit'], ['Automatisations', '#automatisations'], ['Réseaux', '#reseaux'], ['Tarifs', '#tarifs']]
+const LINKS = [['Parcours', '#parcours'], ['Produit', '#produit'], ['Automatisations', '#automatisations'], ['Réseaux', '#reseaux'], ['Tarifs', '/tarifs']]
 
 export function Nav() {
   const [open, setOpen] = useState(false)

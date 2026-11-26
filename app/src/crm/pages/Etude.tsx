@@ -8,15 +8,17 @@ import bench from '../../content/03-benchmark.md?raw'
 import insp from '../../content/01-inspiration.md?raw'
 import motionDoc from '../../content/02-motion-benchmark.md?raw'
 import ideas from '../../content/04-idees-et-automatisations.md?raw'
+import concu from '../../content/05-etude-concurrentielle-2026-11.md?raw'
+import panel from '../../content/06-benchmark-large-et-panel-clients-2026-11.md?raw'
 
-const DOCS = { bench: { label: 'Benchmark métier', md: bench }, insp: { label: 'Direction artistique', md: insp }, motion: { label: 'Motion & interactions', md: motionDoc }, ideas: { label: 'Idées & automatisations', md: ideas } }
+const DOCS = { panel: { label: 'Benchmark & panel clients', md: panel }, concu: { label: 'Étude concurrentielle 2026', md: concu }, bench: { label: 'Benchmark métier', md: bench }, insp: { label: 'Direction artistique', md: insp }, motion: { label: 'Motion & interactions', md: motionDoc }, ideas: { label: 'Idées & automatisations', md: ideas } }
 type Key = keyof typeof DOCS | 'shots'
 
 const SHOTS = ['aw-loam-house.jpg', 'aw-mejuma.jpg', 'aw-sobha-privy.jpg', 'aw-lenval.jpg', 'aw-lev.jpg', 'aw-mrc-boca.png', 'aw-rialto.jpg', 'drb-elyse-phenomenon.webp', 'drb-nixtio-luxury.webp', 'drb-lumios-editorial.webp', 'drb-nixtio-dashboard.webp', 'drb-nexusai-dark.webp', 'drb-onero-crm.webp', 'drb-palco-crm.webp', 'drb-eloria-orbix.webp', 'drb-estateo-outcrowd.webp', 'drb-minhaj-editorial.webp', 'drb-serhii-minimal.webp', 'be-agentic-ai-crm.jpg', 'be-re-platform.jpg', 'be-lunare.png', 'be-blumont.jpg', 'be-jawhara.jpg', 'be-propflow.png', 'be-valuation.png', 'be-re-investment.png', 'lb-vestris.webp', 'lb-chisel.webp', 'lb-flamingo.webp', 'ms-luxury-hero.jpg', 'ms-monolith-hero-stratum.jpg', 'ms-sky-estate.jpg', 'ms-agent-wave.jpg', 'ms-golden-portal.jpg', 'ms-zenith-realty.jpg', 'ms-scroll-landing.jpg', 'ms-interactive-discovery.jpg', 'ms-space-voyage-preloader.jpg', 'site-loamhouse.jpeg', 'site-111w57.jpeg', 'site-aman.jpeg', 'site-feau.jpeg', 'site-barnes.jpeg', 'site-zingraf.jpeg', 'site-theagency.jpeg', 'site-knightfrank.jpeg', 'site-lenval.jpeg', 'site-lev.jpeg', 'site-linear.jpeg', 'site-attio.jpeg', 'site-folk.jpeg', 'site-twenty.jpeg', 'site-clay.jpeg', 'site-arc.jpeg', 'site-vercel.jpeg']
 const SRC: Record<string, string> = { aw: 'Awwwards', drb: 'Dribbble', be: 'Behance', lb: 'Land-book', ms: 'MotionSites', site: 'Site de référence' }
 
 export default function Etude() {
-  const [k, setK] = useState<Key>('bench')
+  const [k, setK] = useState<Key>('panel')
   const [zoom, setZoom] = useState<string | null>(null)
   const html = useMemo(() => (k === 'shots' ? '' : (marked.parse(DOCS[k].md, { async: false }) as string)), [k])
   return (

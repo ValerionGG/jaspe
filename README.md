@@ -42,11 +42,53 @@ Création/édition/suppression persistées sur toutes les pages (dossiers, biens
 - Aide & tutoriels : visite guidée interactive (6 parcours), leçons, glossaire, FAQ, checklist de prise en main.
 - Offre Essentiel (page commerciale + calculateur), édition CRM Essentiel, mode simple, portail des raccourcis.
 
+## Nouveautés (phase 4 — retours bêta, novembre 2026)
+Réponse aux retours des testeurs (étude complète : `research/05-etude-concurrentielle-2026-11.md`, aussi dans le CRM, page « Étude & benchmark »).
+- **Temps gagné** (`/app/temps`) : gain net = référence manuelle − (relecture + corrections), par semaine et par type, calibrage au chrono, valeur en €, export CSV. Journalisé par le moteur (`server/assist.js`, collection `timelog`).
+- **Conformité & veille légale** (`/app/conformite`) : checklists FR (Hoguet, LCB-FT, DPE, ERP…) et PT (Lei 15/2013, Lei 83/2017, IMPIC…), points bloquants par étape, preuve obligatoire, veille sourcée ; routine AUT-122.
+- **Brief → plan d’action** (bouton « Brief ») : texte ou dictée → relances datées, brouillons, veille (AUT-121), facture, contrôles ; chaque action cite sa phrase et n’est lancée qu’une fois cochée (AUT-120).
+- **Factures & commissions** (`/app/factures`) : brouillon depuis la transaction, validation (numéro FA-AAAA-NNNN figé), envoi consigné, encaissement ; TVA 20 % (FR) ou IVA 23 % (PT, document de préparation à émettre dans un logiciel certifié AT).
+- **Retours bêta** : bouton bulle sur chaque écran, lecture et export dans Réglages ; pays d’exercice et mentions légales dans Réglages › Agence & réseau.
+
+## Vague 1 (benchmark & panel clients, novembre 2026)
+- **Routage IA** (`server/copilot.js`) : Haiku 5.5 pour lire, Sonnet 5.5 pour rédiger, Opus 5.5 pour auditer (compromis, conformité) ; prompt système en cache ; coût de chaque appel journalisé (collection `aicalls`). Modèles surchargeables : `JASPE_MODEL_LIRE`, `JASPE_MODEL_REDIGER`, `JASPE_MODEL_AUDITER`.
+- **Import CSV eGO / Hektor** (`/app/import`, `server/importer.js`) : séparateur et source détectés, colonnes devinées puis corrigeables, prix/surfaces/typologies nettoyés, aucun doublon même en réimportant. Les en-têtes des exports réels restent à confirmer.
+- **Compte rendu vendeur < 24 h** : délai entre la fin du RDV (dossier passé en « post ») et la validation de L1, suivi sur la page Temps gagné, avec la carte « Valeur rendue cette semaine » à copier ou imprimer.
+- **Chiffres sourcés** : chaque livrable liste ses chiffres et leur source ; un chiffre sans source porte « non vérifié » et la validation d’un document client demande confirmation.
+- **Premier jour en 3 écrans** : mode simple par défaut (Aujourd’hui, Tâches, Dossiers, Temps gagné, Import, Aide), carte « Premier jour » (brief → débrief → temps gagné) et stepper compact.
+- Tests serveur : `npm test` (15 tests).
+
 ## Limites assumées
 - Aucun envoi externe réel : e-mails, SMS, courriers, portails, signature, synchro agendas sont **consignés** (« connecteur non configuré »).
-- Pas d’authentification ni de multi-utilisateur : poste local de démonstration (Claire Delmas).
+- Sans `JASPE_AUTH=1` : pas d’authentification ni de multi-utilisateur, poste local de démonstration (Claire Delmas).
 - Données de démonstration synthétiques ; certaines séries historiques (pilotage) sont des amorces étiquetées.
 - Pinterest inaccessible sans compte pendant la recherche visuelle.
+- Contenus juridiques (checklists, grille LCB-FT, listes GAFI d’octobre 2025, mentions de facture, durées de conservation) : aide, pas un avis ; à faire relire par un juriste FR et un juriste PT.
+
+## Pack Preuves (vague 2)
+`server/evidence.js`, page Conformité › Preuves. Grille de risque LCB-FT/BCFT par partie (facteurs expliqués, signaux du brief pré-cochés, décision et justification du conseiller), lien client sans compte `/depot/:jeton` (14 jours, PDF/JPG/PNG vérifiés, 10 Mo, empreinte SHA-256, rattachement au point de checklist, déclaration d’origine des fonds), export de contrôle horodaté (HTML imprimable + JSON + empreinte), récapitulatif trimestriel IMPIC (Portugal, champs à confirmer). Avec les comptes, le jeton porte l’agence (`orgId.jeton`).
+
+## Factures émises par un logiciel certifié (vague 2)
+`server/invoicing.js`, page Factures. Deux modèles : agence → client et mandataire → réseau (franchise 293 B, recibo verde / art. 53.º CIVA selon réglage). Portugal : émission via l’API InvoiceXpress (`INVOICEXPRESS_API_KEY`, `INVOICEXPRESS_ACCOUNT`) qui renvoie numéro légal, ATCUD et PDF ; constantes de taxe marquées « à confirmer ». France : XML Factur-X EN 16931 (CII) à transmettre via une plateforme agréée ; pas de PDF/A-3 hybride.
+
+## Vague 3 : se brancher partout
+- **Serveur MCP** (`server/mcp.js`, `server/mcp-stdio.js`) : 9 outils (5 de lecture, 4 de préparation). Les outils d’écriture ne font que **proposer** dans « Tâches & validations » ; `mcp.approve` exécute après accord du conseiller. HTTP sur `/mcp` avec jeton d’agence (`Authorization: Bearer jsp.…`, empreinte seule stockée) ou stdio (`node server/mcp-stdio.js`). Configuration à copier dans Réglages › Intégrations.
+- **Lecture du compromis / CPCV** (`server/contract.js`, étape Compromis & acte) : PDF lu avec unpdf ; Claude Opus 5.5 en sortie structurée si `ANTHROPIC_API_KEY`, sinon règles FR/PT. Chaque date, condition et pièce cite son extrait ; rien n’est appliqué sans case cochée ; relances J-7 créées aux échéances.
+- **Débrief par WhatsApp** (`server/whatsapp.js`, webhook `/api/whatsapp/webhook`) : texte ou vocal d’un numéro de conseiller enregistré → transcription (service tiers compatible « audio transcriptions » : `JASPE_STT_URL`, `JASPE_STT_KEY`, `JASPE_STT_MODEL`) → plan proposé à valider. Variables `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`. Signature `X-Hub-Signature-256` vérifiée. Démo locale uniquement pour l’instant (routage numéro → agence à faire en mode comptes).
+- **IMPIC** : échéance à la fin du trimestre suivant (« a confirmar »), rappels J-15 et J-3, export CSV de l’anexo.
+
+## Vague 4 : le monde réel
+- **E-mails réels** (`server/mailer.js`, nodemailer) : `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_SECURE`. Seuls les livrables validés partent, heures calmes respectées ; sans SMTP, envois consignés comme avant. Mot de passe oublié (`/mot-de-passe-oublie`, jeton 1 h à usage unique) et invitations par e-mail en mode comptes.
+- **Données de marché réelles** (`server/market.js`) : DVF géolocalisées (Etalab/DGFiP, données ouvertes, sans clé) par commune, ventes du même type, surface ±30 %, 24 mois, cache 7 jours ; utilisées par la veille AUT-121, la page Marché (« Ventes réelles ») et les chiffres sourcés des livrables. Casafari si l’agence a un compte (`CASAFARI_API_KEY`, `CASAFARI_COMPARABLES_URL`, correspondance à confirmer). `JASPE_MARKET=off` coupe le réseau.
+- **Portugais européen** (`app/src/i18n`) : écrans du mode simple, brief, tâches, import, temps gagné ; livrables L1, L2, L3, L7, D1, D5 en pt-PT quand l’agence est au Portugal. Les autres écrans restent en français.
+
+## Mise en production : ce qu’il reste à fournir
+Clés et comptes : Stripe (produits, prix, webhook), InvoiceXpress, SMTP, WhatsApp Business (Meta) et service de transcription, éventuellement Casafari et `ANTHROPIC_API_KEY`. Relecture juridique FR et PT (checklists, grille LCB-FT, mentions de factures, durées de conservation, échéance IMPIC). Confirmation des en-têtes d’export eGO / Hektor sur un vrai fichier.
+
+## Comptes et paiement (vague 2)
+Activer : `JASPE_AUTH=1` (comptes, une base par agence dans `server/data/orgs/<orgId>.sqlite`, comptes et abonnements dans `server/data/accounts.sqlite`). Paiement : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_SOLO_MONTH`, `STRIPE_PRICE_SOLO_YEAR`, `STRIPE_PRICE_AGENCE`, `STRIPE_PRICE_SEAT`, `STRIPE_PRICE_PREUVES`, `STRIPE_PRICE_DONNEES` ; option `JASPE_PUBLIC_URL` pour les URL de retour. Webhook Stripe : `POST /api/billing/webhook` (événements checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed). Sans clé : 503 « Paiement non configuré ». Pages publiques `/tarifs`, `/connexion`, `/inscription`, `/invitation/:token`. Remboursement 15 jours et garantie « 2 h gagnées » : traités à la main. Pas de réinitialisation de mot de passe par e-mail (aucun envoi réel).
+
+Tests serveur : `npm test` (84 tests, aucun appel réseau réel : Stripe, InvoiceXpress, WhatsApp, SMTP, DVF et Claude sont simulés).
 
 ## Recherche
 `research/` : inspiration (Dribbble/Behance/Awwwards/sites), motion (MotionSites & co), benchmark de ~55 acteurs, 398 idées + 100 routines — consultables dans le CRM, page « Étude & benchmark ».

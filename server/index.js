@@ -3,30 +3,104 @@ import { createServer } from 'node:http'
 import { readFile, writeFile, stat, mkdir } from 'node:fs/promises'
 import { join, extname, normalize, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash, createHmac } from 'node:crypto'
 import { openDb, COLLECTIONS } from './db.js'
 import { createEngine, HttpError } from './engine.js'
 import { createCopilot } from './copilot.js'
+import { createAccounts, createGate, demoRoute, orgPaths } from './auth.js'
+import { createBilling } from './billing.js'
+import { createEvidence } from './evidence.js'
+import { createMailer, sendOutbox, sendDueOutbox, createMailActions } from './mailer.js'
+import { mcpActions, handleMcpHttp } from './mcp.js'
+import { createContractReader } from './contract.js'
+import { createMarket } from './market.js'
+import { createWhatsApp } from './whatsapp.js'
+import Anthropic from '@anthropic-ai/sdk'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.PORT ?? 5318)
 const DIST = join(here, '..', 'app', 'dist')
 const FILES = join(here, 'data', 'files')
-const MAX_BODY = 12 * 1024 * 1024
+// 10 Mo de pièce client encodés en base64 ≈ 13,4 Mo.
+const MAX_BODY = 15 * 1024 * 1024
 const TICK_MS = Number(process.env.NXT_TICK_MS ?? 60_000)
 
-export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDir = FILES, delay } = {}) {
-  const db = openDb(dbPath)
-  const clients = new Set()
-  const emit = (col, id, op = 'put') => { const msg = `data: ${JSON.stringify({ col, id, op })}\n\n`; for (const c of clients) c.write(msg) }
-  const engine = createEngine(db, emit, delay ? { delay } : undefined)
-  const copilot = createCopilot(db)
+export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDir = FILES, delay, auth = process.env.JASPE_AUTH === '1', dataDir = join(here, 'data'), env = process.env, fetch: stripeFetch } = {}) {
+  // SMTP (SMTP_HOST…) : sans configuration, les envois restent consignés comme avant.
+  const mailer = createMailer({ env })
+  // Client Claude partagé (lecture des compromis) ; sans clé, extraction par règles.
+  const anthropic = env.ANTHROPIC_API_KEY || env.ANTHROPIC_AUTH_TOKEN ? new Anthropic() : null
+  // Un contexte = une base, son moteur, son copilote et ses clients SSE. Démo : un seul ; comptes : un par agence.
+  const makeCtx = (dbFile, dir, orgId) => {
+    const db = openDb(dbFile)
+    const clients = new Set()
+    const emit = (col, id, op = 'put') => { const msg = `data: ${JSON.stringify({ col, id, op })}\n\n`; for (const c of clients) c.write(msg) }
+    // Données de marché réelles (DVF en France ; Casafari si l’agence a déjà un compte).
+    // Jamais de réseau pendant les tests (node --test) ni si JASPE_MARKET=off : l’appel échoue proprement et la veille revient aux biens de démonstration.
+    const offline = env.JASPE_MARKET === 'off' || !!process.env.NODE_TEST_CONTEXT
+    const market = createMarket({ db, fetch: offline ? async () => { throw new Error('Données de marché désactivées (hors ligne)') } : globalThis.fetch, env })
+    const engine = createEngine(db, emit, { ...(delay ? { delay } : {}), market })
+    engine.extend({ actions: market.actions })
+    // Pack Preuves : empreintes SHA-256 et fichiers déposés par le client, branchés ici (API Node).
+    const evidence = createEvidence(db, {
+      emit, HttpError,
+      sha256: (b) => createHash('sha256').update(b).digest('hex'),
+      saveFile: async (id, bytes) => { await mkdir(dir, { recursive: true }); await writeFile(join(dir, id), bytes) },
+      evaluate: (id) => engine.actions['compliance.evaluate']({ dossierId: id }),
+      setCompliance: (p) => engine.actions['compliance.set'](p),
+    })
+    const create = evidence.actions['evidence.link.create']
+    // Avec les comptes, le lien porte l’agence (« orgId.jeton ») pour que la page publique sache quelle base ouvrir.
+    const actions = orgId ? { ...evidence.actions, 'evidence.link.create': async (p) => { const r = await create(p); return { ...r, token: `${orgId}.${r.token}`, path: `/depot/${orgId}.${r.token}` } } } : evidence.actions
+    engine.extend({ actions, rules: evidence.rules })
+    // MCP : propositions dans la file de validation, exécutées seulement après accord du conseiller.
+    engine.extend({ actions: mcpActions(engine, db, { orgId, emit }) })
+    // E-mails réels des livrables validés (jamais sans validation), heures calmes respectées.
+    const mp = (c, i, p) => { const d = db.patch(c, i, p); if (d) emit(c, i); return d }
+    const act = (who, what, tone, link) => { const d = db.put('activity', { at: new Date().toISOString(), who, what, tone, link }, { front: true }); emit('activity', d.id) }
+    // Compromis / CPCV en PDF → dates, conditions, pièces ; rien n’est appliqué sans validation.
+    engine.extend({ actions: createContractReader({ db, put: (c, d, o2) => { const x = db.put(c, d, o2); emit(c, x.id); return x }, patch: mp, activity: act, HttpError, client: anthropic, readFileBytes: (id) => readFile(join(dir, id)) }).actions })
+    // Débrief par WhatsApp (texte ou vocal) → plan proposé dans la file de validation.
+    const wa = createWhatsApp({
+      db, put: (c, d, o2) => { const x = db.put(c, d, o2); emit(c, x.id); return x }, patch: mp,
+      remove: (c, i2) => { db.remove(c, i2); emit(c, i2, 'delete') }, activity: act,
+      notify: (title, body, tone = 'info', link) => { const d = db.put('notifications', { at: new Date().toISOString(), title, body, tone, link, read: false }, { front: true }); emit('notifications', d.id); return d },
+      HttpError, env, hmac: (k, b) => createHmac('sha256', k).update(b).digest('hex'), apply: (p) => engine.actions['assistant.apply'](p),
+    })
+    engine.extend({ actions: wa.actions })
+    engine.extend({
+      actions: { ...createMailActions(db, mailer), ...(mailer.configured ? { 'outbox.send': ({ id }) => sendOutbox(db, mailer, id, { patch: mp, activity: act }) } : {}) },
+      rules: mailer.configured ? { 'AUT-MAIL': () => { sendDueOutbox(db, mailer, { patch: mp, activity: act }).catch(() => {}); return ['skip', 'Envois programmés traités'] } } : {},
+    })
+    return { db, clients, emit, engine, evidence, wa, copilot: createCopilot(db), filesDir: dir }
+  }
+  const main = auth ? null : makeCtx(dbPath, filesDir)
+  const { db, engine, copilot } = main ?? {}
+  const orgs = new Map()
+  const openOrg = (orgId) => { if (!orgs.has(orgId)) { const p = orgPaths(dataDir, filesDir, orgId); orgs.set(orgId, makeCtx(p.dbPath, p.filesDir, orgId)) } return orgs.get(orgId) }
+
+  /** Page publique de dépôt client (sans compte) : /api/public/depot/:jeton[/file|/declaration]. */
+  async function publicDepot(req, res, [, , raw, sub]) {
+    let ctx = main, token = String(raw ?? '')
+    if (auth) {
+      const i = token.indexOf('.')
+      const orgId = i > 0 ? token.slice(0, i) : ''
+      // Jamais d’ouverture de base pour un identifiant d’agence inconnu.
+      if (!/^[A-Za-z0-9_-]{4,64}$/.test(orgId) || !accounts.getOrg(orgId)) throw new HttpError(404, 'Lien inconnu')
+      ctx = openOrg(orgId); token = token.slice(i + 1)
+    }
+    const h = ctx.evidence.publicHandlers
+    if (req.method === 'GET' && !sub) return send(res, 200, await h.read(token))
+    if (req.method === 'POST' && sub === 'file') return send(res, 201, await h.upload(token, await readBody(req)))
+    if (req.method === 'POST' && sub === 'declaration') return send(res, 200, await h.declare(token, await readBody(req)))
+    throw new HttpError(405, 'Méthode non prise en charge')
+  }
 
   const send = (res, status, body, headers = {}) => {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers })
     res.end(body === undefined ? '' : JSON.stringify(body))
   }
-  const readBody = (req) => new Promise((resolve, reject) => {
+  const readBody = (req) => req._jaspeBody !== undefined ? Promise.resolve(req._jaspeBody) : new Promise((resolve, reject) => {
     let size = 0; const chunks = []
     req.on('data', (c) => { size += c.length; if (size > MAX_BODY) { reject(new HttpError(413, 'Corps trop volumineux')); req.destroy() } else chunks.push(c) })
     req.on('end', () => { if (!chunks.length) return resolve({}); try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))) } catch { reject(new HttpError(400, 'JSON invalide')) } })
@@ -34,7 +108,11 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
   })
   const col = (name) => { if (!COLLECTIONS.has(name)) throw new HttpError(404, `Collection inconnue : ${name}`); return name }
 
-  async function api(req, res, parts) {
+  const accounts = auth ? createAccounts(dataDir === ':memory:' ? ':memory:' : join(dataDir, 'accounts.sqlite')) : null
+  const billing = auth ? createBilling({ accounts, env, ...(stripeFetch ? { fetch: stripeFetch } : {}) }) : null
+  const gate = auth ? createGate({ accounts, billing, openOrg, send, readBody, mailer, publicUrl: env.JASPE_PUBLIC_URL }) : null
+
+  async function api(req, res, parts, { db, engine, copilot, clients, emit, filesDir } = main) {
     const [head, a, b] = parts
     const m = req.method
     if (head === 'health') return send(res, 200, { ok: true, copilot: copilot.mode, engine: engine.ENGINE_IDS, clients: clients.size })
@@ -108,7 +186,23 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost')
     try {
-      if (url.pathname.startsWith('/api/')) return await api(req, res, url.pathname.slice(5).split('/').filter(Boolean).map((x) => decodeURIComponent(x)))
+      // Webhook WhatsApp : corps BRUT pour vérifier la signature. Démo uniquement (le routage numéro → agence n’existe pas encore en mode comptes).
+      if (url.pathname === '/api/whatsapp/webhook') {
+        if (!main) throw new HttpError(501, 'Débrief WhatsApp non disponible en mode comptes pour l’instant')
+        const raw = req.method === 'POST' ? await new Promise((resolve, reject) => { const c = []; let n = 0; req.on('data', (d) => { n += d.length; if (n > 1024 * 1024) { reject(new HttpError(413, 'Corps trop volumineux')); req.destroy() } else c.push(d) }); req.on('end', () => resolve(Buffer.concat(c))); req.on('error', reject) }) : Buffer.alloc(0)
+        const r = await main.wa.handleWebhook(req, raw, url.searchParams)
+        res.writeHead(r.status, { 'content-type': r.contentType ?? 'text/plain; charset=utf-8' }); res.end(r.body ?? '')
+        r.done?.catch?.(console.error)
+        return
+      }
+      if (url.pathname === '/mcp') return await handleMcpHttp(req, res, gate ? { openOrg, accounts } : main)
+      if (url.pathname.startsWith('/api/')) {
+        const parts = url.pathname.slice(5).split('/').filter(Boolean).map((x) => decodeURIComponent(x))
+        if (parts[0] === 'public' && parts[1] === 'depot') return await publicDepot(req, res, parts)
+        if (!gate) return demoRoute(req, res, parts, send) || await api(req, res, parts)
+        const ctx = await gate.handle(req, res, parts)
+        return ctx ? await api(req, res, parts, ctx) : undefined
+      }
       return await staticFile(req, res, url.pathname)
     } catch (e) {
       const status = e instanceof HttpError ? e.status : Number.isInteger(e?.status) ? e.status : 500
@@ -116,12 +210,14 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
       if (!res.headersSent) send(res, status, { error: e.message ?? 'Erreur serveur' })
     }
   })
-  return { server, db, engine, copilot }
+  // Routines : la base de démo, ou chaque agence ayant une session ouverte.
+  const tick = () => (gate ? gate.tick() : engine.tick())
+  return { server, db, engine, copilot, accounts, billing, openOrg, tick }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === normalize(process.argv[1])) {
-  const { server, engine, copilot } = createApp()
-  server.listen(PORT, '127.0.0.1', () => console.log(`Jaspe — API sur http://127.0.0.1:${PORT} · copilote : ${copilot.mode}`))
-  setTimeout(() => engine.tick(), 5000)
-  setInterval(() => engine.tick(), TICK_MS)
+  const { server, copilot, accounts, tick } = createApp()
+  server.listen(PORT, '127.0.0.1', () => console.log(`Jaspe — API sur http://127.0.0.1:${PORT} · ${accounts ? 'comptes actifs (JASPE_AUTH=1)' : `démo locale · copilote : ${copilot.mode}`}`))
+  setTimeout(() => tick().catch(console.error), 5000)
+  setInterval(() => tick().catch(console.error), TICK_MS)
 }

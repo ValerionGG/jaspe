@@ -46,20 +46,56 @@ function rules(db, q) {
   return { text: 'Je peux répondre sur vos dossiers (citez le vendeur), les mandats sans visite, les validations en attente ou vos priorités du jour. Configurez une clé ANTHROPIC_API_KEY sur le serveur pour des réponses en langage libre.', cites: cite('Mode règles locales') }
 }
 
-export function createCopilot(db) {
-  const client = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN ? new Anthropic() : null
+/* ——— Routage multi-modèles ——— */
+// Prix en $ par million de tokens (tarifs API Anthropic relevés le 03/11/2026). Écriture du cache = 1,25 × l’entrée (TTL 5 min).
+// Lecture du cache Haiku non documentée ici : 0,1 × l’entrée par hypothèse.
+export const PRICES = {
+  'claude-haiku-5-5': { in: 0.10, out: 0.50, cacheRead: 0.01, cacheWrite: 0.125 },
+  'claude-sonnet-5-5': { in: 2.00, out: 10.00, cacheRead: 0.10, cacheWrite: 2.50 },
+  'claude-opus-5-5': { in: 4.00, out: 20.00, cacheRead: 0.20, cacheWrite: 5.00 },
+}
+/** Trois paliers : Haiku pour lire et lister, Sonnet pour rédiger, Opus seulement pour auditer (compromis, conformité, risque). */
+export const TIERS = {
+  lire: { model: process.env.JASPE_MODEL_LIRE ?? 'claude-haiku-5-5', effort: 'low', max_tokens: 2000 },
+  rediger: { model: process.env.JASPE_MODEL_REDIGER ?? 'claude-sonnet-5-5', effort: 'low', max_tokens: 4000 },
+  auditer: { model: process.env.JASPE_MODEL_AUDITER ?? 'claude-opus-5-5', effort: 'medium', max_tokens: 8000 },
+}
+export function routeQuestion(q) {
+  const n = q.toLowerCase()
+  if (/audit|compromis|cpcv|promessa|contrat|clause|conformit|lcb|tracfin|blanchiment|branqueamento|risque juridique|litige/.test(n)) return 'auditer'
+  if (/r[ée]dig|[ée]cri[st]|pr[ée]pare|brouillon|mail|courrier|lettre|message|r[ée]ponse|contre-proposition|argumentaire|annonce|compte[- ]rendu/.test(n)) return 'rediger'
+  return 'lire'
+}
+/** Coût d’un appel en dollars à partir de response.usage. */
+export function callCost(model, u = {}) {
+  const p = PRICES[model] ?? PRICES['claude-opus-5-5']
+  return ((u.input_tokens ?? 0) * p.in + (u.output_tokens ?? 0) * p.out + (u.cache_read_input_tokens ?? 0) * p.cacheRead + (u.cache_creation_input_tokens ?? 0) * p.cacheWrite) / 1e6
+}
+
+export function createCopilot(db, { client: injected } = {}) {
+  const client = injected ?? (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN ? new Anthropic() : null)
+  /** Journal par appel : palier, modèle, tokens, coût. Sert au plafond par plan et au suivi de la marge. */
+  const logCall = (tier, model, usage, extra = {}) => {
+    const cost = callCost(model, usage)
+    db.put('aicalls', { at: new Date().toISOString(), tier, model, input: usage?.input_tokens ?? 0, output: usage?.output_tokens ?? 0, cacheRead: usage?.cache_read_input_tokens ?? 0, cacheWrite: usage?.cache_creation_input_tokens ?? 0, cost: Math.round(cost * 1e6) / 1e6, ...extra }, { front: true })
+    return cost
+  }
   return {
     mode: client ? 'claude' : 'rules',
     async ask(question, history = []) {
       if (!client) return { ...rules(db, question), mode: 'rules' }
+      const tier = routeQuestion(question)
+      const t = TIERS[tier]
+      // Haiku 5.5 n’a pas de repli serveur en cas de refus : `fallbacks` n’est envoyé qu’à Sonnet et Opus.
+      const fallback = t.model.startsWith('claude-haiku') ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }
       try {
         const res = await client.beta.messages.create({
-          model: 'claude-opus-5-5',
-          max_tokens: 16000,
-          betas: ['server-side-fallback-2026-07-01'],
-          fallbacks: 'default',
-          output_config: { effort: 'low' },
-          system: SYSTEM,
+          model: t.model,
+          max_tokens: t.max_tokens,
+          ...fallback,
+          output_config: { effort: t.effort },
+          // Prompt système figé, mis en cache ; l’instantané (variable) vient après le point de cache.
+          system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
           messages: [
             { role: 'user', content: `Instantané des données (JSON) :\n${JSON.stringify(snapshot(db))}` },
             { role: 'assistant', content: 'Bien reçu. Quelle est votre question ?' },
@@ -67,9 +103,11 @@ export function createCopilot(db) {
             { role: 'user', content: question },
           ],
         })
-        if (res.stop_reason === 'refusal') return { text: 'Je ne peux pas répondre à cette demande.', mode: 'claude' }
+        const model = res.model ?? t.model
+        const cost = logCall(tier, model, res.usage, { stop: res.stop_reason })
+        if (res.stop_reason === 'refusal') return { text: 'Je ne peux pas répondre à cette demande.', mode: 'claude', tier, cost }
         const text = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim()
-        return { text: text || 'Pas de réponse.', cites: ['Données du CRM · instantané'], mode: 'claude' }
+        return { text: text || 'Pas de réponse.', cites: ['Données du CRM · instantané'], mode: 'claude', tier, model, cost }
       } catch (e) {
         if (e instanceof Anthropic.AuthenticationError) return { ...rules(db, question), mode: 'rules', warning: 'Clé API invalide — mode règles' }
         if (e instanceof Anthropic.RateLimitError) return { ...rules(db, question), mode: 'rules', warning: 'Limite de débit atteinte — mode règles' }

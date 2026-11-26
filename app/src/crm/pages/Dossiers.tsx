@@ -2,16 +2,18 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { useState } from 'react'
 import { Plus, Kanban, Rows, FunnelSimple, Sparkle, Clock } from '@phosphor-icons/react'
-import { PageHeader, Tabs, SoftBtn, Heat, Stagger, Card, DELIV_TONE } from '../ui'
+import { PageHeader, Tabs, SoftBtn, Heat, Stagger, Card } from '../ui'
 import { Avatar, EXPO } from '../../ui/kit'
 import { STAGES, prop, agent, eur, DELIVERABLES, type Dossier, type Stage } from '../../data/mock'
 import { useDossiers, useProperties, useAgents } from '../../data/collections'
 import { action } from '../../data/store'
 import { Modal, Field, Input, Select, Textarea, AsyncForm, toast, errText } from '../forms'
+import { useT } from '../../i18n'
 
 function DossierCard({ d, onDragStart }: { d: Dossier; onDragStart: (id: string) => void }) {
   const p = prop(d.propertyId), a = agent(d.agentId)
   const ready = Object.values(d.deliverables).filter((s) => s === 'done').length
+  const { t } = useT()
   return (
     <motion.div layout layoutId={d.id} transition={{ duration: 0.5, ease: EXPO }}>
       <Link to={`/app/dossiers/${d.id}`} draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', d.id); onDragStart(d.id) }} className="group block overflow-hidden rounded-2xl bg-ink-700/70 ring-1 ring-white/[0.06] transition-all duration-500 ease-silk hover:-translate-y-0.5 hover:ring-champagne/30 hover:shadow-float">
@@ -25,7 +27,7 @@ function DossierCard({ d, onDragStart }: { d: Dossier; onDragStart: (id: string)
         <div className="p-3.5">
           <div className="truncate text-[13.5px] font-medium">{p.title}</div>
           <div className="truncate text-[12px] text-bone/50">{d.seller} · {p.district}</div>
-          <div className="mt-3 flex gap-[3px]">{DELIVERABLES.map((x) => { const s = d.deliverables[x.code]; return <span key={x.code} title={`${x.code} · ${DELIV_TONE[s].l}`} className={`h-1 flex-1 rounded-full ${s === 'done' ? 'bg-sage' : s === 'review' ? 'bg-champagne' : s === 'running' ? 'bg-sea' : s === 'blocked' ? 'bg-coral' : 'bg-white/10'}`} /> })}</div>
+          <div className="mt-3 flex gap-[3px]">{DELIVERABLES.map((x) => { const s = d.deliverables[x.code]; return <span key={x.code} title={`${x.code} · ${t(`deliv.${s}` as const)}`} className={`h-1 flex-1 rounded-full ${s === 'done' ? 'bg-sage' : s === 'review' ? 'bg-champagne' : s === 'running' ? 'bg-sea' : s === 'blocked' ? 'bg-coral' : 'bg-white/10'}`} /> })}</div>
           <div className="mt-3 flex items-center justify-between gap-2">
             <span className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-bone/70"><Sparkle size={11} weight="fill" className="shrink-0 text-champagne" /><span className="truncate">{d.next}</span></span>
             <Avatar src={a.photo} size={22} />
@@ -47,20 +49,21 @@ export default function Dossiers() {
   const [over, setOver] = useState<Stage | null>(null)
   const [scope, setScope] = useState<'mine' | 'agency'>('agency')
   const nav = useNavigate()
+  const { t } = useT()
   const list = scope === 'mine' ? items.filter((d) => d.agentId === 'a1') : items
   const total = list.reduce((s, d) => s + prop(d.propertyId).price, 0)
 
   return (
     <div>
       <PageHeader
-        kicker="Portefeuille vendeur"
-        title={<>Dossiers <span className="italic text-champagne-300">vendeurs</span></>}
-        sub={<>{list.length} dossiers actifs · {eur(total)} en portefeuille · glissez une carte pour changer d’étape.</>}
+        kicker={t('dos.kicker')}
+        title={<>{t('dos.title1')} <span className="italic text-champagne-300">{t('dos.title2')}</span></>}
+        sub={<>{t('dos.sub', { n: list.length, total: eur(total) })}</>}
         actions={<>
-          <Tabs id="scope" value={scope} onChange={setScope} items={[{ id: 'agency', label: 'Agence' }, { id: 'mine', label: 'Mes dossiers' }]} />
-          <Tabs id="view" value={view} onChange={setView} items={[{ id: 'board', label: <span className="flex items-center gap-1.5"><Kanban size={14} />Tableau</span> }, { id: 'table', label: <span className="flex items-center gap-1.5"><Rows size={14} />Liste</span> }]} />
-          <SoftBtn icon={<FunnelSimple size={14} />}>Filtres</SoftBtn>
-          <SoftBtn tone="gold" icon={<Plus size={14} />} onClick={() => setCreating(true)}>Nouveau dossier</SoftBtn>
+          <Tabs id="scope" value={scope} onChange={setScope} items={[{ id: 'agency', label: t('dos.agency') }, { id: 'mine', label: t('dos.mine') }]} />
+          <Tabs id="view" value={view} onChange={setView} items={[{ id: 'board', label: <span className="flex items-center gap-1.5"><Kanban size={14} />{t('dos.board')}</span> }, { id: 'table', label: <span className="flex items-center gap-1.5"><Rows size={14} />{t('dos.list')}</span> }]} />
+          <SoftBtn icon={<FunnelSimple size={14} />}>{t('dos.filters')}</SoftBtn>
+          <SoftBtn tone="gold" icon={<Plus size={14} />} onClick={() => setCreating(true)}>{t('dos.new')}</SoftBtn>
         </>}
       />
       <AnimatePresence mode="wait">
@@ -78,16 +81,16 @@ export default function Dossiers() {
                         const id = e.dataTransfer.getData('text/plain') || drag
                         const cur = items.find((d) => d.id === id)
                         if (!id || !cur || cur.stage === s.id) return
-                        try { await action('dossier.move', { id, stage: s.id }); toast(s.id === 'post' ? `${cur.seller} → livrables L1–L9 lancés` : `${cur.seller} → ${s.label}`) } catch (x) { toast(errText(x), 'error') }
+                        try { await action('dossier.move', { id, stage: s.id }); toast(s.id === 'post' ? t('dos.movedPost', { seller: cur.seller }) : `${cur.seller} → ${t(`stage.${s.id}` as const)}`) } catch (x) { toast(errText(x), 'error') }
                       }}
                       className={`min-h-[60vh] rounded-[1.4rem] p-2 ring-1 transition-colors duration-300 ${over === s.id ? 'bg-champagne/[0.06] ring-champagne/30' : 'bg-white/[0.015] ring-white/[0.05]'}`}
                     >
                       <div className="mb-2 flex items-center justify-between px-2 py-1.5">
-                        <div className="flex items-center gap-2"><span className="num text-[10.5px] text-mist">{String(i + 1).padStart(2, '0')}</span><span className="text-[13px] font-medium">{s.label}</span></div>
+                        <div className="flex items-center gap-2"><span className="num text-[10.5px] text-mist">{String(i + 1).padStart(2, '0')}</span><span className="text-[13px] font-medium">{t(`stage.${s.id}` as const)}</span></div>
                         <span className="num rounded-full bg-white/[0.05] px-2 text-[11px] text-bone/60">{col.length}</span>
                       </div>
                       <div className="space-y-2.5">{col.map((d) => <DossierCard key={d.id} d={d} onDragStart={setDrag} />)}</div>
-                      {!col.length && <div className="mx-1 rounded-xl border border-dashed border-white/[0.08] p-6 text-center text-[11.5px] text-mist">Déposez un dossier ici</div>}
+                      {!col.length && <div className="mx-1 rounded-xl border border-dashed border-white/[0.08] p-6 text-center text-[11.5px] text-mist">{t('dos.dropHere')}</div>}
                     </div>
                   </Stagger>
                 )
@@ -99,7 +102,7 @@ export default function Dossiers() {
             <Card pad={false}>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[960px] text-left text-[13px]">
-                  <thead className="text-[10.5px] uppercase tracking-eyebrow text-mist"><tr className="border-b border-white/[0.06]">{['Bien', 'Vendeur', 'Étape', 'Livrables', 'Prix', 'Prochaine action', 'Conseiller', ''].map((h) => <th key={h} className="px-5 py-3.5 font-normal">{h}</th>)}</tr></thead>
+                  <thead className="text-[10.5px] uppercase tracking-eyebrow text-mist"><tr className="border-b border-white/[0.06]">{[t('dos.th.property'), t('dos.th.seller'), t('dos.th.stage'), t('dos.th.deliv'), t('dos.th.price'), t('dos.th.next'), t('dos.th.agent'), ''].map((h) => <th key={h} className="px-5 py-3.5 font-normal">{h}</th>)}</tr></thead>
                   <tbody>
                     {list.map((d) => {
                       const p = prop(d.propertyId), a = agent(d.agentId)
@@ -108,7 +111,7 @@ export default function Dossiers() {
                         <tr key={d.id} onClick={() => nav(`/app/dossiers/${d.id}`)} className="cursor-pointer border-b border-white/[0.04] transition hover:bg-white/[0.025]">
                           <td className="px-5 py-3"><div className="flex items-center gap-3"><img src={p.photo} alt="" className="h-10 w-14 rounded-lg object-cover" /><div><div>{p.title}</div><div className="num text-[11px] text-mist">{d.ref}</div></div></div></td>
                           <td className="px-5 py-3 text-bone/75">{d.seller}</td>
-                          <td className="px-5 py-3"><span className="rounded-full bg-white/[0.05] px-2.5 py-1 text-[11.5px] ring-1 ring-white/[0.07]">{STAGES.find((s) => s.id === d.stage)!.label}</span></td>
+                          <td className="px-5 py-3"><span className="rounded-full bg-white/[0.05] px-2.5 py-1 text-[11.5px] ring-1 ring-white/[0.07]">{t(`stage.${STAGES.find((s) => s.id === d.stage)!.id}` as const)}</span></td>
                           <td className="px-5 py-3"><div className="flex items-center gap-2"><div className="h-1 w-20 rounded-full bg-white/10"><div className="h-1 rounded-full bg-champagne" style={{ width: `${(ready / 14) * 100}%` }} /></div><span className="num text-[11px] text-mist">{ready}/14</span></div></td>
                           <td className="num px-5 py-3">{eur(p.price)}</td>
                           <td className="px-5 py-3"><div className="text-bone/80">{d.next}</div><div className="text-[11px] text-mist">{d.due}</div></td>
@@ -124,11 +127,11 @@ export default function Dossiers() {
           </motion.div>
         )}
       </AnimatePresence>
-      <Modal open={creating} onClose={() => setCreating(false)} title={<>Nouveau dossier <span className="italic text-champagne-300">vendeur</span></>} kicker="Portefeuille">
-        <AsyncForm submitLabel="Créer le dossier" success="Dossier créé — préparation D1–D3 planifiée" onCancel={() => setCreating(false)} onSubmit={async (v) => {
+      <Modal open={creating} onClose={() => setCreating(false)} title={<>{t('dos.newTitle1')} <span className="italic text-champagne-300">{t('dos.newTitle2')}</span></>} kicker={t('dos.portfolio')}>
+        <AsyncForm submitLabel={t('dos.create')} success={t('dos.created')} onCancel={() => setCreating(false)} onSubmit={async (v) => {
           let propertyId = v.propertyId
           if (propertyId === 'new') {
-            if (!v.title || !v.address) throw new Error('Titre et adresse du bien requis')
+            if (!v.title || !v.address) throw new Error(t('dos.errTitle'))
             const price = Number(v.price) || 0, surface = Number(v.surface) || 0
             const p = await propOps.create({ title: v.title, type: v.type, address: v.address, district: v.district || v.city, city: v.city || 'Antibes', surface, rooms: Number(v.rooms) || 0, price, estimateLow: Math.round(price * 0.94), estimateHigh: Math.round(price * 1.04), dpe: (v.dpe || 'D') as 'D', photo: '/img/house-garden.webp', gallery: ['/img/house-garden.webp'], lat: 43.58, lng: 7.12, features: [], year: 2000, status: 'Brouillon', portals: {}, stats: { views: 0, contacts: 0, visits: 0 } } as never)
             propertyId = p.id
@@ -138,28 +141,28 @@ export default function Dossiers() {
           setCreating(false)
         }}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Vendeur(s)"><Input name="seller" required placeholder="Famille Dupont" /></Field>
-            <Field label="Conseiller"><Select name="agentId" defaultValue="a1">{agents.filter((a) => a.mandats > 0).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
+            <Field label={t('dos.f.seller')}><Input name="seller" required placeholder={t('dos.ph.seller')} /></Field>
+            <Field label={t('dos.f.agent')}><Select name="agentId" defaultValue="a1">{agents.filter((a) => a.mandats > 0).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
           </div>
-          <Field label="Bien"><Select name="propertyId" defaultValue="new" onChange={(e) => e.currentTarget.form?.querySelector<HTMLElement>('[data-newprop]')?.toggleAttribute('hidden', e.currentTarget.value !== 'new')}>
-            <option value="new">+ Nouveau bien</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.title} — {p.district}</option>)}
+          <Field label={t('dos.f.property')}><Select name="propertyId" defaultValue="new" onChange={(e) => e.currentTarget.form?.querySelector<HTMLElement>('[data-newprop]')?.toggleAttribute('hidden', e.currentTarget.value !== 'new')}>
+            <option value="new">{t('dos.newProperty')}</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.title} — {p.district}</option>)}
           </Select></Field>
           <div data-newprop className="grid gap-4 rounded-2xl bg-white/[0.02] p-4 ring-1 ring-white/[0.06] sm:grid-cols-2">
-            <Field label="Titre du bien" className="sm:col-span-2"><Input name="title" placeholder="Villa contemporaine vue mer" /></Field>
-            <Field label="Adresse" className="sm:col-span-2"><Input name="address" placeholder="14 chemin des Nielles" /></Field>
-            <Field label="Ville"><Input name="city" defaultValue="Antibes" /></Field>
-            <Field label="Quartier"><Input name="district" placeholder="Cap d’Antibes" /></Field>
-            <Field label="Type"><Select name="type" defaultValue="Villa">{['Villa', 'Maison', 'Appartement'].map((t) => <option key={t}>{t}</option>)}</Select></Field>
-            <Field label="DPE"><Select name="dpe" defaultValue="C">{'ABCDEFG'.split('').map((t) => <option key={t}>{t}</option>)}</Select></Field>
-            <Field label="Surface (m²)"><Input name="surface" type="number" min={0} inputMode="numeric" /></Field>
-            <Field label="Pièces"><Input name="rooms" type="number" min={0} inputMode="numeric" /></Field>
-            <Field label="Prix envisagé (€)" className="sm:col-span-2"><Input name="price" type="number" min={0} step={1000} inputMode="numeric" /></Field>
+            <Field label={t('dos.f.title')} className="sm:col-span-2"><Input name="title" placeholder={t('dos.ph.title')} /></Field>
+            <Field label={t('dos.f.address')} className="sm:col-span-2"><Input name="address" placeholder="14 chemin des Nielles" /></Field>
+            <Field label={t('dos.f.city')}><Input name="city" defaultValue="Antibes" /></Field>
+            <Field label={t('dos.f.district')}><Input name="district" placeholder="Cap d’Antibes" /></Field>
+            <Field label={t('dos.f.type')}><Select name="type" defaultValue="Villa">{['Villa', 'Maison', 'Appartement'].map((t) => <option key={t}>{t}</option>)}</Select></Field>
+            <Field label={t('dos.f.dpe')}><Select name="dpe" defaultValue="C">{'ABCDEFG'.split('').map((t) => <option key={t}>{t}</option>)}</Select></Field>
+            <Field label={t('dos.f.surface')}><Input name="surface" type="number" min={0} inputMode="numeric" /></Field>
+            <Field label={t('dos.f.rooms')}><Input name="rooms" type="number" min={0} inputMode="numeric" /></Field>
+            <Field label={t('dos.f.price')} className="sm:col-span-2"><Input name="price" type="number" min={0} step={1000} inputMode="numeric" /></Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Rendez-vous de découverte"><Input name="due" placeholder="Mer. 14 oct. 10:00" /></Field>
-            <Field label="Horizon"><Input name="timeline" placeholder="3 à 6 mois" /></Field>
+            <Field label={t('dos.f.due')}><Input name="due" placeholder={t('dos.ph.due')} /></Field>
+            <Field label={t('dos.f.timeline')}><Input name="timeline" placeholder={t('dos.ph.timeline')} /></Field>
           </div>
-          <Field label="Motivation déclarée"><Textarea name="motivation" rows={2} placeholder="Ce que le vendeur a dit de son projet, sans interprétation" /></Field>
+          <Field label={t('dos.f.motivation')}><Textarea name="motivation" rows={2} placeholder={t('dos.ph.motivation')} /></Field>
         </AsyncForm>
       </Modal>
     </div>

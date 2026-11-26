@@ -9,6 +9,8 @@ export const COLLECTIONS = new Set([
   'routines', 'runs', 'campaigns', 'consents', 'ideas', 'documents', 'settings', 'integrations', 'leads',
   'notifications', 'files', 'outbox', 'notes', 'agents', 'coaching',
   'conversations', 'messages', 'reminders', 'templates', 'tutorials',
+  'timelog', 'compliance', 'regwatch', 'invoices', 'watches', 'feedback', 'aicalls',
+  'risks', 'depotlinks', 'proofs', 'cmplog', 'exports', 'extractions', 'mcplog', 'waplans',
 ])
 
 export function openDb(path) {

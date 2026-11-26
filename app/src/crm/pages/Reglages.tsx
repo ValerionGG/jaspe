@@ -5,21 +5,25 @@ import clsx from 'clsx'
 import {
   UserCircle, TreeStructure, UsersThree, PaintBrush, PlugsConnected, ShieldCheck, BellSimple, CreditCard, LockKey,
   Lock, LockOpen, CaretRight, Plus, EnvelopeSimple, CheckCircle, Warning, ArrowsClockwise, DownloadSimple, UploadSimple,
-  Sparkle, Moon, Sun, Desktop, DeviceMobile, SignOut, Key, Fingerprint, Buildings, Globe, X, Info, Scales, Trash, FloppyDisk, Plugs,
+  Sparkle, Moon, Sun, Desktop, DeviceMobile, SignOut, Key, Fingerprint, Buildings, Globe, X, Info, Scales, Trash, FloppyDisk, Plugs, ChatTeardropText,
 } from '@phosphor-icons/react'
 import { PageHeader, Card, Tabs, SoftBtn, Stagger, IconBtn, Empty } from '../ui'
 import { Avatar, EXPO } from '../../ui/kit'
 import { me, img, type Agent } from '../../data/mock'
-import { useSettings, useAgents, useIntegrations, useConsents, useActivity, type Activity } from '../../data/collections'
-import { uploadFile, type Doc } from '../../data/store'
+import { useSettings, useAgents, useIntegrations, useConsents, useActivity, useFeedback, type Activity } from '../../data/collections'
+import { uploadFile, action, type Doc, useMe, authCall, refreshMe, resetLocalData, type Me } from '../../data/store'
+import { PLANS, PLAN_OPTIONS } from '../../data/plans'
 import { useTheme } from '../../ui/theme'
 import { Modal, Field, Input, Select, AsyncForm, toast, errText } from '../forms'
+import { MailSettings } from '../MailSettings'
+import { WhatsAppSettings } from '../WhatsAppSettings'
+import { LangPanel } from '../../i18n/LangSwitch'
 import {
-  NETWORK, INHERITED, ROLES, PERMS, PERM_MATRIX, RETENTION, SESSIONS, AI_USAGE, INVOICES, MONTHS, download, csv,
+  NETWORK, INHERITED, ROLES, PERMS, PERM_MATRIX, RETENTION, SESSIONS, download, csv,
   type Integration,
 } from '../../data/pilot'
 
-type Section = 'profil' | 'reseau' | 'equipe' | 'marque' | 'integrations' | 'conformite' | 'notifications' | 'facturation' | 'securite'
+type Section = 'profil' | 'reseau' | 'equipe' | 'marque' | 'integrations' | 'conformite' | 'notifications' | 'facturation' | 'securite' | 'beta'
 const SECTIONS: { id: Section; label: string; icon: typeof UserCircle; hint: string }[] = [
   { id: 'profil', label: 'Profil', icon: UserCircle, hint: 'Identité, thème, copilote' },
   { id: 'reseau', label: 'Agence & réseau', icon: TreeStructure, hint: 'Hiérarchie et héritage' },
@@ -28,8 +32,9 @@ const SECTIONS: { id: Section; label: string; icon: typeof UserCircle; hint: str
   { id: 'integrations', label: 'Intégrations', icon: PlugsConnected, hint: 'Connecteurs' },
   { id: 'conformite', label: 'Conformité', icon: ShieldCheck, hint: 'RGPD, AI Act, audit' },
   { id: 'notifications', label: 'Notifications', icon: BellSimple, hint: 'Canaux, horaires calmes' },
-  { id: 'facturation', label: 'Facturation', icon: CreditCard, hint: 'Plan, sièges, IA' },
+  { id: 'facturation', label: 'Facturation', icon: CreditCard, hint: 'Offre, quotas, paiement' },
   { id: 'securite', label: 'Sécurité', icon: LockKey, hint: 'MFA, SSO, sessions' },
+  { id: 'beta', label: 'Retours bêta', icon: ChatTeardropText, hint: 'Ce que disent les testeurs' },
 ]
 const HOME = 'Antibes Vieille-Ville'
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -177,6 +182,7 @@ function Profil() {
           ))}
         </div>
       </Card>
+      <LangPanel />
       <Card title="Préférences du copilote" kicker="Comment il travaille pour vous">
         <Row title="Ton des livrables" desc="Appliqué aux mails L1, avant-premières L3 et courriers L5">
           <Tabs id="rg-tone" value={TONES[p.copilotTone as keyof typeof TONES] ?? 'Sobre'} onChange={(v) => save({ copilotTone: v.toLowerCase() }, `Ton « ${v} » enregistré`)} items={Object.values(TONES).map((t) => ({ id: t, label: t }))} />
@@ -218,6 +224,22 @@ function Reseau() {
         }}>
           <Field label="Nom commercial *"><Input name="agencyName" defaultValue={ag.agencyName} maxLength={80} /></Field>
         </AsyncForm>
+      </Card>
+      <Card title="Pays et mentions légales" kicker="Checklists de conformité, TVA et mentions des factures">
+        <div className="space-y-4">
+          <Field label="Pays d’exercice" hint="Change la checklist de conformité (France ou Portugal), le taux de TVA/IVA et les mentions des factures">
+            <Select value={(ag as { country?: string }).country ?? 'FR'} onChange={(e) => action('settings.country', { country: e.target.value }).then(() => { toast(e.target.value === 'PT' ? 'Pays : Portugal' : 'Pays : France'); audit(`a changé le pays d’exercice (${e.target.value})`) }, (x) => toast(errText(x), 'error'))}>
+              <option value="FR">France</option><option value="PT">Portugal</option>
+            </Select>
+          </Field>
+          <AsyncForm key={`${(ag as { carte?: string }).carte}-${(ag as { ami?: string }).ami}`} submitLabel="Enregistrer les mentions" success="Mentions légales enregistrées" onSubmit={async (v) => {
+            if (!(await save({ carte: v.carte?.trim(), ami: v.ami?.trim() } as Partial<typeof AGENCY>))) throw new Error('Enregistrement impossible')
+            audit('a mis à jour les mentions légales des factures')
+          }}>
+            <Field label="France : carte professionnelle, garantie, RCS" hint="Reporté sur chaque facture de commission"><Input name="carte" defaultValue={(ag as { carte?: string }).carte ?? ''} placeholder="Carte T n° CPI 0601 2026 000 000 000 · Garantie Galian 120 000 € · RCS Antibes 000 000 000" maxLength={200} /></Field>
+            <Field label="Portugal : licence AMI, NIF"><Input name="ami" defaultValue={(ag as { ami?: string }).ami ?? ''} placeholder="Licença AMI n.º 00000 · NIF 500 000 000" maxLength={200} /></Field>
+          </AsyncForm>
+        </div>
       </Card>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.1fr]">
         <Card title="Hiérarchie" kicker="Réseau → agences → équipes">
@@ -302,8 +324,10 @@ function Equipe() {
   const m = { ...PERM_MATRIX, ...(sec.perms ?? {}) }
   const taken = new Set([profile.email, ...agents.map((a) => a.email)].filter(Boolean).map((e) => String(e).toLowerCase()))
   const remove = (a: Member, label: string) => run(ops.remove(a.id).then(() => audit(`${label} ${a.name}`, 'warn')), a.status === 'invité' ? 'Invitation annulée' : `${a.name} retiré de l’équipe`).finally(() => setConfirm(null))
+  const account = useMe()
   return (
     <div className="space-y-6">
+      {account?.mode === 'auth' && <AccountTeam me={account} />}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_1fr]">
         <Card title="Membres" kicker={`${members.length} actifs · ${invites.length} invitation${invites.length > 1 ? 's' : ''}`} pad={false} action={<SoftBtn tone="gold" icon={<Plus size={13} />} onClick={() => setInviting(true)}>Inviter</SoftBtn>}>
           <div className="divide-y divide-white/[0.04] px-5 pb-3">
@@ -495,6 +519,8 @@ function Integrations() {
   return (
     <div className="space-y-5">
       <div className="flex items-start gap-3 rounded-[1.3rem] bg-sea/[0.06] p-4 text-[12.5px] text-bone/70 ring-1 ring-sea/20"><Info size={18} weight="light" className="mt-0.5 shrink-0 text-sea" /><span>Aucun jeton d’API n’est configuré sur ce serveur : les connexions et synchronisations sont <span className="text-bone">simulées et consignées</span> (statut, journal d’audit). Aucune donnée n’est échangée avec les services tiers.</span></div>
+      <MailSettings />
+      <WhatsAppSettings />
       <div className="grid grid-cols-3 gap-3">
         {([['connecte', 'Connectées', 'text-sage'], ['erreur', 'À réparer', 'text-coral'], ['a_connecter', 'Disponibles', 'text-bone']] as const).map(([s, l, c]) => (
           <Card key={s}><div className="text-[11.5px] text-mist">{l}</div><div className={clsx('display mt-1 text-[2.2rem] leading-none', c)}>{count(s)}</div></Card>
@@ -530,7 +556,89 @@ function Integrations() {
           ))}
         </AnimatePresence>
       </motion.div>
+      <McpAccess />
     </div>
+  )
+}
+
+/* ——— Jaspe dans Claude ou ChatGPT (MCP) ——— */
+type ApiToken = { id: string; name: string; hint: string; createdAt: string; lastUsedAt?: string | null; revokedAt?: string | null }
+function McpAccess() {
+  const account = useMe()
+  const audit = useAudit()
+  const [tokens, setTokens] = useState<ApiToken[] | null>(null)
+  const [fresh, setFresh] = useState<string | null>(null)
+  const [name, setName] = useState('Claude Desktop')
+  const [busy, setBusy] = useState(false)
+  const [unavailable, setUnavailable] = useState(false)
+  const load = () => action<{ tokens: ApiToken[] }>('apitoken.list').then((r) => { setTokens(r.tokens); setUnavailable(false) }, () => { setTokens([]); setUnavailable(true) })
+  useEffect(() => { load() }, [])
+  const url = `${window.location.origin}/mcp`
+  const orgId = account?.mode === 'auth' ? account.org.id : null
+  const token = fresh ?? 'jsp.…'
+  const stdioCfg = JSON.stringify({ mcpServers: { jaspe: { command: 'node', args: ['C:\\chemin\\vers\\Jaspe\\server\\mcp-stdio.js'], ...(orgId ? { env: { JASPE_ORG: orgId } } : {}) } } }, null, 2)
+  const httpCfg = JSON.stringify({ mcpServers: { jaspe: { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${JASPE_AUTH}'], env: { JASPE_AUTH: `Bearer ${token}` } } } }, null, 2)
+  const cliCmd = `claude mcp add --transport http jaspe ${url} --header "Authorization: Bearer ${token}"`
+  const copy = (t: string, what: string) => navigator.clipboard.writeText(t).then(() => toast(`${what} copié`), () => toast('Copie impossible : sélectionnez le texte', 'error'))
+  const create = async () => {
+    setBusy(true)
+    try { const r = await action<{ token: string; name: string }>('apitoken.create', { name }); setFresh(r.token); audit(`a créé le jeton d’API « ${r.name} » (MCP)`, 'warn'); await load() }
+    catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
+  }
+  const revoke = async (t: ApiToken) => {
+    try { await action('apitoken.revoke', { id: t.id }); audit(`a révoqué le jeton d’API « ${t.name} »`, 'warn'); toast(`Jeton « ${t.name} » révoqué`); await load() }
+    catch (e) { toast(errText(e), 'error') }
+  }
+  const active = (tokens ?? []).filter((t) => !t.revokedAt)
+  const Code = ({ label, value }: { label: string; value: string }) => (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2"><span className="text-[11.5px] text-mist">{label}</span><SoftBtn onClick={() => copy(value, label)}>Copier</SoftBtn></div>
+      <pre className="thin-scroll overflow-x-auto rounded-xl bg-ink-900/60 p-3 text-[11.5px] leading-relaxed text-bone/80 ring-1 ring-white/[0.06]">{value}</pre>
+    </div>
+  )
+  return (
+    <Card>
+      <div className="flex items-start gap-3">
+        <PlugsConnected size={20} weight="light" className="mt-0.5 shrink-0 text-champagne" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-medium">Jaspe dans Claude ou ChatGPT (MCP)</div>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-bone/60">9 outils : lire vos dossiers, tâches du jour, temps gagné et conformité ; préparer un plan depuis un brief, une relance, un livrable ou une facture. <span className="text-bone">Rien n’est écrit sans vous</span> : chaque préparation arrive dans Tâches &amp; validations, à valider ou refuser.</p>
+        </div>
+      </div>
+      {unavailable && <div className="mt-4 flex items-start gap-2 rounded-xl bg-champagne/[0.06] p-3 text-[12px] text-champagne-300 ring-1 ring-champagne/20"><Info size={14} className="mt-0.5 shrink-0" />Serveur MCP non disponible sur cette version (hors ligne ou démo statique) : lancez le serveur Jaspe pour créer un jeton.</div>}
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="space-y-3">
+          <div className="text-[11.5px] text-mist">Adresse du serveur (Streamable HTTP)</div>
+          <div className="flex items-center gap-2"><code className="num min-w-0 flex-1 truncate rounded-xl bg-white/[0.03] px-3 py-2 text-[12.5px] ring-1 ring-white/[0.06]">{url}</code><SoftBtn onClick={() => copy(url, 'Adresse')}>Copier</SoftBtn></div>
+          <div className="text-[11.5px] text-mist">Jetons d’API de l’agence</div>
+          <div className="flex gap-2">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom du jeton (ex. Claude Desktop)" aria-label="Nom du jeton" />
+            <SoftBtn tone="gold" icon={<Key size={13} />} onClick={() => !busy && create()}>{busy ? 'Création…' : 'Créer un jeton'}</SoftBtn>
+          </div>
+          {fresh && (
+            <div className="rounded-xl bg-sage/[0.07] p-3 ring-1 ring-sage/25">
+              <div className="flex items-center gap-1.5 text-[12px] text-sage"><Warning size={13} />Copiez ce jeton maintenant : il ne sera plus affiché.</div>
+              <div className="mt-2 flex items-center gap-2"><code className="num min-w-0 flex-1 break-all text-[12px] text-bone">{fresh}</code><SoftBtn onClick={() => copy(fresh, 'Jeton')}>Copier</SoftBtn><IconBtn label="Masquer le jeton" onClick={() => setFresh(null)}><X size={13} /></IconBtn></div>
+            </div>
+          )}
+          <div className="divide-y divide-white/[0.05] rounded-xl ring-1 ring-white/[0.06]">
+            {active.length === 0 ? <div className="p-3 text-[12px] text-mist">Aucun jeton actif.</div> : active.map((t) => (
+              <div key={t.id} className="flex items-center gap-3 p-3 text-[12.5px]">
+                <Key size={14} className="shrink-0 text-mist" />
+                <div className="min-w-0 flex-1"><div className="truncate">{t.name} <span className="num text-mist">{t.hint}</span></div><div className="text-[11px] text-mist">Créé le {new Date(t.createdAt).toLocaleDateString('fr-FR')} · {t.lastUsedAt ? `utilisé le ${new Date(t.lastUsedAt).toLocaleString('fr-FR')}` : 'jamais utilisé'}</div></div>
+                <IconBtn label={`Révoquer ${t.name}`} onClick={() => revoke(t)}><Trash size={14} /></IconBtn>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-3">
+          <Code label="Claude Desktop · local (stdio)" value={stdioCfg} />
+          <Code label="Claude Desktop · serveur (HTTP + jeton)" value={httpCfg} />
+          <Code label="Claude Code" value={cliCmd} />
+          <p className="text-[11px] leading-relaxed text-mist">ChatGPT : ajoutez un connecteur MCP personnalisé avec l’adresse ci-dessus et l’en-tête Authorization: Bearer &lt;jeton&gt;. L’adresse doit être joignable depuis Internet (HTTPS).</p>
+        </div>
+      </div>
+    </Card>
   )
 }
 
@@ -667,77 +775,171 @@ function Notifications() {
 }
 
 /* ——— Facturation ——— */
+type AuthMe = Extract<Me, { mode: 'auth' }>
+const STATUS: Record<string, [string, 'sage' | 'sea' | 'champagne' | 'coral' | 'mute']> = {
+  none: ['Gratuit, à vie', 'mute'], active: ['Abonnement actif', 'sage'], trialing: ['Période d’essai', 'sea'],
+  past_due: ['Paiement en échec', 'coral'], unpaid: ['Impayé', 'coral'], canceled: ['Résilié', 'mute'], incomplete: ['Paiement à finaliser', 'coral'],
+}
+const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '')
+
+function Gauge({ label, used, max }: { label: string; used: number; max: number | null }) {
+  const pct = max ? Math.min(100, (used / max) * 100) : 12
+  return (
+    <div>
+      <div className="flex justify-between text-[12.5px]"><span className="text-bone/65">{label}</span><span className="num">{used}{max ? ` / ${max}` : ' · illimité'}</span></div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.06]"><motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, ease: EXPO }} className={clsx('h-full rounded-full', max && used > max ? 'bg-coral' : max && used >= max ? 'bg-champagne-300' : 'bg-champagne/70')} /></div>
+      {max !== null && used > max && <p className="mt-1.5 text-[11.5px] text-coral">Au-delà du quota : les éléments en trop restent consultables, en lecture seule.</p>}
+    </div>
+  )
+}
+
 function Facturation() {
-  const [ag, save] = useSetting('agency', AGENCY)
-  const audit = useAudit()
-  const max = Math.max(...AI_USAGE), budget = 800
-  const [hover, setHover] = useState<number | null>(null)
-  const [req, setReq] = useState<'plan' | 'seats' | null>(null)
-  const logs = ag.billingLog ?? []
-  const invoice = (f: (typeof INVOICES)[number]) => { download(`${f.id}-recapitulatif.csv`, csv([['Facture', 'Date', 'Montant HT (€)', 'Statut', 'Plan'], [f.id, f.date, f.amount, f.status, 'Réseau Prestige · 45 sièges'], [], ['Récapitulatif généré par Jaspe — la facture officielle est émise par le prestataire de paiement (non connecté).']]), 'text/csv'); toast('Récapitulatif téléchargé (.csv)') }
+  const me = useMe()
+  const [params, setParams] = useSearchParams()
+  const [busy, setBusy] = useState<string | null>(null)
+  const [period, setPeriod] = useState<'month' | 'year'>('month')
+  const [opts, setOpts] = useState<string[]>([])
+  const [seats, setSeats] = useState(7)
+  useEffect(() => {
+    const p = params.get('paiement')
+    if (!p) return
+    refreshMe()
+    toast(p === 'ok' ? 'Paiement reçu : l’offre s’active dès la confirmation de Stripe' : 'Paiement annulé : rien n’a été prélevé', p === 'ok' ? 'ok' : 'info')
+    const next = new URLSearchParams(params); next.delete('paiement'); setParams(next, { replace: true })
+  }, [params, setParams])
+  const a: AuthMe | null = me?.mode === 'auth' ? me : null
+  const go = (key: string, path: string, body?: unknown) => {
+    setBusy(key)
+    authCall<{ url: string }>('POST', path, body).then((r) => { window.location.href = r.url }, (e) => { toast(errText(e), 'error'); setBusy(null) })
+  }
+  const owner = a?.user.role === 'owner'
+  const subscribed = !!a && a.plan.customer && ['active', 'trialing', 'past_due'].includes(a.plan.status)
+  const canPay = !!a?.billing.configured && owner
+  const [statusLabel, statusTone]: [string, 'sage' | 'sea' | 'champagne' | 'coral' | 'mute'] = a ? STATUS[a.plan.status] ?? [a.plan.status, 'mute'] : ['Démonstration', 'mute']
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_1fr]">
-        <div className="relative overflow-hidden rounded-[1.4rem] p-px">
-          <div className="absolute inset-0 rounded-[1.4rem] bg-[conic-gradient(from_200deg_at_50%_50%,rgb(var(--acc-500)_/_.55),rgb(var(--acc-500)_/_.05),rgb(var(--sea)_/_.3),rgb(var(--acc-500)_/_.05),rgb(var(--acc-500)_/_.55))]" />
-          <div className="relative h-full rounded-[calc(1.4rem-1px)] bg-ink-800 p-6">
-            <div className="text-[10.5px] uppercase tracking-eyebrow text-mist">Plan actuel</div>
-            <div className="display mt-2 text-[2.6rem]">Réseau <span className="italic text-champagne-300">Prestige</span></div>
-            <div className="mt-1 text-[12.5px] text-bone/55">Facturation annuelle · renouvellement le 1ᵉʳ mars 2027</div>
-            <div className="mt-6 flex flex-wrap items-end justify-between gap-3"><div><div className="num text-[1.6rem]">3 486 €<span className="text-[13px] text-mist"> HT / mois</span></div><div className="text-[11.5px] text-mist">45 sièges · IA incluse jusqu’à 800 €</div></div><SoftBtn tone="gold" onClick={() => setReq('plan')}>Changer de plan</SoftBtn></div>
-          </div>
+      {!a && (
+        <div className="flex items-start gap-3 rounded-2xl bg-sea/10 p-4 text-[13px] text-bone/80 ring-1 ring-sea/20">
+          <Info size={17} className="mt-0.5 shrink-0 text-sea" />
+          <span><strong className="font-medium">Mode démonstration : paiement non actif.</strong> Aucun compte ni abonnement sur ce poste. Les comptes et le paiement Stripe s’activent sur un serveur lancé avec <code className="num">JASPE_AUTH=1</code>. <a href="/tarifs" className="text-champagne-300 hover:underline">Voir les tarifs</a></span>
         </div>
-        <Card title="Sièges" kicker="39 utilisés sur 45">
-          <div className="flex h-3 gap-[3px]">{Array.from({ length: 45 }, (_, i) => <motion.span key={i} initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ delay: i * 0.01, duration: 0.5, ease: EXPO }} className={clsx('flex-1 rounded-sm', i < 39 ? 'bg-champagne' : 'bg-white/10')} />)}</div>
-          <div className="mt-4 space-y-2 text-[12.5px]">
-            {([['Conseillers', 31], ['Directeurs', 7], ['Siège & marketing', 1]] as const).map(([l, n]) => <div key={l} className="flex justify-between"><span className="text-bone/60">{l}</span><span className="num">{n}</span></div>)}
-          </div>
-          <div className="mt-4"><SoftBtn icon={<Plus size={13} />} onClick={() => setReq('seats')}>Ajouter des sièges</SoftBtn></div>
-        </Card>
-      </div>
-      {logs.length > 0 && (
-        <Card title="Demandes consignées" kicker="Prestataire de facturation non connecté">
-          {logs.slice().reverse().map((l) => <Row key={l.at} title={l.what} desc={new Date(l.at).toLocaleString('fr-FR')} tag={<Tag tone="sea">consignée</Tag>} />)}
-        </Card>
       )}
-      <Card title="Consommation IA · réseau" kicker="€ HT par mois · seuil inclus 800 € · historique importé" action={<span className="num text-[12px] text-bone/70">{hover !== null ? `${MONTHS[hover]} : ${AI_USAGE[hover]} €` : `Oct. : ${AI_USAGE[11]} €`}</span>}>
-        <div className="relative flex h-40 items-end gap-2" onMouseLeave={() => setHover(null)}>
-          <div className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-coral/60" style={{ bottom: `${(budget / (max * 1.1)) * 100}%` }}><span className="absolute -top-4 left-0 text-[10px] text-coral">Seuil inclus · {budget} €</span></div>
-          {AI_USAGE.map((v, i) => (
-            <div key={i} className="flex h-full flex-1 items-end" onMouseEnter={() => setHover(i)}>
-              <motion.div initial={{ height: 0 }} animate={{ height: `${(v / (max * 1.1)) * 100}%` }} transition={{ duration: 0.9, delay: i * 0.04, ease: EXPO }}
-                className={clsx('w-full rounded-t-md transition-opacity', v > budget ? 'bg-coral/70' : 'bg-champagne/60', hover !== null && hover !== i && 'opacity-40')} />
+      {a && !a.billing.configured && (
+        <div className="flex items-start gap-3 rounded-2xl bg-coral/10 p-4 text-[13px] text-bone/80 ring-1 ring-coral/20">
+          <Warning size={17} className="mt-0.5 shrink-0 text-coral" />
+          <span><strong className="font-medium">Paiement non configuré sur ce serveur.</strong> Aucune somme ne peut être prélevée tant que la clé Stripe n’est pas renseignée. Vous restez sur votre offre actuelle.</span>
+        </div>
+      )}
+      {a && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_1fr]">
+          <div className="relative overflow-hidden rounded-[1.4rem] p-px">
+            <div className="absolute inset-0 rounded-[1.4rem] bg-[conic-gradient(from_200deg_at_50%_50%,rgb(var(--acc-500)_/_.55),rgb(var(--acc-500)_/_.05),rgb(var(--sea)_/_.3),rgb(var(--acc-500)_/_.05),rgb(var(--acc-500)_/_.55))]" />
+            <div className="relative h-full rounded-[calc(1.4rem-1px)] bg-ink-800 p-6">
+              <div className="flex items-center justify-between gap-3"><div className="text-[10.5px] uppercase tracking-eyebrow text-mist">Offre actuelle · {a.org.name}</div><Tag tone={statusTone}>{statusLabel}</Tag></div>
+              <div className="display mt-2 text-[2.6rem]">{a.plan.label}</div>
+              <div className="mt-1 text-[12.5px] text-bone/60">
+                {a.plan.status === 'past_due' || a.plan.status === 'unpaid' ? 'Le dernier paiement a échoué : l’offre Découverte s’applique jusqu’au règlement. Vos données sont conservées.'
+                  : a.plan.status === 'canceled' ? 'Abonnement résilié : retour à Découverte. Vos données sont conservées.'
+                  : a.plan.cancelAtPeriodEnd ? `Résiliation enregistrée : l’offre reste active jusqu’au ${dateFr(a.plan.periodEnd)}.`
+                  : a.plan.periodEnd ? `${a.plan.period === 'year' ? 'Annuel' : 'Mensuel'} · renouvellement le ${dateFr(a.plan.periodEnd)}` : 'Sans engagement, sans carte bancaire.'}
+              </div>
+              {a.plan.options.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{a.plan.options.map((o) => <Tag key={o} tone="champagne">{PLAN_OPTIONS.find((x) => x.id === o)?.name ?? o}</Tag>)}</div>}
+              <div className="mt-6 flex flex-wrap gap-2">
+                {a.plan.customer && owner && <SoftBtn tone="gold" onClick={() => go('portal', 'billing/portal')}>{busy === 'portal' ? 'Ouverture…' : 'Gérer ou résilier'}</SoftBtn>}
+                <a href="/tarifs" className="rounded-full px-3 py-1.5 text-[12.5px] text-bone/60 ring-1 ring-white/10 hover:text-bone">Comparer les offres</a>
+              </div>
+              {a.plan.customer && owner && <p className="mt-3 text-[11.5px] text-mist">Portail Stripe : factures, moyen de paiement, sièges, résiliation en un clic.</p>}
             </div>
+          </div>
+          <Card title="Quotas" kicker="Selon votre offre">
+            <div className="space-y-5">
+              <Gauge label="Dossiers actifs" used={a.usage.dossiers} max={a.limits.dossiers} />
+              <Gauge label="Sièges" used={a.usage.seats} max={a.limits.seats} />
+            </div>
+            <p className="mt-4 text-[11.5px] text-mist">Un dossier arrivé à l’acte ou archivé ne compte plus. Les invitations en attente occupent un siège.</p>
+          </Card>
+        </div>
+      )}
+      <Card title={subscribed ? 'Changer d’offre' : 'Passer à une offre payante'} kicker="Sans engagement · 15 jours remboursés">
+        {a && !owner && <p className="mb-4 text-[12.5px] text-bone/60">Seul le responsable de l’agence gère l’abonnement.</p>}
+        {subscribed && owner && <p className="mb-4 text-[12.5px] text-bone/60">Un abonnement est en cours : changez d’offre, de sièges ou d’options depuis « Gérer ou résilier ».</p>}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {PLANS.map((p) => {
+            const current = a?.plan.id === p.id
+            return (
+              <div key={p.id} className={clsx('flex flex-col rounded-2xl p-4 ring-1', current ? 'bg-champagne/[0.07] ring-champagne/30' : 'bg-white/[0.02] ring-white/[0.06]')}>
+                <div className="flex items-center justify-between"><span className="text-[14.5px] font-medium">{p.name}</span>{current && <Tag tone="champagne">Actuelle</Tag>}</div>
+                <div className="mt-2"><span className="num text-[1.5rem]">{p.id === 'solo' && period === 'year' ? '99' : p.price}</span> <span className="text-[12px] text-mist">{p.id === 'solo' && period === 'year' ? '€ / an' : p.unit}</span></div>
+                <div className="mt-1 text-[12px] text-bone/60">{p.dossiers} · {p.seats}</div>
+                {p.id === 'solo' && <div className="mt-3 flex gap-1">{(['month', 'year'] as const).map((v) => <button key={v} onClick={() => setPeriod(v)} aria-pressed={period === v} className={clsx('rounded-full px-2.5 py-1 text-[11.5px] ring-1', period === v ? 'bg-bone text-ink ring-bone' : 'text-bone/60 ring-white/10')}>{v === 'month' ? 'Mensuel' : 'Annuel'}</button>)}</div>}
+                {p.id === 'agence' && <label className="mt-3 flex items-center gap-2 text-[12px] text-bone/60">Sièges <input type="number" min={7} max={200} value={seats} onChange={(e) => setSeats(Math.max(7, Math.min(200, Number(e.target.value) || 7)))} className="w-16 rounded-lg bg-white/[0.04] px-2 py-1 text-bone ring-1 ring-white/10" />{seats > 7 && <span className="num">+{(seats - 7) * 6} € / mois</span>}</label>}
+                <div className="mt-auto pt-4">
+                  {p.id !== 'decouverte' && !current && (
+                    canPay && !subscribed
+                      ? <SoftBtn tone="gold" onClick={() => !busy && go(p.id, 'billing/checkout', { plan: p.id, period: p.id === 'solo' ? period : 'month', options: opts, seats })}>{busy === p.id ? 'Redirection vers Stripe…' : `Passer à ${p.name}`}</SoftBtn>
+                      : <span className="text-[11.5px] text-mist">{!a ? 'Paiement non actif en démonstration' : !owner ? 'Réservé au responsable' : subscribed ? 'Via « Gérer ou résilier »' : 'Paiement non configuré'}</span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          {PLAN_OPTIONS.map((o) => (
+            <label key={o.id} className="flex cursor-pointer items-start gap-3 rounded-xl bg-white/[0.02] p-3 ring-1 ring-white/[0.06]">
+              <input type="checkbox" className="mt-1" checked={opts.includes(o.id)} onChange={(e) => setOpts((x) => (e.target.checked ? [...x, o.id] : x.filter((y) => y !== o.id)))} />
+              <span><span className="text-[13px]">{o.name} <span className="num text-champagne-300">{o.price}</span></span><span className="block text-[11.5px] text-mist">{o.desc}</span></span>
+            </label>
           ))}
         </div>
-        <div className="mt-1.5 flex gap-2">{MONTHS.map((m) => <span key={m} className="flex-1 text-center text-[9.5px] text-mist">{m.slice(0, 3)}</span>)}</div>
+        <p className="mt-4 flex items-start gap-2 text-[11.5px] text-mist"><Info size={13} className="mt-0.5 shrink-0" />Paiement par Stripe : Jaspe ne voit pas votre carte. Remboursement sous 15 jours et garantie « 2 h gagnées ou mois remboursé » : traités à la main pour l’instant, demande via le bouton retour de l’application.</p>
       </Card>
-      <Card title="Factures" pad={false}>
-        <div className="divide-y divide-white/[0.04] px-5 pb-2">
-          {INVOICES.map((f) => (
-            <div key={f.id} className="flex items-center gap-4 py-3 text-[13px]">
-              <span className="num text-bone/80">{f.id}</span><span className="num flex-1 text-mist">{f.date}</span><span className="num">{f.amount.toLocaleString('fr-FR')} €</span>
-              <Tag tone="sage">{f.status}</Tag>
-              <IconBtn label={`Télécharger le récapitulatif ${f.id}`} onClick={() => invoice(f)}><DownloadSimple size={14} /></IconBtn>
-            </div>
-          ))}
-        </div>
-      </Card>
-      <Modal open={!!req} onClose={() => setReq(null)} title={req === 'plan' ? 'Changer de plan' : 'Ajouter des sièges'} kicker="Demande au service commercial Jaspe" width={480}>
-        <AsyncForm submitLabel="Consigner la demande" onCancel={() => setReq(null)} onSubmit={async (v) => {
-          let what = ''
-          if (req === 'seats') { const n = Number(v.seats); if (!Number.isInteger(n) || n < 1 || n > 100) throw new Error('Nombre de sièges entre 1 et 100'); what = `Ajout de ${n} siège${n > 1 ? 's' : ''}` }
-          else { if (!v.plan) throw new Error('Choisissez un plan'); what = `Passage au plan ${v.plan}` }
-          if (v.note?.trim()) what += ` — ${v.note.trim()}`
-          if (!(await save({ billingLog: [...logs, { at: new Date().toISOString(), what }] }))) throw new Error('Enregistrement impossible')
-          audit(`a demandé : ${what.toLowerCase()}`); toast('Demande consignée — facturation non connectée', 'info'); setReq(null)
-        }}>
-          {req === 'seats' ? <Field label="Sièges supplémentaires *"><Input name="seats" type="number" min={1} max={100} defaultValue={5} /></Field>
-            : <Field label="Plan souhaité *"><Select name="plan" defaultValue="Réseau Prestige+">{['Agence Essentiel', 'Réseau Prestige', 'Réseau Prestige+', 'Sur mesure'].map((p) => <option key={p}>{p}</option>)}</Select></Field>}
-          <Field label="Précision"><Input name="note" placeholder="Date souhaitée, agences concernées…" maxLength={160} /></Field>
-        </AsyncForm>
-      </Modal>
     </div>
+  )
+}
+
+/** Comptes réels (JASPE_AUTH=1) : membres, invitations par lien à usage unique. */
+type TeamState = { members: { id: string; name: string; email: string; role: string }[]; invites: { id: string; expiresAt: string }[]; limits: { seats: number }; usage: { seats: number } }
+function AccountTeam({ me: a }: { me: AuthMe }) {
+  const [team, setTeam] = useState<TeamState | null>(null)
+  const [link, setLink] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const load = () => authCall<TeamState>('GET', 'team').then(setTeam, (e) => toast(errText(e), 'error'))
+  useEffect(() => { load() }, [])
+  const owner = a.user.role === 'owner'
+  const invite = () => {
+    setBusy(true)
+    authCall<{ path: string }>('POST', 'team/invite').then((r) => { setLink(`${window.location.origin}${r.path}`); load(); refreshMe() }, (e) => toast(errText(e), 'error')).finally(() => setBusy(false))
+  }
+  const copy = () => { if (link) navigator.clipboard?.writeText(link).then(() => toast('Lien copié'), () => toast('Copie impossible : sélectionnez le lien', 'info')) }
+  const drop = (path: string, ok: string) => authCall('DELETE', path).then(() => { toast(ok); load(); refreshMe() }, (e) => toast(errText(e), 'error'))
+  return (
+    <Card title="Comptes de l’agence" kicker={team ? `${team.usage.seats} siège${team.usage.seats > 1 ? 's' : ''} occupé${team.usage.seats > 1 ? 's' : ''} sur ${team.limits.seats}` : 'Chargement…'}
+      action={owner && <SoftBtn tone="gold" icon={<Plus size={13} />} onClick={() => !busy && invite()}>{busy ? 'Création…' : 'Inviter un conseiller'}</SoftBtn>}>
+      {link && (
+        <div className="mb-4 rounded-xl bg-champagne/[0.07] p-3 ring-1 ring-champagne/25">
+          <div className="text-[12px] text-bone/75">Lien d’invitation à usage unique, valable 7 jours. Aucun e-mail n’est envoyé : copiez-le et transmettez-le au conseiller.</div>
+          <div className="mt-2 flex items-center gap-2"><input readOnly value={link} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 rounded-lg bg-white/[0.04] px-3 py-2 text-[12px] text-bone ring-1 ring-white/10" /><SoftBtn onClick={copy}>Copier</SoftBtn></div>
+        </div>
+      )}
+      <div className="divide-y divide-white/[0.04]">
+        {team?.members.map((m) => (
+          <div key={m.id} className="flex items-center gap-3 py-2.5">
+            <Initials name={m.name} />
+            <div className="min-w-0 flex-1"><div className="flex items-center gap-2 truncate text-[13px]">{m.name}{m.id === a.user.id && <Tag tone="champagne">Vous</Tag>}</div><div className="truncate text-[11px] text-mist">{m.email} · {m.role === 'owner' ? 'Responsable' : 'Conseiller'}</div></div>
+            {owner && m.role !== 'owner' && <IconBtn label={`Retirer ${m.name}`} onClick={() => drop(`team/members/${m.id}`, `${m.name} n’a plus accès à l’agence`)}><Trash size={14} /></IconBtn>}
+          </div>
+        ))}
+        {team?.invites.map((iv) => (
+          <div key={iv.id} className="flex items-center gap-3 py-2.5">
+            <EnvelopeSimple size={16} className="mx-2 shrink-0 text-mist" />
+            <div className="min-w-0 flex-1 text-[12.5px] text-bone/70">Invitation en attente · expire le {new Date(iv.expiresAt).toLocaleDateString('fr-FR')}</div>
+            {owner && <IconBtn label="Annuler l’invitation" onClick={() => drop(`team/invites/${iv.id}`, 'Invitation annulée')}><X size={13} /></IconBtn>}
+          </div>
+        ))}
+      </div>
+      {!owner && <p className="mt-3 text-[11.5px] text-mist">Seul le responsable de l’agence invite ou retire des conseillers.</p>}
+    </Card>
   )
 }
 
@@ -749,8 +951,15 @@ function Securite() {
   const revoked = s.revoked ?? []
   const sessions = SESSIONS.filter((x) => !revoked.includes(x.device))
   const set = (patch: Partial<typeof SECURITY>, ok: string, log: string) => save(patch, ok).then((v) => v && audit(log, 'warn'))
+  const account = useMe()
+  const logout = () => authCall('POST', 'auth/logout').then(() => { resetLocalData(); window.location.href = '/connexion' }, (e) => toast(errText(e), 'error'))
   return (
     <div className="space-y-6">
+      {account?.mode === 'auth' && (
+        <Card title="Votre compte" kicker={`${account.user.email} · ${account.org.name}`}>
+          <Row title="Se déconnecter de cet appareil" desc="La session expire de toute façon après 30 jours."><SoftBtn icon={<SignOut size={13} />} onClick={logout}>Se déconnecter</SoftBtn></Row>
+        </Card>
+      )}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card title="Authentification" kicker="Double facteur">
           <Row title={<span className="flex items-center gap-2"><Fingerprint size={16} weight="light" className="text-champagne-300" />Double authentification</span>} desc="Clé d’accès (passkey) sur ce Mac et l’iPhone" tag={s.mfa ? <Tag tone="sage">Active</Tag> : <Tag tone="coral">Inactive</Tag>}><Toggle label="MFA" on={s.mfa} onChange={(v) => set({ mfa: v }, v ? 'Double authentification activée' : 'Double authentification désactivée', `${v ? 'a activé' : 'a désactivé'} sa double authentification`)} /></Row>
@@ -783,8 +992,31 @@ function Securite() {
   )
 }
 
+const MOOD: Record<string, string> = { bloque: 'Bloqué', lent: 'Trop long', idee: 'Idée', top: 'Ça aide' }
+function Beta() {
+  const [items] = useFeedback()
+  const exp = () => download('retours-beta-jaspe.csv', csv([['Date', 'Ressenti', 'Page', 'Retour'], ...items.map((f) => [new Date(f.at).toLocaleString('fr-FR'), MOOD[f.mood ?? ''] ?? '', f.page ?? '', f.text])]))
+  return (
+    <div className="space-y-6">
+      <Card title="Retours des bêta-testeurs" kicker="Bouton bulle en haut de chaque écran" action={items.length > 0 && <SoftBtn icon={<DownloadSimple size={14} />} onClick={exp}>Exporter CSV</SoftBtn>}>
+        {items.length === 0 ? <Empty title="Aucun retour pour l’instant">Les testeurs envoient un retour depuis l’icône bulle de la barre du haut ; il est rattaché à l’écran utilisé.</Empty> : (
+          <ul className="divide-y divide-white/[0.06]">
+            {items.map((f) => (
+              <li key={f.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:gap-4">
+                <span className="num w-36 shrink-0 text-[11.5px] text-mist">{new Date(f.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="w-24 shrink-0 text-[12px] text-champagne-300">{MOOD[f.mood ?? ''] ?? '—'}</span>
+                <span className="min-w-0 flex-1 text-[13.5px] text-bone/85">{f.text}<span className="block text-[11px] text-mist">{f.page}</span></span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  )
+}
+
 const VIEWS: Record<Section, () => ReactNode> = {
-  profil: Profil, reseau: Reseau, equipe: Equipe, marque: Marque, integrations: Integrations, conformite: Conformite, notifications: Notifications, facturation: Facturation, securite: Securite,
+  profil: Profil, reseau: Reseau, equipe: Equipe, marque: Marque, integrations: Integrations, conformite: Conformite, notifications: Notifications, facturation: Facturation, securite: Securite, beta: Beta,
 }
 
 export default function Reglages() {

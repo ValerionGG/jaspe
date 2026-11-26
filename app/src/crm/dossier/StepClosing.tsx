@@ -1,16 +1,16 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { CheckCircle, Circle, Plus, Trash, Scales, Vault, ArrowSquareOut, FloppyDisk, Stamp } from '@phosphor-icons/react'
+import { CheckCircle, Circle, Plus, Trash, Scales, Vault, ArrowSquareOut, FloppyDisk, Stamp, FilePdf, UploadSimple, Warning } from '@phosphor-icons/react'
 import { Card, SoftBtn, Stagger, Empty } from '../ui'
 import { Pill, EXPO } from '../../ui/kit'
 import { prop, eur } from '../../data/mock'
 import type { Closing } from '../../data/dossier'
-import { useTransactions } from '../../data/collections'
+import { useTransactions, useFiles } from '../../data/collections'
 import type { CondState } from '../../data/ops'
-import { action } from '../../data/store'
-import { Field, Input } from '../forms'
+import { action, uploadFile } from '../../data/store'
+import { Field, Input, Select } from '../forms'
 import { stepProgress } from './Stepper'
 import { StepHead, Eyebrow, Kpi, useRun, useNow, countdown, ts, todayIso, addDays, daysFrom, fdate, money } from './sale-ui'
 import type { StepProps } from './index'
@@ -148,6 +148,101 @@ export default function StepClosing({ dossier, journey, save, goTo }: StepProps)
           </Card>
         </Stagger>
       </div>
+
+      <Stagger i={5}>
+        <ContractReader dossierId={dossier.id} onApplied={(closing) => save({ closing: { ...c, ...closing, checklist: c.checklist } })} />
+      </Stagger>
     </>
+  )
+}
+
+/* ——— Lecture du compromis / CPCV (PDF) : proposition citée, rien n’est appliqué sans case cochée ——— */
+type Quoted = { quote: string; unverified?: boolean }
+type Extraction = {
+  id: string; mode: 'claude' | 'rules'; model?: string; cost?: number; fileName?: string; lang?: 'fr' | 'pt'
+  parties: ({ role: string; name: string } & Quoted)[]
+  prix: ({ value: number } & Quoted) | null; depot: ({ value: number } & Quoted) | null; notaire: ({ name: string } & Quoted) | null
+  dates: ({ id: string; k: string; label: string; date: string; confidence: number; computed?: string } & Quoted)[]
+  conditions: ({ id: string; k: string; label: string; echeance: string | null } & Quoted)[]
+  pieces: ({ id: string; label: string } & Quoted)[]
+  alertes: { level: 'info' | 'warn' | 'risk'; text: string; quote?: string }[]
+}
+type ApplyResult = { closing: Partial<Closing>; tasks: unknown[]; noTransaction?: boolean }
+
+function ContractReader({ dossierId, onApplied }: { dossierId: string; onApplied: (c: Partial<Closing>) => Promise<void> }) {
+  const [files] = useFiles()
+  const pdfs = files.filter((f) => f.dossierId === dossierId && (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)))
+  const [fileId, setFileId] = useState('')
+  const [ex, setEx] = useState<Extraction | null>(null)
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const { busy, run } = useRun()
+  const chosen = fileId || pdfs[0]?.id || ''
+
+  const extract = (id: string) => run('read', async () => {
+    const r = await action<Extraction>('contract.extract', { dossierId, fileId: id })
+    setEx(r)
+    // Pré-coche ce qui est sûr (confiance ≥ 0,8 et citation retrouvée) ; le reste attend une relecture.
+    setSel(new Set([...r.dates.filter((d) => d.confidence >= 0.8 && !d.unverified).map((d) => d.id), ...r.conditions.filter((x) => !x.unverified).map((x) => x.id), ...r.pieces.map((p) => p.id)]))
+  }, 'Compromis lu — vérifiez chaque élément avant d’appliquer')
+  const upload = (f?: File) => f && run('up', async () => { const d = await uploadFile(f, dossierId); setFileId(d.id); await extract(d.id) })
+  const flip = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const apply = () => ex && run('apply', async () => {
+    const r = await action<ApplyResult>('contract.apply', { extractionId: ex.id, accept: [...sel] })
+    if (Object.keys(r.closing).length) await onApplied(r.closing)
+    setEx(null)
+  }, `${sel.size} élément(s) appliqué(s) au dossier`)
+
+  const Row = ({ id, title, sub, q }: { id: string; title: string; sub?: string; q: Quoted }) => (
+    <li className="rounded-xl bg-white/[0.02] ring-1 ring-white/[0.05]">
+      <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 text-[13px]">
+        <input type="checkbox" className="mt-0.5 accent-champagne" checked={sel.has(id)} onChange={() => flip(id)} />
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2">{title}{sub && <span className="text-[11.5px] text-mist">{sub}</span>}{q.unverified && <Pill tone="red">citation introuvable</Pill>}</span>
+          <span className="mt-1 block border-l-2 border-champagne/40 pl-2 text-[11.5px] italic text-bone/60">« {q.quote} »</span>
+        </span>
+      </label>
+    </li>
+  )
+  const Section = ({ t, children }: { t: string; children: ReactNode }) => <div className="mt-4"><Eyebrow>{t}</Eyebrow><ul className="mt-2 space-y-1.5">{children}</ul></div>
+
+  return (
+    <Card title="Lire le compromis (PDF)" kicker={ex ? `${ex.mode === 'claude' ? 'Lecture Opus' : 'Lecture par règles'} · ${ex.fileName ?? ''}` : 'Compromis FR · CPCV PT'}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {pdfs.length > 0 && (
+          <Select value={chosen} onChange={(e) => setFileId(e.target.value)} className="sm:max-w-xs">
+            {pdfs.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </Select>
+        )}
+        {pdfs.length > 0 && <SoftBtn tone="gold" icon={<FilePdf size={14} />} disabled={!chosen || !!busy} onClick={() => extract(chosen)}>{busy === 'read' ? 'Lecture…' : 'Lancer l’extraction'}</SoftBtn>}
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] text-champagne-300 ring-1 ring-white/10 hover:bg-white/[0.04]">
+          <UploadSimple size={14} />{busy === 'up' ? 'Dépôt…' : 'Déposer un PDF'}
+          <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => { upload(e.target.files?.[0]); e.target.value = '' }} />
+        </label>
+      </div>
+      {!ex && <p className="mt-3 text-[12px] text-mist">Dates, conditions suspensives, pièces et notaire sont proposés avec la phrase exacte du contrat. Rien n’est modifié avant « Appliquer au dossier ». Aide à la lecture, pas un avis juridique.</p>}
+      {ex && (
+        <>
+          {ex.alertes.length > 0 && (
+            <ul className="mt-4 space-y-1">{ex.alertes.map((a, i) => <li key={i} className={clsx('flex items-start gap-2 text-[12px]', a.level === 'risk' ? 'text-coral' : a.level === 'warn' ? 'text-champagne-300' : 'text-mist')}><Warning size={13} className="mt-0.5 shrink-0" />{a.text}</li>)}</ul>
+          )}
+          {ex.dates.length > 0 && <Section t="Dates">{ex.dates.map((d) => <Row key={d.id} id={d.id} title={`${d.label} · ${fdate(d.date)}`} sub={`${Math.round(d.confidence * 100)} %${d.computed ? ` · ${d.computed}` : ''}`} q={d} />)}</Section>}
+          {ex.conditions.length > 0 && <Section t="Conditions suspensives">{ex.conditions.map((x) => <Row key={x.id} id={x.id} title={x.k} sub={x.echeance ? `échéance ${fdate(x.echeance)}` : 'échéance non datée'} q={x} />)}</Section>}
+          {ex.pieces.length > 0 && <Section t="Pièces à réunir">{ex.pieces.map((p) => <Row key={p.id} id={p.id} title={p.label} q={p} />)}</Section>}
+          {(ex.notaire || ex.prix || ex.depot) && (
+            <Section t="Notaire & montants">
+              {ex.notaire && <Row id="notaire" title={`Notaire : ${ex.notaire.name}`} q={ex.notaire} />}
+              {ex.prix && <Row id="prix" title={`Prix : ${money(ex.prix.value)}`} q={ex.prix} />}
+              {ex.depot && <Row id="depot" title={`${ex.lang === 'pt' ? 'Sinal' : 'Dépôt de garantie'} : ${money(ex.depot.value)}`} q={ex.depot} />}
+            </Section>
+          )}
+          {ex.parties.length > 0 && <div className="mt-4 text-[12px] text-mist">Parties lues : {ex.parties.map((p) => `${p.name} (${p.role})`).join(' · ')}</div>}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <SoftBtn tone="gold" icon={<CheckCircle size={14} />} disabled={!sel.size || !!busy} onClick={apply}>{busy === 'apply' ? 'Application…' : `Appliquer au dossier (${sel.size})`}</SoftBtn>
+            <SoftBtn onClick={() => setEx(null)}>Ignorer</SoftBtn>
+            <span className="text-[11.5px] text-mist">Relances J-7 créées pour chaque échéance cochée.</span>
+          </div>
+        </>
+      )}
+    </Card>
   )
 }
