@@ -602,6 +602,16 @@ function McpAccess() {
   const stdioCfg = JSON.stringify({ mcpServers: { jaspe: { command: 'node', args: ['C:\\chemin\\vers\\Jaspe\\server\\mcp-stdio.js'], ...(orgId ? { env: { JASPE_ORG: orgId } } : {}) } } }, null, 2)
   const httpCfg = JSON.stringify({ mcpServers: { jaspe: { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${JASPE_AUTH}'], env: { JASPE_AUTH: `Bearer ${token}` } } } }, null, 2)
   const cliCmd = `claude mcp add --transport http jaspe ${url} --header "Authorization: Bearer ${token}"`
+  // Codex (CLI, app, extension) : le jeton reste dans une variable d’environnement, jamais dans le fichier.
+  const codexCmd = `codex mcp add jaspe --url ${url} --bearer-token-env-var JASPE_TOKEN`
+  const codexToml = `# ~/.codex/config.toml
+[mcp_servers.jaspe]
+url = "${url}"
+bearer_token_env_var = "JASPE_TOKEN"`
+  const codexEnv = `# Windows (PowerShell)
+setx JASPE_TOKEN "${token}"
+# macOS / Linux
+export JASPE_TOKEN="${token}"`
   const copy = (t: string, what: string) => navigator.clipboard.writeText(t).then(() => toast(`${what} copié`), () => toast('Copie impossible : sélectionnez le texte', 'error'))
   const create = async () => {
     setBusy(true)
@@ -624,8 +634,8 @@ function McpAccess() {
       <div className="flex items-start gap-3">
         <PlugsConnected size={20} weight="light" className="mt-0.5 shrink-0 text-champagne" />
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-medium">Jaspe dans Claude ou ChatGPT (MCP)</div>
-          <p className="mt-1 text-[12.5px] leading-relaxed text-bone/60">9 outils : lire vos dossiers, tâches du jour, temps gagné et conformité ; préparer un plan depuis un brief, une relance, un livrable ou une facture. <span className="text-bone">Rien n’est écrit sans vous</span> : chaque préparation arrive dans Tâches &amp; validations, à valider ou refuser.</p>
+          <div className="text-[15px] font-medium">Jaspe dans Claude, Codex ou ChatGPT (MCP)</div>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-bone/60">12 outils : lire vos dossiers, tâches du jour, validations en attente, temps gagné, conformité, ventes réelles comparables, et rechercher dans l’agence ; préparer un plan depuis un brief, une relance, un livrable ou une facture. <span className="text-bone">Rien n’est écrit sans vous</span> : chaque préparation arrive dans Tâches &amp; validations, à valider ou refuser.</p>
         </div>
       </div>
       {unavailable && <div className="mt-4 flex items-start gap-2 rounded-xl bg-champagne/[0.06] p-3 text-[12px] text-champagne-300 ring-1 ring-champagne/20"><Info size={14} className="mt-0.5 shrink-0" />Serveur MCP non disponible sur cette version (hors ligne ou démo statique) : lancez le serveur Jaspe pour créer un jeton.</div>}
@@ -658,6 +668,9 @@ function McpAccess() {
           <Code label="Claude Desktop · local (stdio)" value={stdioCfg} />
           <Code label="Claude Desktop · serveur (HTTP + jeton)" value={httpCfg} />
           <Code label="Claude Code" value={cliCmd} />
+          <Code label="Codex · commande" value={codexCmd} />
+          <Code label="Codex · ou à la main (config.toml)" value={codexToml} />
+          <Code label="Codex · jeton dans une variable d’environnement" value={codexEnv} />
           <p className="text-[11px] leading-relaxed text-mist">ChatGPT : ajoutez un connecteur MCP personnalisé avec l’adresse ci-dessus et l’en-tête Authorization: Bearer &lt;jeton&gt;. L’adresse doit être joignable depuis Internet (HTTPS).</p>
         </div>
       </div>

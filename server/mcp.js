@@ -132,6 +132,54 @@ export function createMcpServer({ engine, db, user, emit = () => {} } = {}) {
     return text({ dossier: d.seller, pays: c.country, etape: c.stage, score: c.score, bloquants: c.items.filter((i) => i.state === 'blocked').map(pick), a_faire: c.items.filter((i) => i.state === 'todo').map(pick), conformes: c.items.filter((i) => i.state === 'ok').length, non_applicables: c.items.filter((i) => i.state === 'na').length })
   })
 
+  tool('jaspe_marche', {
+    title: 'Ventes réelles comparables',
+    description: 'Ventes réelles comparables au bien d’un dossier (France : DVF, données publiques Etalab ; même commune, même type, surface ±30 %, 24 mois) : médiane €/m², échantillon, écart avec le prix affiché. Au Portugal, aucune source publique vente par vente : le dit clairement.',
+    inputSchema: { dossierId: z.string().describe('Identifiant ou référence du dossier'), actualiser: z.boolean().optional().describe('Interroger la source maintenant plutôt que le cache (7 jours)') },
+    annotations: { title: 'Ventes réelles comparables', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  }, async ({ dossierId, actualiser = false }) => {
+    const d = dossier(dossierId)
+    // Source absente ou injoignable : réponse honnête (0 vente + raison), jamais de chiffre inventé.
+    let r
+    try {
+      if (!engine.actions['market.comparables']) throw new Error('Données de marché non disponibles sur ce serveur')
+      r = await engine.actions['market.comparables']({ propertyId: d.propertyId, ...(actualiser ? { refresh: true } : {}) })
+    } catch (e) { r = { comparables: [], note: String(e.message ?? e) } }
+    const p = db.get('properties', d.propertyId) ?? {}
+    const sales = (r?.comparables ?? []).filter((s) => Number.isFinite(s.price) && Number.isFinite(s.surface))
+    const ppm = sales.map((s) => s.price / s.surface).sort((a, b) => a - b)
+    const med = ppm.length ? Math.round(ppm[Math.floor(ppm.length / 2)]) : null
+    const asked = p.price && p.surface ? Math.round(p.price / p.surface) : null
+    return text({ dossier: d.seller, bien: p.title, source: r?.source ?? null, note: r?.note ?? null, ventes: sales.length, mediane_eur_m2: med, prix_affiche_eur_m2: asked, ecart_pct: med && asked ? Math.round((asked / med - 1) * 100) : null, echantillon: sales.slice(0, 10).map((s) => ({ date: s.date, prix: s.price, surface: s.surface, eur_m2: Math.round(s.price / s.surface), adresse: s.address })) })
+  })
+
+  tool('jaspe_validations_en_attente', {
+    title: 'Validations en attente',
+    description: 'Tout ce qui attend le feu vert du conseiller dans « Tâches & validations » : documents à relire, relances, offres, débriefs WhatsApp, propositions venues de Claude ou Codex. Avec le gain de temps attendu de chacun.',
+    inputSchema: { dossierId: z.string().optional().describe('Limiter à un dossier') },
+    annotations: { title: 'Validations en attente', ...READ },
+  }, ({ dossierId }) => {
+    const only = dossierId ? dossier(dossierId).id : null
+    const rows = db.list('queue').filter((q) => !only || q.dossier === only).map((q) => ({ id: q.id, titre: q.title, type: q.kind, dossier: q.dossier ? db.get('dossiers', q.dossier)?.seller : null, echeance: q.due, gain_min: q.saved ?? null, revue_individuelle: !q.safe, origine: q.source ?? 'Jaspe' }))
+    return text({ total: rows.length, validations: rows })
+  })
+
+  tool('jaspe_rechercher', {
+    title: 'Rechercher dans l’agence',
+    description: 'Recherche plein texte dans les dossiers, biens, contacts et acquéreurs de l’agence (nom, ville, référence, téléphone, e-mail).',
+    inputSchema: { texte: z.string().min(2).describe('Texte cherché'), limite: z.number().int().min(1).max(50).optional() },
+    annotations: { title: 'Rechercher dans l’agence', ...READ },
+  }, ({ texte, limite = 15 }) => {
+    const q = String(texte).toLowerCase()
+    const hit = (o, keys) => keys.some((k) => String(o?.[k] ?? '').toLowerCase().includes(q))
+    return text({
+      dossiers: db.list('dossiers').filter((d) => hit(d, ['seller', 'ref', 'next'])).slice(0, limite).map(short),
+      biens: db.list('properties').filter((p) => hit(p, ['title', 'city', 'district', 'address', 'ref'])).slice(0, limite).map((p) => ({ id: p.id, titre: p.title, ville: p.city, prix: p.price, surface: p.surface, statut: p.status })),
+      contacts: db.list('contacts').filter((c) => hit(c, ['name', 'email', 'phone', 'city', 'org'])).slice(0, limite).map((c) => ({ id: c.id, nom: c.name, roles: c.roles, ville: c.city, telephone: c.phone, email: c.email })),
+      acquereurs: db.list('buyers').filter((b) => hit(b, ['name', 'type'])).slice(0, limite).map((b) => ({ id: b.id, nom: b.name, budget: b.budget, zones: b.zones, type: b.type })),
+    })
+  })
+
   /* ——— Préparation (propositions à valider) ——— */
   tool('jaspe_plan_depuis_brief', {
     title: 'Plan d’action depuis un brief',

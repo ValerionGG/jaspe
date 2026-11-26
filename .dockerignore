@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/dist-static
+server/data
+.git
+.claude
+research
+docs
+*.log

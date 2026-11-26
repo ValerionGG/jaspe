@@ -21,6 +21,8 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.PORT ?? 5318)
+// En conteneur : HOST=0.0.0.0 ; en local, on n’écoute que sur la machine.
+const HOST = process.env.HOST ?? '127.0.0.1'
 const DIST = join(here, '..', 'app', 'dist')
 const FILES = join(here, 'data', 'files')
 // 10 Mo de pièce client encodés en base64 ≈ 13,4 Mo.
@@ -228,7 +230,7 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === normalize(process.argv[1])) {
   const { server, copilot, accounts, tick } = createApp()
-  server.listen(PORT, '127.0.0.1', () => console.log(`Jaspe — API sur http://127.0.0.1:${PORT} · ${accounts ? 'comptes actifs (JASPE_AUTH=1)' : `démo locale · copilote : ${copilot.mode}`}`))
+  server.listen(PORT, HOST, () => console.log(`Jaspe — API sur http://${HOST}:${PORT} · ${accounts ? 'comptes actifs (JASPE_AUTH=1)' : `démo locale · copilote : ${copilot.mode}`}`))
   setTimeout(() => tick().catch(console.error), 5000)
   setInterval(() => tick().catch(console.error), TICK_MS)
 }
