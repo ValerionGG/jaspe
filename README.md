@@ -30,6 +30,11 @@ Landing sur `/`, portail des raccourcis sur `/portail`, offre commerciale sur `/
   - `src/data/collections.ts` : un hook par collection avec son amorce.
   - `src/ui/theme.tsx` : clair / sombre / système, sans flash au chargement.
 
+## En ligne
+
+- **Production réelle (comptes, données persistantes)** : https://jaspe.217-160-124-232.nip.io, sur Dokploy. Notice : [deploy/dokploy/README.md](deploy/dokploy/README.md).
+- **Démo statique** : https://valeriongg.github.io/jaspe/ (données dans le navigateur).
+
 ## Version en ligne (GitHub Pages)
 `npm --prefix app run build:static` produit `app/dist-static` : routes par ancre (`#/app`), chemins relatifs, et **moteur métier embarqué** (le même `server/engine.js` exécuté dans le navigateur) avec stockage local. Le copilote y répond par réponses préparées ; les fichiers déposés sont limités à 1,5 Mo.
 
