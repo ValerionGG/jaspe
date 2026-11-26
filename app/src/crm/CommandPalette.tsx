@@ -6,6 +6,7 @@ import { MagnifyingGlass, Sparkle, ArrowRight, Buildings, Kanban, UsersThree, Li
 import { prop, eur } from '../data/mock'
 import { useDossiers, useProperties, useBuyers, useContacts } from '../data/collections'
 import { EXPO } from '../ui/kit'
+import { useIdentity } from '../data/identity'
 
 type Item = { id: string; label: string; hint?: string; group: string; icon: typeof Sparkle; go?: string; ai?: boolean }
 
@@ -18,22 +19,23 @@ export function CommandPalette({ open, onClose, onCopilot }: { open: boolean; on
   const [PROPERTIES] = useProperties()
   const [BUYERS] = useBuyers()
   const [CONTACTS] = useContacts()
+  const { real } = useIdentity()
   useEffect(() => { if (open) { setQ(''); setSel(0); setTimeout(() => input.current?.focus(), 40) } }, [open])
 
   const all: Item[] = useMemo(() => [
-    { id: 'ai1', label: 'Préparer le RDV de demain avec M. & Mme Laurent', group: 'Demander au copilote', icon: Sparkle, ai: true },
-    { id: 'ai2', label: 'Générer les livrables L1 → L9 du dossier Martin', group: 'Demander au copilote', icon: Sparkle, ai: true },
+    { id: 'ai1', label: real ? 'Préparer mon prochain rendez-vous vendeur' : 'Préparer le RDV de demain avec M. & Mme Laurent', group: 'Demander au copilote', icon: Sparkle, ai: true },
+    { id: 'ai2', label: real ? 'Quels livrables attendent ma validation ?' : 'Générer les livrables L1 → L9 du dossier Martin', group: 'Demander au copilote', icon: Sparkle, ai: true },
     { id: 'ai3', label: 'Quels mandats n’ont eu aucune visite depuis 14 jours ?', group: 'Demander au copilote', icon: Sparkle, ai: true },
     { id: 'n1', label: 'Nouveau rendez-vous vendeur', hint: 'N', group: 'Actions', icon: CalendarPlus, go: '/app/agenda' },
     { id: 'n2', label: 'Nouveau dossier vendeur', group: 'Actions', icon: Kanban, go: '/app/dossiers' },
     { id: 'n3', label: 'Lancer une estimation', group: 'Actions', icon: FileText, go: '/app/marche' },
     { id: 'n4', label: 'Centre de validation', group: 'Actions', icon: PenNib, go: '/app/studio' },
     { id: 'n5', label: 'Routines actives', group: 'Actions', icon: Lightning, go: '/app/automatisations' },
-    ...DOSSIERS.map((d) => ({ id: d.id, label: `${d.seller} — ${prop(d.propertyId).title}`, hint: d.ref, group: 'Dossiers', icon: Kanban, go: `/app/dossiers/${d.id}` })),
+    ...DOSSIERS.map((d) => ({ id: d.id, label: real ? [d.seller, PROPERTIES.find((p) => p.id === d.propertyId)?.title].filter(Boolean).join(' — ') : `${d.seller} — ${prop(d.propertyId).title}`, hint: d.ref, group: 'Dossiers', icon: Kanban, go: `/app/dossiers/${d.id}` })),
     ...PROPERTIES.map((p) => ({ id: p.id, label: p.title, hint: `${p.district} · ${eur(p.price)}`, group: 'Biens', icon: Buildings, go: '/app/biens' })),
     ...BUYERS.map((b) => ({ id: b.id, label: b.name, hint: `${eur(b.budget[0])} – ${eur(b.budget[1])}`, group: 'Acquéreurs', icon: UsersThree, go: '/app/acquereurs' })),
     ...CONTACTS.map((c) => ({ id: c.id, label: c.name, hint: c.email, group: 'Contacts', icon: AddressBook, go: '/app/contacts' })),
-  ], [DOSSIERS, PROPERTIES, BUYERS, CONTACTS])
+  ], [DOSSIERS, PROPERTIES, BUYERS, CONTACTS, real])
 
   const list = useMemo(() => {
     const n = q.trim().toLowerCase()

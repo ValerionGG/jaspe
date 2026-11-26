@@ -10,6 +10,9 @@ import { action } from '../../data/store'
 import { useTasks, useConversations, useTemplates, useFiles } from '../../data/collections'
 import { COMPARABLES, eur, fmt, type DelivState } from '../../data/mock'
 import { DelivSection, Paper, Panel, Eyebrow, useBusy, type Ctx } from './deliv-kit'
+import { isDemoProperty, countryOf, estimateRange, useMeMode, type LooseProperty } from './facts'
+import { useRealMarket, finitePos } from './market-real'
+import { useIdentity } from '../../data/identity'
 
 /* ——— L6 · Book de services (pages feuilletables) ——— */
 const DEPS: Record<number, string[]> = { 1: ['L7'], 2: ['L8'], 3: ['L3', 'L4', 'L5'], 4: [] }
@@ -43,7 +46,7 @@ export function L6Section({ ctx }: { ctx: Ctx }) {
                         <div className="absolute inset-x-6 bottom-6 text-bone md:inset-x-8 md:bottom-8">
                           <div className="font-sans text-[10px] uppercase tracking-eyebrow text-champagne-300">Book de services · {d.ref}</div>
                           <div className="mt-2 text-[34px] leading-[1.02] md:text-[46px]">{head}</div>
-                          <div className="mt-2 font-sans text-[12px] text-bone/70">{p.title} · {p.address}, {p.city} · préparé par {a.name}</div>
+                          <div className="mt-2 font-sans text-[12px] text-bone/70">{p.title} · {[p.address, p.city].filter(Boolean).join(', ')} · préparé par {a.name}</div>
                         </div>
                       </div>
                     )}
@@ -108,21 +111,42 @@ const ADJUST = [['Vue mer / dégagement', '+6 %', 'Grille réseau 2026'], ['Éta
 
 export function L7Section({ ctx }: { ctx: Ctx }) {
   const { p, j } = ctx
+  const lp = p as LooseProperty
+  const mode = useMeMode()
+  const demo = isDemoProperty(lp, mode)
+  const country = countryOf(lp, useIdentity().country)
+  const real = useRealMarket(p.id, !demo)
   const pref = ctx.prefs.L7 ?? {}
-  const rejected = pref.rejected ?? COMPARABLES.filter((c) => !c.keep).map((c) => c.addr)
-  const [price, setPrice] = useState(pref.price ?? (j.mandate.price || p.price))
+  const rejected = pref.rejected ?? (demo ? COMPARABLES.filter((c) => !c.keep).map((c) => c.addr) : [])
+  const [price, setPrice] = useState(pref.price ?? (j.mandate.price || p.price || 0))
   const { busy, run } = useBusy()
   return (
     <DelivSection code="L7" ctx={ctx}>
       {(doc) => {
-        const comps = comparablesOf(p)
+        // Démo : échantillon historique. Compte réel : ventes réelles uniquement (DVF / Casafari), sinon rien d’inventé.
+        const comps: Comp[] = demo ? comparablesOf(p) : real.comps.map((c) => ({ addr: c.address ? `${c.address} · ${c.date}` : c.id, date: c.date, surface: c.surface, price: c.price, kind: `Vendu · ${c.source}`, dist: c.commune ?? '—' }))
         const kept = comps.filter((c) => !rejected.includes(c.addr) && c.kind.startsWith('Vendu'))
         const ppm = median(kept.map((c) => c.price / c.surface))
-        const calc: [number, number] = [Math.round((ppm * p.surface * 0.95) / 1e4) * 1e4, Math.round((ppm * p.surface * 1.05) / 1e4) * 1e4]
-        const [lo, hi] = doc.range ?? [p.estimateLow, p.estimateHigh]
+        const surf = finitePos(p.surface) ? p.surface : 0
+        const calc: [number, number] | null = ppm > 0 && surf ? [Math.round((ppm * surf * 0.95) / 1e4) * 1e4, Math.round((ppm * surf * 1.05) / 1e4) * 1e4] : null
+        const range = demo ? (doc.range ?? [p.estimateLow, p.estimateHigh]) as [number, number] : estimateRange(lp, doc.range) ?? calc
+        if (!range) {
+          return (
+            <div className="space-y-4">
+              <Panel title="Fourchette retenue · avis de valeur">
+                <div className="display text-[2rem] leading-none text-bone/70">Estimation à établir</div>
+                <p className="mt-3 text-[12.5px] text-bone/60">{!surf ? 'Surface habitable non renseignée sur la fiche du bien : aucun prix au m² ne peut être calculé.' : real.loading ? 'Lecture des ventes enregistrées…' : country === 'PT' ? 'Comparables à importer (Casafari ou relevés INE) — aucune donnée publique de ventes, transaction par transaction, au Portugal.' : 'Aucune vente comparable lue pour ce bien. Interrogez DVF pour lire les ventes officielles de la commune (même type, surface ± 30 %, 24 derniers mois).'}</p>
+                {surf > 0 && <div className="mt-4"><SoftBtn disabled={real.busy} onClick={() => real.load(false)}>{real.busy ? 'Lecture…' : country === 'PT' ? 'Interroger Casafari' : 'Interroger DVF'}</SoftBtn></div>}
+                <p className="mt-3 border-t border-white/[0.05] pt-3 text-[11.5px] text-mist">Aucune fourchette n’est affichée sans comparables réels ou estimation saisie : rien n’est simulé.</p>
+              </Panel>
+            </div>
+          )
+        }
+        const [lo, hi] = range
         const min = Math.round((lo * 0.85) / 1e4) * 1e4, max = Math.round((hi * 1.15) / 1e4) * 1e4
         const pos = (v: number) => `${Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100))}%`
-        const gap = price > hi ? (price - hi) / hi : price < lo ? (price - lo) / lo : 0
+        const pv = price > 0 ? price : Math.round((lo + hi) / 2 / 1e4) * 1e4 // prix absent (compte réel) : milieu de fourchette
+        const gap = pv > hi ? (pv - hi) / hi : pv < lo ? (pv - lo) / lo : 0
         const verdict = gap > 0 ? { t: `Au-dessus de la fourchette de ${Math.round(gap * 100)} % : argumentaire requis, risque de délai allongé`, c: 'text-coral' } : gap < 0 ? { t: `Sous la fourchette de ${Math.round(-gap * 100)} % : vente rapide probable, valeur laissée sur la table`, c: 'text-champagne-300' } : { t: 'Dans la fourchette retenue : prix défendable devant les acquéreurs', c: 'text-sage' }
         const toggle = (addr: string) => ctx.setPrefs('L7', { ...pref, rejected: rejected.includes(addr) ? rejected.filter((x) => x !== addr) : [...rejected, addr] })
         return (
@@ -130,25 +154,25 @@ export function L7Section({ ctx }: { ctx: Ctx }) {
             <div className="grid gap-4 2xl:grid-cols-[1.3fr_1fr]">
               <Panel title="Fourchette retenue · avis de valeur">
                 <div className="display text-[2.6rem] leading-none md:text-5xl">{eur(lo)} – {eur(hi)}</div>
-                <div className="num mt-1 text-[12px] text-mist">{fmt(Math.round(lo / p.surface))} – {fmt(Math.round(hi / p.surface))} €/m² · {p.surface} m² · DPE {p.dpe}</div>
+                <div className="num mt-1 text-[12px] text-mist">{surf ? <>{fmt(Math.round(lo / surf))} – {fmt(Math.round(hi / surf))} €/m² · {surf} m²</> : 'Surface non renseignée'}{p.dpe ? ` · DPE ${p.dpe}` : ''}</div>
                 <div className="relative mt-8 h-2 rounded-full bg-white/[0.08]">
                   <div className="absolute inset-y-0 rounded-full bg-gradient-to-r from-champagne-700 to-champagne" style={{ left: pos(lo), right: `calc(100% - ${pos(hi)})` }} />
-                  <div className="absolute -top-1 h-4 w-px bg-sea" style={{ left: pos(calc[0]) }} title="Recalcul bas" /><div className="absolute -top-1 h-4 w-px bg-sea" style={{ left: pos(calc[1]) }} title="Recalcul haut" />
-                  <motion.div className="absolute -top-6 -translate-x-1/2" animate={{ left: pos(price) }} transition={{ duration: 0.3, ease: EXPO }}><span className="num whitespace-nowrap rounded-full bg-bone px-2 py-0.5 text-[11px] text-ink">{eur(price)}</span></motion.div>
-                  <motion.div className="absolute -top-1.5 h-5 w-0.5 rounded bg-bone" animate={{ left: pos(price) }} transition={{ duration: 0.3, ease: EXPO }} />
+                  {calc && <><div className="absolute -top-1 h-4 w-px bg-sea" style={{ left: pos(calc[0]) }} title="Recalcul bas" /><div className="absolute -top-1 h-4 w-px bg-sea" style={{ left: pos(calc[1]) }} title="Recalcul haut" /></>}
+                  <motion.div className="absolute -top-6 -translate-x-1/2" animate={{ left: pos(pv) }} transition={{ duration: 0.3, ease: EXPO }}><span className="num whitespace-nowrap rounded-full bg-bone px-2 py-0.5 text-[11px] text-ink">{eur(pv)}</span></motion.div>
+                  <motion.div className="absolute -top-1.5 h-5 w-0.5 rounded bg-bone" animate={{ left: pos(pv) }} transition={{ duration: 0.3, ease: EXPO }} />
                 </div>
-                <input type="range" min={min} max={max} step={10000} value={price} onChange={(e) => setPrice(+e.target.value)} onPointerUp={() => ctx.setPrefs('L7', { ...pref, rejected, price })} onKeyUp={() => ctx.setPrefs('L7', { ...pref, rejected, price })} aria-label="Prix de présentation simulé" className="mt-4 w-full accent-[rgb(var(--acc-500))]" />
+                <input type="range" min={min} max={max} step={10000} value={pv} onChange={(e) => setPrice(+e.target.value)} onPointerUp={() => ctx.setPrefs('L7', { ...pref, rejected, price: pv })} onKeyUp={() => ctx.setPrefs('L7', { ...pref, rejected, price: pv })} aria-label="Prix de présentation simulé" className="mt-4 w-full accent-[rgb(var(--acc-500))]" />
                 <div className="flex justify-between text-[10.5px] text-mist"><span className="num">{eur(min)}</span><span className="num">{eur(max)}</span></div>
                 <p className={clsx('mt-3 text-[13px]', verdict.c)}>{verdict.t}</p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <SoftBtn disabled={!!busy || price === j.mandate.price} onClick={() => run('m', () => ctx.save({ mandate: { ...j.mandate, price } }), `Prix de ${eur(price)} reporté au mandat`)}>{busy === 'm' ? 'Report…' : 'Reporter au mandat'}</SoftBtn>
+                  <SoftBtn disabled={!!busy || pv === j.mandate.price} onClick={() => run('m', () => ctx.save({ mandate: { ...j.mandate, price: pv } }), `Prix de ${eur(pv)} reporté au mandat`)}>{busy === 'm' ? 'Report…' : 'Reporter au mandat'}</SoftBtn>
                   <span className="text-[11.5px] text-mist">Mandat : {j.mandate.price ? eur(j.mandate.price) : 'prix non fixé'} · vendeur : {j.discovery.prixSouhaite?.v ?? 'non déclaré'}</span>
                 </div>
               </Panel>
               <Panel title="Recalcul déterministe">
-                <div className="display text-4xl text-sea">{eur(calc[0])} – {eur(calc[1])}</div>
-                <p className="mt-2 text-[12.5px] text-bone/70">Médiane de <span className="num">{fmt(Math.round(ppm))}</span> €/m² sur <span className="num">{kept.length}</span> vente{kept.length > 1 ? 's' : ''} DVF retenue{kept.length > 1 ? 's' : ''}, ±5 %. Calculé hors génération de texte.</p>
-                <div className="mt-4 space-y-1.5">{ADJUST.map(([k, v, s]) => <div key={k} className="flex items-center justify-between gap-3 text-[12.5px]"><span className="text-bone/75">{k}</span><span className="flex items-center gap-2"><span className="text-[10.5px] text-mist">{s}</span><span className={clsx('num w-11 text-right', v.startsWith('+') ? 'text-sage' : 'text-coral')}>{v}</span></span></div>)}</div>
+                <div className="display text-4xl text-sea">{calc ? <>{eur(calc[0])} – {eur(calc[1])}</> : '—'}</div>
+                <p className="mt-2 text-[12.5px] text-bone/70">{calc ? <>Médiane de <span className="num">{fmt(Math.round(ppm))}</span> €/m² sur <span className="num">{kept.length}</span> vente{kept.length > 1 ? 's' : ''}{demo || country === 'FR' ? ' DVF' : ''} retenue{kept.length > 1 ? 's' : ''}, ±5 %. Calculé hors génération de texte.</> : 'Aucune vente réelle retenue : pas de recalcul possible.'}</p>
+                {demo && <div className="mt-4 space-y-1.5">{ADJUST.map(([k, v, s]) => <div key={k} className="flex items-center justify-between gap-3 text-[12.5px]"><span className="text-bone/75">{k}</span><span className="flex items-center gap-2"><span className="text-[10.5px] text-mist">{s}</span><span className={clsx('num w-11 text-right', v.startsWith('+') ? 'text-sage' : 'text-coral')}>{v}</span></span></div>)}</div>}
                 <p className="mt-3 border-t border-white/[0.05] pt-3 text-[11.5px] text-mist">Avis de valeur professionnel, pas une expertise. La largeur de la fourchette reflète l’incertitude de l’échantillon.</p>
               </Panel>
             </div>

@@ -8,7 +8,7 @@ import {
 } from '@phosphor-icons/react'
 import { Logo } from '../landing/chrome'
 import { Avatar, EXPO } from '../ui/kit'
-import { me } from '../data/mock'
+import { useIdentity } from '../data/identity'
 import { IconBtn } from './ui'
 import { CommandPalette } from './CommandPalette'
 import { CopilotDrawer } from './Copilot'
@@ -108,6 +108,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const simple = essentiel || simplePref
   const nav = useNavigate()
   const { t } = useT()
+  const who = useIdentity()
   const switchEdition = () => { setEdition(essentiel ? 'complet' : 'essentiel'); nav('/app'); location.reload() }
   const badges: Record<string, number> = {
     messages: convs.reduce((n, c) => n + (c.unread ?? 0), 0),
@@ -123,12 +124,12 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       {!collapsed && (essentiel ? (
         <div className="mx-3 mb-2 rounded-2xl bg-gradient-to-br from-champagne/20 to-transparent p-3 ring-1 ring-champagne/25">
           <div className="flex items-center justify-between"><span className="text-[13px] font-medium">{t('nav.essentiel')}</span><span className="rounded-full bg-champagne px-2 py-0.5 text-[10px] font-medium text-ink">{t('nav.essentielPrice')}</span></div>
-          <div className="mt-1 text-[11px] text-mist">{t('nav.independent')} · Claire Delmas</div>
+          <div className="mt-1 text-[11px] text-mist">{t('nav.independent')} · {who.name}</div>
         </div>
       ) : (
         <button className="mx-3 mb-2 flex items-center gap-3 rounded-2xl bg-white/[0.03] p-2.5 text-left ring-1 ring-white/[0.06] transition hover:bg-white/[0.05]">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-champagne to-champagne-700 font-serif text-[15px] italic text-ink">A</span>
-          <span className="min-w-0 flex-1"><span className="block truncate text-[13px]">Antibes Vieille-Ville</span><span className="block text-[11px] text-mist">{t('nav.network')}</span></span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-champagne to-champagne-700 font-serif text-[15px] italic text-ink">{who.orgName.trim()[0]?.toUpperCase() ?? 'A'}</span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-[13px]">{who.orgName}</span><span className="block text-[11px] text-mist">{who.real ? who.orgSub : t('nav.network')}</span></span>
           <CaretUpDown size={14} className="text-mist" />
         </button>
       ))}
@@ -167,8 +168,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           </button>
         )}
         <NavLink to="reglages" className={clsx('flex items-center gap-3 rounded-xl p-2 transition hover:bg-white/[0.04]', collapsed && 'justify-center')}>
-          <Avatar src={me.photo} size={32} />
-          {!collapsed && <span className="min-w-0 flex-1"><span className="block truncate text-[13px]">{me.name}</span><span className="block text-[11px] text-mist">{me.role}</span></span>}
+          <Avatar src={who.photo} name={who.name} size={32} />
+          {!collapsed && <span className="min-w-0 flex-1"><span className="block truncate text-[13px]">{who.name}</span><span className="block text-[11px] text-mist">{who.role}</span></span>}
           {!collapsed && <GearSix size={16} className="text-mist" />}
         </NavLink>
         {collapsed && <button onClick={onToggle} className="mt-2 flex w-full justify-center rounded-xl p-2 text-mist hover:text-bone" aria-label={t('nav.expand')}><SidebarSimple size={16} /></button>}

@@ -11,7 +11,7 @@ import { Modal, Field, Input, AsyncForm, toast, errText } from '../forms'
 import { action } from '../../data/store'
 import { useConversations, useMessages, useAgents } from '../../data/collections'
 import type { Channel } from '../../data/messaging'
-import { CH, rel, isSnoozed, waiting, waitLabel, ConvAvatar, TagChip, useTags, useOutside, Menu, menuItem, eyebrow, me, type Conv, type Msg } from './shared'
+import { CH, rel, isSnoozed, waiting, waitLabel, ConvAvatar, TagChip, useTags, useOutside, Menu, menuItem, eyebrow, useSelf, type Conv, type Msg } from './shared'
 import Thread from './Thread'
 import Context from './Context'
 
@@ -23,14 +23,15 @@ const BOXES: { id: Box; label: string; icon: typeof Tray }[] = [
 ]
 const EXT: Channel[] = ['whatsapp', 'email', 'sms', 'portal']
 const SORTS: Record<Sort, string> = { recent: 'Plus récentes', unread: 'Non lues d’abord', sla: 'Attente la plus longue' }
-const inBox = (c: Conv, b: Box) => b === 'done' ? c.status === 'done' : b === 'snoozed' ? isSnoozed(c)
-  : c.status !== 'done' && !isSnoozed(c) && (b === 'all' || (b === 'unread' && c.unread > 0) || (b === 'mine' && c.assignee === me.id))
+const inBox = (c: Conv, b: Box, meId: string) => b === 'done' ? c.status === 'done' : b === 'snoozed' ? isSnoozed(c)
+  : c.status !== 'done' && !isSnoozed(c) && (b === 'all' || (b === 'unread' && c.unread > 0) || (b === 'mine' && c.assignee === meId))
 const typing = (e: KeyboardEvent) => { const t = e.target as HTMLElement; return t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) }
 
 export default function Inbox({ selected, select }: { selected: string | null; select: (id: string | null) => void }) {
   const [convs, ops] = useConversations()
   const [msgs] = useMessages()
   const [tags, addTag] = useTags()
+  const me = useSelf()
   const [box, setBox] = useState<Box>('all')
   const [channel, setChannel] = useState<Channel | null>(null)
   const [tag, setTag] = useState<string | null>(null)
@@ -58,7 +59,7 @@ export default function Inbox({ selected, select }: { selected: string | null; s
   const list = useMemo(() => {
     const s = q.trim().toLowerCase()
     const r = all.filter((c) => {
-      if (channel ? c.channel !== channel || (channel === 'internal' ? c.status === 'done' : !inBox(c, box)) : !inBox(c, box)) return false
+      if (channel ? c.channel !== channel || (channel === 'internal' ? c.status === 'done' : !inBox(c, box, me.id)) : !inBox(c, box, me.id)) return false
       if (tag && !c.tags.includes(tag)) return false
       if (!s) return true
       return [c.title, c.subtitle, c.topic, c.lastText, ...c.tags, ...(byConv.get(c.id) ?? []).map((m) => m.text)].some((t) => t?.toLowerCase().includes(s))
@@ -67,7 +68,7 @@ export default function Inbox({ selected, select }: { selected: string | null; s
     return r.sort((a, b) => sort === 'sla' ? w(b) - w(a) || b.lastAt.localeCompare(a.lastAt)
       : sort === 'unread' ? (b.unread > 0 ? 1 : 0) - (a.unread > 0 ? 1 : 0) || b.lastAt.localeCompare(a.lastAt)
         : Number(!!b.pinned) - Number(!!a.pinned) || b.lastAt.localeCompare(a.lastAt))
-  }, [all, box, channel, tag, q, sort, byConv])
+  }, [all, box, channel, tag, q, sort, byConv, me.id])
 
   const open = useCallback((id: string) => { select(id); setPane('thread') }, [select])
 
@@ -86,7 +87,7 @@ export default function Inbox({ selected, select }: { selected: string | null; s
     return () => window.removeEventListener('keydown', k)
   }, [list, selected, conv, ops, open])
 
-  const count = (b: Box) => all.filter((c) => c.kind === 'direct' && inBox(c, b)).length
+  const count = (b: Box) => all.filter((c) => c.kind === 'direct' && inBox(c, b, me.id)).length
   const unreadOf = (ch: Channel) => all.filter((c) => c.channel === ch && c.status !== 'done').reduce((n, c) => n + c.unread, 0)
   const team = all.filter((c) => c.kind === 'channel')
 
@@ -117,7 +118,7 @@ export default function Inbox({ selected, select }: { selected: string | null; s
           </div>
           <div>
             <div className={clsx(eyebrow, 'mb-1.5 px-2')}>Canaux</div>
-            {EXT.map((ch) => { const I = CH[ch].icon; const n = all.filter((c) => c.channel === ch && inBox(c, box)).length; const u = unreadOf(ch)
+            {EXT.map((ch) => { const I = CH[ch].icon; const n = all.filter((c) => c.channel === ch && inBox(c, box, me.id)).length; const u = unreadOf(ch)
               return <Row key={ch} active={channel === ch} onClick={() => setChannel(channel === ch ? null : ch)} icon={<I size={15} weight="light" className={CH[ch].text} />} label={CH[ch].label} n={u || n} hot={u > 0} /> })}
           </div>
           <div>
@@ -268,6 +269,7 @@ function TagFilter({ tags, tag, setTag, addTag }: { tags: string[]; tag: string 
 
 function NewChannel({ open, onClose, onCreated, create }: { open: boolean; onClose: () => void; onCreated: (id: string) => void; create: (d: Partial<Conv>) => Promise<Conv> }) {
   const [agents] = useAgents()
+  const me = useSelf()
   const [members, setMembers] = useState<Set<string>>(new Set([me.id]))
   return (
     <Modal open={open} onClose={onClose} title="Nouveau canal" kicker="Équipe · messagerie interne">

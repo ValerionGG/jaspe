@@ -8,9 +8,13 @@ import { PublicShell } from './public-shell'
 import { In, card, micro } from './essentiel-sections'
 import { PLANS, PLAN_OPTIONS, COMMITMENTS } from '../data/plans'
 
+const AGENCE = PLANS.find((p) => p.id === 'agence')!
+const SEATS = 7 // conseillers inclus dans le forfait Agence (cf. AGENCE.seats)
+const perSeat = (Number(AGENCE.price.replace(',', '.')) / SEATS).toLocaleString('fr-FR', { maximumFractionDigits: 2 })
+
 const COMPARE: [string, string, string][] = [
-  ['Prix pour 7 conseillers', '49 € / mois', '350 à 1 050 € / mois'],
-  ['Prix par conseiller', '7 € / mois', '50 à 150 € / mois'],
+  [`Prix pour ${SEATS} conseillers`, `${AGENCE.price} ${AGENCE.unit} au total`, '350 à 1 050 € / mois'],
+  ['Prix par conseiller', `${perSeat} € / mois, puis 6 € / siège au-delà de ${SEATS}`, '50 à 150 € / mois'],
   ['Engagement', 'Aucun, résiliation en un clic', 'Variable, parfois annuel'],
   ['Rédaction des comptes rendus et livrables', 'Oui, à relire et valider', 'Variable selon l’éditeur'],
   ['Diffusion multiportail', 'Non : à garder dans votre outil actuel', 'Oui, en général'],
@@ -38,6 +42,7 @@ export default function Tarifs() {
             <Eyebrow>Tarifs</Eyebrow>
             <h1 className="display mt-5 text-[2.6rem] leading-[1.02] sm:text-6xl">Commencez gratuitement. <span className="italic text-champagne-300">Payez quand vous gagnez du temps.</span></h1>
             <p className="mt-5 text-[15.5px] leading-relaxed text-bone/65">Trois offres, deux options, aucun frais caché. Tout se fait en ligne : inscription, paiement, ajout de sièges, résiliation.</p>
+            <p className="mt-4 inline-flex rounded-full bg-sage/10 px-3.5 py-1.5 text-[13px] text-sage ring-1 ring-sage/25">Bêta en cours : tout est ouvert et gratuit, aucune carte demandée.</p>
           </motion.div>
           <div className="mt-8 flex flex-wrap gap-2">{COMMITMENTS.map((c) => <span key={c} className="flex items-center gap-1.5 rounded-full bg-white/[0.04] px-3 py-1.5 text-[12.5px] text-bone/75 ring-1 ring-white/10"><ShieldCheck size={13} className="text-sage" />{c}</span>)}</div>
 
@@ -53,13 +58,14 @@ export default function Tarifs() {
           <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
             {PLANS.map((p, i) => {
               const hi = p.id === 'solo'
-              const showYear = yearly && p.yearly
+              const year = yearly && p.yearly ? p.yearly.split(' € ') : null // « 99 € / an » → ['99', '/ an']
+              const monthly = year ? (Number(year[0]) / 12).toLocaleString('fr-FR', { maximumFractionDigits: 2 }) : ''
               return (
                 <In key={p.id} delay={i * 0.06} className={clsx(card, 'flex flex-col p-7', hi && 'ring-champagne/30')}>
                   <div className="flex items-center justify-between"><span className="text-[17px] font-medium">{p.name}</span>{hi && <span className="eyebrow bg-champagne text-ink">Le plus choisi</span>}</div>
                   <p className="mt-2 text-[13.5px] text-bone/60">{p.pitch}</p>
-                  <div className="mt-7 flex items-baseline gap-2"><span className="display text-6xl">{showYear ? '99' : p.price}</span><span className="text-[14px] text-bone/60">{showYear ? '€ / an' : p.unit}</span></div>
-                  <div className="mt-1 h-5 text-[12.5px] text-mist">{showYear ? 'soit 8,25 € / mois, deux mois offerts' : p.yearly ? `ou ${p.yearly}` : ''}</div>
+                  <div className="mt-7 flex items-baseline gap-2"><span className="display text-6xl">{year ? year[0] : p.price}</span><span className="text-[14px] text-bone/60">{year ? `€ ${year[1]}` : p.unit}</span></div>
+                  <div className="mt-1 h-5 text-[12.5px] text-mist">{year ? `soit ${monthly} € / mois, deux mois offerts` : p.yearly ? `ou ${p.yearly}` : ''}</div>
                   <div className="mt-6 space-y-1 text-[13.5px]"><div className="text-bone">{p.dossiers}</div><div className="text-bone/60">{p.seats}</div></div>
                   <ul className="mt-6 flex-1 space-y-2.5">{p.features.map((f) => <li key={f} className="flex items-start gap-2.5 text-[13.5px] text-bone/80"><Check size={14} className="mt-0.5 shrink-0 text-champagne" />{f}</li>)}</ul>
                   <Link to="/inscription" className={clsx('mt-8 rounded-full px-5 py-3 text-center text-[14px] font-medium transition', hi ? 'bg-champagne text-ink hover:bg-champagne-300' : 'bg-white/[0.04] text-bone ring-1 ring-white/10 hover:bg-white/[0.08]')}>

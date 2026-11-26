@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import clsx from 'clsx'
 import { CaretLeft, CaretRight, Plus, GoogleLogo, MicrosoftOutlookLogo, Warning, MapPin, Car, Clock, Sparkle, CheckCircle, Circle, ArrowsClockwise, UsersThree, ArrowRight, CalendarDots, PencilSimple, Trash, DotsSixVertical, BellRinging, X, ChatCircleText } from '@phosphor-icons/react'
 import { PageHeader, Card, Tabs, SoftBtn, Stagger, IconBtn } from '../ui'
 import { Ring, EXPO } from '../../ui/kit'
-import { prop, type Dossier } from '../../data/mock'
-import { KINDS, NOW, type CalEvent, type Kind, type Prep } from '../../data/ops'
+import { type Dossier } from '../../data/mock'
+import { useIdentity } from '../../data/identity'
+import { usePropOf } from '../../data/people'
+import { KINDS, NOW as NOW_DEMO, type CalEvent, type Kind, type Prep } from '../../data/ops'
 import { useEvents, useDossiers, useReminders } from '../../data/collections'
 import type { Reminder } from '../../data/messaging'
 import { action, type Doc } from '../../data/store'
@@ -31,6 +33,15 @@ const monthCells = (d: number) => { const { first, n } = monthOf(d); return Arra
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 const dayToIso = (d: number) => { const x = dt(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}` }
 const isoToDay = (s: string) => toDay(new Date(`${s}T00:00`))
+
+/** « Maintenant » de l’agenda : jour de démo figé (12 oct. 2026, 10:36) en démo, date et heure réelles en compte réel. */
+function useAgendaNow(): { day: number; h: number; label: string } {
+  const real = useIdentity().real
+  const [clock, setClock] = useState(() => new Date())
+  useEffect(() => { if (!real) return; const t = setInterval(() => setClock(new Date()), 60_000); return () => clearInterval(t) }, [real])
+  if (!real) return NOW_DEMO
+  return { day: toDay(clock), h: clock.getHours() + clock.getMinutes() / 60, label: clock.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }
+}
 
 const DEFAULT_CHECK: Record<Kind, string[]> = {
   rdv: ['Brief relationnel relu (D1)', 'Comparables DVF imprimés (D2)', 'Radar quartier & PLU (D3)', 'Mandat pré-rempli', 'Simulation des objections (D4)'],
@@ -61,6 +72,7 @@ const overlaps = (a: Ev, b: Ev) => a.id !== b.id && a.day === b.day && toH(a.sta
 const checkList = (e: Ev) => e.checklist ?? DEFAULT_CHECK[e.kind].map((t) => ({ t, ok: false }))
 
 export default function Agenda() {
+  const NOW = useAgendaNow()
   const [raw, ops] = useEvents()
   const events = raw as Ev[]
   const [dossiers] = useDossiers()
@@ -68,7 +80,11 @@ export default function Agenda() {
   const remSet = new Set(reminders.filter((r) => r.status === 'programmé' && r.eventId).map((r) => r.eventId as string))
   const [view, setView] = useState<'jour' | 'semaine' | 'mois'>(() => (window.innerWidth < 768 ? 'jour' : 'semaine'))
   const [day, setDay] = useState(NOW.day)
-  const [sel, setSel] = useState('e22')
+  const [sel, setSel] = useState(() => (NOW === NOW_DEMO ? 'e22' : ''))
+  // L’identité peut arriver après le premier rendu : on recale alors le jour affiché sur aujourd’hui.
+  const isReal = NOW !== NOW_DEMO
+  const [wasReal, setWasReal] = useState(isReal)
+  if (wasReal !== isReal) { setWasReal(isReal); setDay(NOW.day); setSel(isReal ? '' : 'e22') }
   const [hidden, setHidden] = useState<Kind[]>([])
   const [preparing, setPreparing] = useState<{ id: string; code: string } | null>(null)
   const [editing, setEditing] = useState<Ev | 'new' | null>(null)
@@ -269,6 +285,7 @@ export default function Agenda() {
 }
 
 function EventForm({ e, day, dossiers, onSave, onCancel }: { e?: Ev; day: number; dossiers: Dossier[]; onSave: (p: Omit<CalEvent, 'id' | 'source'>) => Promise<void>; onCancel: () => void }) {
+  const real = useIdentity().real
   return (
     <AsyncForm submitLabel={e ? 'Enregistrer' : 'Créer l’événement'} success={e ? 'Événement mis à jour' : 'Événement créé'} onCancel={onCancel} onSubmit={async (v) => {
       if (!v.title.trim()) throw new Error('Titre requis')
@@ -278,15 +295,15 @@ function EventForm({ e, day, dossiers, onSave, onCancel }: { e?: Ev; day: number
       const d = isoToDay(v.date)
       await onSave({ title: v.title.trim(), kind: v.kind as Kind, day: d, start: v.start, end: v.end, place: v.place.trim() || '—', who: v.who.trim() || '—', dossier: v.dossier } as Omit<CalEvent, 'id' | 'source'>)
     }}>
-      <Field label="Titre"><Input name="title" required defaultValue={e?.title} placeholder="RDV estimation — Villa Les Combes" /></Field>
+      <Field label="Titre"><Input name="title" required defaultValue={e?.title} placeholder={real ? 'RDV estimation — maison de M. Dupont' : 'RDV estimation — Villa Les Combes'} /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Type"><Select name="kind" defaultValue={e?.kind ?? 'rdv'}>{(Object.keys(KINDS) as Kind[]).map((k) => <option key={k} value={k}>{KINDS[k].label}</option>)}</Select></Field>
         <Field label="Jour"><Input name="date" type="date" required defaultValue={dayToIso(e?.day ?? day)} /></Field>
         <Field label="Début"><Input name="start" type="time" required step={900} min="08:00" max="20:00" defaultValue={e?.start ?? '10:00'} /></Field>
         <Field label="Fin"><Input name="end" type="time" required step={900} min="08:00" max="20:00" defaultValue={e?.end ?? '11:00'} /></Field>
       </div>
-      <Field label="Lieu"><Input name="place" defaultValue={e?.place} placeholder="41 route de Grasse · ou Visio / Téléphone" /></Field>
-      <Field label="Participant(s)"><Input name="who" defaultValue={e?.who} placeholder="Famille Costa" /></Field>
+      <Field label="Lieu"><Input name="place" defaultValue={e?.place} placeholder={real ? 'Adresse · ou Visio / Téléphone' : '41 route de Grasse · ou Visio / Téléphone'} /></Field>
+      <Field label="Participant(s)"><Input name="who" defaultValue={e?.who} placeholder={real ? 'Nom du client' : 'Famille Costa'} /></Field>
       <Field label="Dossier lié" hint="Un dossier lié permet la préparation D1–D3 par le copilote."><Select name="dossier" defaultValue={e?.dossier ?? ''}>
         <option value="">Aucun</option>{dossiers.map((d) => <option key={d.id} value={d.id}>{d.seller} · {d.ref}</option>)}
       </Select></Field>
@@ -318,6 +335,7 @@ function EventBlock({ e, lane, n, wide, active, reminded, ready, conflict, onCli
 }
 
 function Month({ day, events, rem, sel, onDay, onPick, onMove }: { day: number; events: Ev[]; rem: Set<string>; sel: string; onDay: (d: number) => void; onPick: (e: Ev) => void; onMove: (id: string, d: number) => void }) {
+  const NOW = useAgendaNow()
   const [over, setOver] = useState<number | null>(null)
   const cells = monthCells(day), month = monthOf(day).m
   return (
@@ -350,6 +368,7 @@ function Month({ day, events, rem, sel, onDay, onPick, onMove }: { day: number; 
 }
 
 function MiniCal({ day, week, events, onPick, onShift }: { day: number; week: number; events: Ev[]; onPick: (d: number) => void; onShift: (n: number) => void }) {
+  const NOW = useAgendaNow()
   const month = monthOf(day)
   return (
     <Card>
@@ -375,6 +394,7 @@ function EventPanel({ e, d, reminders, conflict, preparing, onCheck, onPrepare, 
   onCheck: (i: number) => void; onPrepare: () => void; onResolve: () => void; onIgnore: () => void; onEdit: () => void; onDelete: () => void
 }) {
   const [confirm, setConfirm] = useState(false)
+  const prop = usePropOf()
   const p = d && prop(d.propertyId), k = KINDS[e.kind], prep = e.prep
   const checks = checkList(e)
   const done = checks.filter((c) => c.ok).length

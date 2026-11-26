@@ -1,16 +1,25 @@
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { useState } from 'react'
-import { Sparkle, MapPin, Ruler, Bed, Tree, Lightning, CheckCircle, Warning, FileText, Phone, EnvelopeSimple, ShareNetwork, DotsThree, X, ArrowsClockwise, Eye, PencilSimple, Printer, UploadSimple, Link as LinkIcon } from '@phosphor-icons/react'
+import { Sparkle, MapPin, Ruler, Bed, Tree, Lightning, CheckCircle, Warning, FileText, Phone, EnvelopeSimple, ShareNetwork, DotsThree, X, House, ArrowsClockwise, Eye, PencilSimple, Printer, UploadSimple, Link as LinkIcon } from '@phosphor-icons/react'
 import { Card, Tabs, SoftBtn, Stagger, DELIV_TONE, IconBtn } from '../ui'
 import { Avatar, Ring, EXPO } from '../../ui/kit'
-import { DOSSIERS, DELIVERABLES, prop, agent, eur, fmt, type DelivState } from '../../data/mock'
-import { useDossiers, useFiles, useActivity, useNotes, type DocumentDoc } from '../../data/collections'
+import { DOSSIERS, DELIVERABLES, prop, eur, fmt, type DelivState } from '../../data/mock'
+import { useDossiers, useFiles, useActivity, useNotes, useAgents, useBuyers, useContacts, type DocumentDoc } from '../../data/collections'
 import { useDoc, action, uploadFile, type Doc } from '../../data/store'
 import { AsyncForm, Field, Input, Textarea, toast, errText } from '../forms'
 import { JourneyStepper, currentStep, type StepId } from '../dossier/Stepper'
 import { StepView } from '../dossier'
 import { useJourney } from '../dossier/useJourney'
+import { factSource, isDemoProperty, joinParts, estimateRange, matchBuyers, countryOf, useCurrentUserName, useMeMode, type LooseProperty } from '../dossier/facts'
+import { piecesFor, DEMO_PIECES } from '../dossier/pieces'
+import type { JourneyX } from '../dossier/prep-model'
+import { useT, type TKey } from '../../i18n'
+import { useIdentity } from '../../data/identity'
+import { figuresOf } from '../dossier/deliv-kit'
+
+const ROLES = ['vendeur', 'acquereur', 'notaire', 'diagnostiqueur', 'syndic', 'courtier', 'photographe']
+type Fact = [string, string, string]
 
 const DPE_C = { A: '#3F8F5A', B: '#6BAF5B', C: '#B8C94A', D: '#F2D43A', E: '#F0A43A', F: '#E86F3A', G: '#D4402F' }
 
@@ -87,6 +96,8 @@ function Preview({ code, onClose, state, dossierId }: { code: string; onClose: (
 
 export default function DossierDetail() {
   const { id } = useParams()
+  const { t } = useT()
+  const ident = useIdentity()
   const [dossiers] = useDossiers()
   const d = dossiers.find((x) => x.id === id) ?? DOSSIERS.find((x) => x.id === id) ?? dossiers[0]
   const [files] = useFiles()
@@ -100,31 +111,71 @@ export default function DossierDetail() {
     setUploading(true)
     try { for (const f of Array.from(list)) { if (f.size > 8e6) throw new Error(`${f.name} dépasse 8 Mo`); await uploadFile(f, d.id) } toast(`${list.length} pièce(s) déposée(s)`) } catch (x) { toast(errText(x), 'error') } finally { setUploading(false) }
   }
-  const p = prop(d.propertyId), a = agent(d.agentId)
+  const p = prop(d.propertyId), lp = p as LooseProperty
+  const [agents] = useAgents()
+  const [buyers] = useBuyers()
+  const [contacts] = useContacts()
+  const a = agents.find((x) => x.id === d.agentId)
+  const mode = useMeMode()
+  const userName = useCurrentUserName()
+  const demo = isDemoProperty(lp, mode)
+  const src = (legacy: string) => factSource(lp, demo, legacy, t)
+  const gallery = (p.gallery ?? []).filter(Boolean)
+  const l7 = useDoc<DocumentDoc & Doc>('documents', `${d.id}-L7`)
+  const range = estimateRange(lp, l7?.range)
+  const compFig = figuresOf(l7 ?? undefined).find((f) => /^Compar/i.test(f.label))
+  const compCount = compFig ? Number(compFig.value) || 0 : demo ? 5 : 0
+  const people = [
+    { n: d.seller, r: t('dd.sellers'), ph: d.sellerPhoto ?? (demo ? '/img/p-paul.webp' : undefined) },
+    ...(a ? [{ n: a.name, r: t('dd.owner', { role: a.role }), ph: a.photo }] : []),
+    ...contacts.filter((c) => c.dossiers?.includes(d.id)).map((c) => ({ n: c.name, r: c.roles.map((x) => (ROLES.includes(x) ? t(`dd.role.${x}` as TKey) : x)).join(' · ') || t('dd.contact'), ph: c.photo })),
+  ].filter((x, i, xs) => x.n && xs.findIndex((y) => y.n === x.n) === i)
+  const matches = matchBuyers(buyers, lp).slice(0, 3)
+  const facts: Fact[] = [
+    ...(p.type ? [['Type', p.type, src('Mandat')] as Fact] : []),
+    ...(p.surface ? [['Surface habitable', `${p.surface} m²`, src('Plan géomètre')] as Fact] : []),
+    ...(p.land ? [['Terrain', `${fmt(p.land)} m²`, src('Cadastre PCI')] as Fact] : demo ? [['Terrain', '—', 'Cadastre PCI'] as Fact] : []),
+    ...(p.rooms ? [['Pièces', String(p.rooms), src('Découverte')] as Fact] : []),
+    ...(p.year ? [['Année', String(p.year), src('Acte')] as Fact] : []),
+    ...(demo ? [['Taxe foncière', '6 840 €', 'Avis 2025'] as Fact] : []),
+  ]
   const [tab, setTab] = useState<'parcours' | 'bien' | 'documents' | 'journal'>('parcours')
   const { journey, save } = useJourney(d.id)
   const [step, setStep] = useState<StepId>(() => currentStep(d))
   const [open, setOpen] = useState<string | null>(null)
   const [photo, setPhoto] = useState(0)
   const ready = Object.values(d.deliverables).filter((s) => s === 'done').length
+  // Pièces : liste historique figée en démo, liste générée (pays, type, régime) et état enregistré sur le parcours sinon.
+  const jx = journey as JourneyX | undefined
+  const country = countryOf(lp, ident.country)
+  const pieces = demo ? [] : piecesFor(country, lp, jx?.discovery?.regime?.v ?? '')
+  const got = jx?.prep?.pieces ?? {}
+  const received = pieces.filter((x) => got[x.key]).length
+  const togglePiece = async (key: string) => {
+    if (!jx) return
+    try { await save({ prep: { ...(jx.prep ?? {}), pieces: { ...got, [key]: !got[key] } } } as Partial<JourneyX>) } catch (x) { toast(errText(x), 'error') }
+  }
+  const pieceCount = demo ? DEMO_PIECES.length : pieces.length
 
   return (
     <div>
       {/* Bandeau photo */}
       <Stagger>
         <div className="theme-dark relative -mx-4 -mt-8 h-[46vh] min-h-[360px] overflow-hidden md:mx-0 md:mt-0 md:rounded-[2rem]">
-          <AnimatePresence mode="popLayout"><motion.img key={photo} src={p.gallery[photo]} alt={p.title} initial={{ opacity: 0, scale: 1.06 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.1, ease: EXPO }} className="absolute inset-0 h-full w-full object-cover" /></AnimatePresence>
+          {gallery[photo] || p.photo
+            ? <AnimatePresence mode="popLayout"><motion.img key={photo} src={gallery[photo] ?? p.photo} alt={p.title} initial={{ opacity: 0, scale: 1.06 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.1, ease: EXPO }} className="absolute inset-0 h-full w-full object-cover" /></AnimatePresence>
+            : <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-ink-800 via-ink-850 to-champagne-700/40"><div className="flex flex-col items-center gap-2 pb-24 text-bone/35"><House size={56} weight="thin" /><span className="text-[11px] uppercase tracking-eyebrow">Aucune photo pour l’instant</span></div></div>}
           <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-ink/10" />
           <div className="absolute right-5 top-5 flex gap-2"><IconBtn label="Partager"><ShareNetwork size={15} /></IconBtn><IconBtn label="Plus"><DotsThree size={15} weight="bold" /></IconBtn></div>
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-5 p-6 md:flex-row md:items-end md:justify-between md:p-8">
             <div>
               <div className="flex flex-wrap items-center gap-2 text-[11px]"><span className="num rounded-full bg-ink/60 px-2.5 py-1 backdrop-blur">{d.ref}</span>{d.mandate && <span className="rounded-full bg-champagne px-2.5 py-1 font-medium text-ink">Mandat {d.mandate.toLowerCase()}</span>}{d.tags.map((t) => <span key={t} className="rounded-full bg-white/10 px-2.5 py-1 backdrop-blur">{t}</span>)}</div>
               <h1 className="display mt-3 text-4xl md:text-6xl">{p.title}</h1>
-              <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px] text-bone/70"><span className="flex items-center gap-1.5"><MapPin size={14} />{p.address}, {p.city}</span><span className="flex items-center gap-1.5"><Ruler size={14} />{p.surface} m²</span><span className="flex items-center gap-1.5"><Bed size={14} />{p.rooms} pièces</span>{p.land && <span className="flex items-center gap-1.5"><Tree size={14} />{fmt(p.land)} m²</span>}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px] text-bone/70"><span className="flex items-center gap-1.5"><MapPin size={14} />{joinParts(p.address, p.city) || 'Localisation non renseignée'}</span>{!!p.surface && <span className="flex items-center gap-1.5"><Ruler size={14} />{p.surface} m²</span>}{!!p.rooms && <span className="flex items-center gap-1.5"><Bed size={14} />{p.rooms} pièces</span>}{p.land && <span className="flex items-center gap-1.5"><Tree size={14} />{fmt(p.land)} m²</span>}</div>
             </div>
             <div className="flex items-end gap-4">
-              <div className="flex gap-1.5">{p.gallery.map((g, i) => <button key={g} onClick={() => setPhoto(i)} className={`h-12 w-16 overflow-hidden rounded-lg ring-2 transition ${i === photo ? 'ring-champagne' : 'ring-transparent opacity-60 hover:opacity-100'}`}><img src={g} alt="" className="h-full w-full object-cover" /></button>)}</div>
-              <div className="text-right"><div className="text-[11px] text-mist">Prix de présentation</div><div className="display text-4xl">{eur(p.price)}</div></div>
+              <div className="flex gap-1.5">{gallery.map((g, i) => <button key={g} onClick={() => setPhoto(i)} className={`h-12 w-16 overflow-hidden rounded-lg ring-2 transition ${i === photo ? 'ring-champagne' : 'ring-transparent opacity-60 hover:opacity-100'}`}><img src={g} alt="" className="h-full w-full object-cover" /></button>)}</div>
+              <div className="text-right"><div className="text-[11px] text-mist">{t('dd.presPrice')}</div><div className="display text-4xl">{eur(p.price)}</div></div>
             </div>
           </div>
         </div>
@@ -137,7 +188,7 @@ export default function DossierDetail() {
 
       <div className="mt-6 grid gap-6 xl:grid-cols-12">
         <div className="space-y-6 xl:col-span-8">
-          <Stagger i={2}><Tabs id="dossier" value={tab} onChange={setTab} items={[{ id: 'parcours', label: 'Parcours vendeur', count: ready }, { id: 'bien', label: 'Bien' }, { id: 'documents', label: 'Pièces', count: 11 + myFiles.length }, { id: 'journal', label: 'Journal', count: myLog.length }]} /></Stagger>
+          <Stagger i={2}><Tabs id="dossier" value={tab} onChange={setTab} items={[{ id: 'parcours', label: t('dd.tab.journey'), count: ready }, { id: 'bien', label: t('dd.tab.property') }, { id: 'documents', label: t('dd.tab.docs'), count: pieceCount + myFiles.length }, { id: 'journal', label: t('dd.tab.log'), count: myLog.length }]} /></Stagger>
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.4, ease: EXPO }} className="space-y-6">
               {tab === 'parcours' && journey && <StepView step={step} dossier={d} journey={journey} save={save} openDeliverable={setOpen} goTo={setStep} />}
@@ -145,37 +196,56 @@ export default function DossierDetail() {
                 <div className="grid gap-6 md:grid-cols-2">
                   <Card title="Caractéristiques" kicker="Origine et validation par champ">
                     <dl className="space-y-2.5 text-[13px]">
-                      {[['Type', p.type, 'Mandat'], ['Surface habitable', `${p.surface} m²`, 'Plan géomètre'], ['Terrain', p.land ? `${fmt(p.land)} m²` : '—', 'Cadastre PCI'], ['Pièces', String(p.rooms), 'Découverte'], ['Année', String(p.year), 'Acte'], ['Taxe foncière', '6 840 €', 'Avis 2025']].map(([k, v, s]) => <div key={k} className="flex items-center justify-between gap-4 border-b border-white/[0.04] pb-2.5 last:border-0"><dt className="text-mist">{k}</dt><dd className="flex items-center gap-2">{v}<span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] text-mist">{s}</span></dd></div>)}
+                      {facts.map(([k, v, s]) => <div key={k} className="flex items-center justify-between gap-4 border-b border-white/[0.04] pb-2.5 last:border-0"><dt className="text-mist">{k}</dt><dd className="flex items-center gap-2">{v}<span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] text-mist">{s}</span></dd></div>)}
+                      {!p.year && !demo && <div className="flex items-center justify-between gap-4 pt-0.5"><dt className="text-mist">Année</dt><dd className="italic text-mist">non renseigné</dd></div>}
                     </dl>
                   </Card>
-                  <Card title="Performance énergétique" kicker="DPE · valide jusqu’au 03/2032">
-                    <div className="space-y-1.5">{(Object.keys(DPE_C) as (keyof typeof DPE_C)[]).map((k, i) => <div key={k} className="flex items-center gap-3"><div className="flex h-7 items-center rounded-r-full pl-3 text-[12px] font-semibold text-ink" style={{ width: `${34 + i * 9}%`, background: DPE_C[k] }}>{k}</div>{p.dpe === k && <span className="num text-[12px] text-champagne-300">← 74 kWh/m²/an</span>}</div>)}</div>
-                    <div className="mt-4 flex flex-wrap gap-1.5">{p.features.map((f) => <span key={f} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[11.5px] ring-1 ring-white/[0.07]">{f}</span>)}</div>
+                  <Card title="Performance énergétique" kicker={demo ? 'DPE · valide jusqu’au 03/2032' : p.dpe ? `DPE · classe ${p.dpe} · ${src('')}` : 'DPE non renseigné'}>
+                    <div className="space-y-1.5">{(Object.keys(DPE_C) as (keyof typeof DPE_C)[]).map((k, i) => <div key={k} className="flex items-center gap-3"><div className="flex h-7 items-center rounded-r-full pl-3 text-[12px] font-semibold text-ink" style={{ width: `${34 + i * 9}%`, background: DPE_C[k] }}>{k}</div>{p.dpe === k && <span className="num text-[12px] text-champagne-300">{demo ? '← 74 kWh/m²/an' : '←'}</span>}</div>)}</div>
+                    <div className="mt-4 flex flex-wrap gap-1.5">{(p.features ?? []).map((f) => <span key={f} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[11.5px] ring-1 ring-white/[0.07]">{f}</span>)}</div>
                   </Card>
                 </div>
               )}
               {tab === 'documents' && (
-                <Card title="Pièces du dossier" kicker="L9 · checklist conditionnelle" action={<label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white/[0.04] px-4 py-2 text-[13px] font-medium ring-1 ring-white/[0.08] transition hover:bg-white/[0.08]"><UploadSimple size={14} />{uploading ? 'Dépôt…' : 'Déposer'}<input type="file" multiple className="sr-only" onChange={(e) => { onUpload(e.currentTarget.files); e.currentTarget.value = '' }} /></label>}>
+                <Card title={t('pc.title')} kicker={demo ? t('pc.kicker') : `${t('pc.kicker')} · ${t('pc.progress', { a: received, b: pieces.length })}`} action={<label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white/[0.04] px-4 py-2 text-[13px] font-medium ring-1 ring-white/[0.08] transition hover:bg-white/[0.08]"><UploadSimple size={14} />{uploading ? t('pc.uploading') : t('pc.upload')}<input type="file" multiple className="sr-only" onChange={(e) => { onUpload(e.currentTarget.files); e.currentTarget.value = '' }} /></label>}>
                   {myFiles.length > 0 && (
                     <div className="mb-4 space-y-2">
-                      <div className="text-[10.5px] uppercase tracking-eyebrow text-mist">Déposées dans Jaspe</div>
+                      <div className="text-[10.5px] uppercase tracking-eyebrow text-mist">{t('pc.inJaspe')}</div>
                       {myFiles.map((f) => <a key={f.id} href={`/api/files/${f.id}/raw`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl bg-champagne/[0.06] px-3.5 py-3 ring-1 ring-champagne/20 transition hover:bg-champagne/10"><FileText size={18} weight="light" className="text-champagne-300" /><span className="flex-1 truncate text-[13px]">{f.name}</span><span className="num text-[11px] text-mist">{Math.max(1, Math.round(f.size / 1024))} Ko</span></a>)}
                     </div>
                   )}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {[['Titre de propriété', 'ok', 'p.1-14'], ['DPE', 'ok', 'p.2'], ['Diagnostic amiante', 'ok', 'p.1'], ['Électricité / gaz', 'ok', 'p.3'], ['Termites', 'ok', 'p.1'], ['ERP · risques', 'ok', 'Géorisques'], ['Taxe foncière 2025', 'ok', 'p.1'], ['PV d’AG 2025', 'missing', '—'], ['Règlement ASL', 'check', 'à vérifier'], ['Plans', 'ok', '3 pages'], ['Permis piscine', 'check', 'à vérifier']].map(([n, s, r]) => (
-                      <div key={n} className="flex items-center gap-3 rounded-xl bg-white/[0.02] px-3.5 py-3 ring-1 ring-white/[0.05]">
-                        <FileText size={18} weight="light" className="text-bone/50" /><span className="flex-1 text-[13px]">{n}</span>
-                        <span className="text-[11px] text-mist">{r}</span>
-                        {s === 'ok' ? <CheckCircle size={16} weight="fill" className="text-sage" /> : s === 'missing' ? <span className="rounded-full bg-coral/15 px-2 py-0.5 text-[10.5px] text-coral">Manquant</span> : <span className="rounded-full bg-champagne/15 px-2 py-0.5 text-[10.5px] text-champagne-300">À vérifier</span>}
+                  {demo ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {DEMO_PIECES.map(([n, s, r]) => (
+                        <div key={n} className="flex items-center gap-3 rounded-xl bg-white/[0.02] px-3.5 py-3 ring-1 ring-white/[0.05]">
+                          <FileText size={18} weight="light" className="text-bone/50" /><span className="flex-1 text-[13px]">{n}</span>
+                          <span className="text-[11px] text-mist">{r}</span>
+                          {s === 'ok' ? <CheckCircle size={16} weight="fill" className="text-sage" /> : s === 'missing' ? <span className="rounded-full bg-coral/15 px-2 py-0.5 text-[10.5px] text-coral">{t('pc.missing')}</span> : <span className="rounded-full bg-champagne/15 px-2 py-0.5 text-[10.5px] text-champagne-300">{t('pc.check')}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {pieces.map((x) => {
+                          const on = !!got[x.key]
+                          return (
+                            <button key={x.key} type="button" onClick={() => togglePiece(x.key)} aria-pressed={on} title={on ? t('pc.markMissing') : t('pc.markReceived')} className={`flex items-center gap-3 rounded-xl px-3.5 py-3 text-left ring-1 transition ${on ? 'bg-sage/[0.06] ring-sage/20' : 'bg-white/[0.02] ring-white/[0.05] hover:bg-white/[0.04]'}`}>
+                              <FileText size={18} weight="light" className="shrink-0 text-bone/50" />
+                              <span className="min-w-0 flex-1"><span className="block text-[13px]">{x.label}</span>{(x.ref || x.when) && <span className="block truncate text-[10.5px] text-mist">{[x.ref, x.when].filter(Boolean).join(' · ')}</span>}</span>
+                              {on ? <span className="flex shrink-0 items-center gap-1 text-[10.5px] text-sage"><CheckCircle size={16} weight="fill" />{t('pc.received')}</span> : <span className="shrink-0 rounded-full bg-coral/15 px-2 py-0.5 text-[10.5px] text-coral">{t('pc.missing')}</span>}
+                            </button>
+                          )
+                        })}
                       </div>
-                    ))}
-                  </div>
+                      <p className="mt-3 text-[11px] text-mist">* {t('pc.footnote')}</p>
+                    </>
+                  )}
                 </Card>
               )}
               {tab === 'journal' && (
                 <Card title="Journal du dossier" kicker="Chaque action, sa source, son auteur">
-                  <AsyncForm submitLabel="Ajouter la note" onSubmit={async (v) => { if (!v.text?.trim()) throw new Error('Note vide'); await noteOps.create({ dossierId: d.id, text: v.text.trim(), at: new Date().toISOString(), by: 'Claire Delmas' }); (document.getElementById('note-text') as HTMLTextAreaElement | null)?.form?.reset() }}>
+                  <AsyncForm submitLabel="Ajouter la note" onSubmit={async (v) => { if (!v.text?.trim()) throw new Error('Note vide'); await noteOps.create({ dossierId: d.id, text: v.text.trim(), at: new Date().toISOString(), by: userName ?? 'Conseiller' }); (document.getElementById('note-text') as HTMLTextAreaElement | null)?.form?.reset() }}>
                     <Textarea id="note-text" name="text" rows={2} placeholder="Consigner un échange, une décision du vendeur…" />
                   </AsyncForm>
                   <div className="mt-6">
@@ -195,26 +265,34 @@ export default function DossierDetail() {
         <div className="space-y-6 xl:col-span-4">
           <Stagger i={3}>
             <Card>
-              <div className="flex items-center gap-4"><Ring value={d.progress} size={64} stroke={4}><span className="num text-sm">{d.progress}%</span></Ring><div><div className="text-[11px] uppercase tracking-eyebrow text-mist">Prochaine action</div><div className="mt-1 text-[15px]">{d.next}</div><div className="text-[12px] text-champagne-300">{d.due}</div></div></div>
-              <div className="mt-5 grid grid-cols-3 gap-2">{[[Phone, 'Appeler'], [EnvelopeSimple, 'Écrire'], [Eye, 'Portail']].map(([I, l]) => { const Ic = I as typeof Phone; return <button key={l as string} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white/[0.03] py-3 text-[11.5px] text-bone/75 ring-1 ring-white/[0.06] transition hover:bg-white/[0.06]"><Ic size={17} weight="light" />{l as string}</button> })}</div>
+              <div className="flex items-center gap-4"><Ring value={d.progress} size={64} stroke={4}><span className="num text-sm">{d.progress}%</span></Ring><div><div className="text-[11px] uppercase tracking-eyebrow text-mist">{t('dd.next')}</div><div className="mt-1 text-[15px]">{d.next}</div><div className="text-[12px] text-champagne-300">{d.due}</div></div></div>
+              <div className="mt-5 grid grid-cols-3 gap-2">{[[Phone, t('dd.call')], [EnvelopeSimple, t('dd.write')], [Eye, t('dd.portal')]].map(([I, l]) => { const Ic = I as typeof Phone; return <button key={l as string} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white/[0.03] py-3 text-[11.5px] text-bone/75 ring-1 ring-white/[0.06] transition hover:bg-white/[0.06]"><Ic size={17} weight="light" />{l as string}</button> })}</div>
             </Card>
           </Stagger>
           <Stagger i={4}>
-            <Card title="Estimation" kicker="L7 · à valider">
-              <div className="display text-4xl">{eur(p.estimateLow)} – {eur(p.estimateHigh)}</div>
-              <div className="relative mt-4 h-1.5 rounded-full bg-white/10"><div className="absolute inset-y-0 rounded-full bg-gradient-to-r from-champagne-700 to-champagne" style={{ left: '20%', right: '15%' }} /><div className="absolute -top-1.5 h-4 w-0.5 rounded bg-bone" style={{ left: '58%' }} /></div>
-              <div className="mt-2 flex justify-between text-[11px] text-mist"><span>Prix présenté {eur(p.price)}</span><span>5 comparables</span></div>
+            <Card title={t('dd.est.title')} kicker={t('dd.est.kicker')}>
+              {range ? (
+                <>
+                  <div className="display text-4xl">{eur(range[0])} – {eur(range[1])}</div>
+                  <div className="relative mt-4 h-1.5 rounded-full bg-white/10"><div className="absolute inset-y-0 rounded-full bg-gradient-to-r from-champagne-700 to-champagne" style={{ left: '20%', right: '15%' }} /><div className="absolute -top-1.5 h-4 w-0.5 rounded bg-bone" style={{ left: '58%' }} /></div>
+                </>
+              ) : (
+                <div><div className="display text-3xl text-bone/70">{t('dd.est.empty')}</div><p className="mt-2 text-[12.5px] text-mist">{t('dd.est.emptyHint')}</p></div>
+              )}
+              <div className="mt-2 flex justify-between gap-3 text-[11px] text-mist"><span>{p.price ? t('dd.est.price', { p: eur(p.price) }) : t('dd.est.noPrice')}</span><span>{compCount ? t('dd.est.comps', { n: compCount }) : t('dd.est.noComps')}</span></div>
             </Card>
           </Stagger>
           <Stagger i={5}>
-            <Card title="Personnes">
-              {[[d.seller, 'Vendeurs · décideurs', '/img/p-paul.webp'], [a.name, `${a.role} · responsable`, a.photo], ['Inès Morel', 'Coordination transaction', '/img/p-ines.webp'], ['Me Faure', 'Notaire vendeur', '/img/p-marc.webp']].map(([n, r, ph]) => <div key={n} className="flex items-center gap-3 border-b border-white/[0.04] py-2.5 last:border-0"><Avatar src={ph} size={34} /><div className="min-w-0 flex-1"><div className="truncate text-[13px]">{n}</div><div className="text-[11px] text-mist">{r}</div></div><LinkIcon size={14} className="text-mist" /></div>)}
+            <Card title={t('dd.people')}>
+              {people.map(({ n, r, ph }) => <div key={n} className="flex items-center gap-3 border-b border-white/[0.04] py-2.5 last:border-0"><Avatar src={ph} name={n} size={34} /><div className="min-w-0 flex-1"><div className="truncate text-[13px]">{n}</div><div className="text-[11px] text-mist">{r}</div></div><LinkIcon size={14} className="text-mist" /></div>)}
             </Card>
           </Stagger>
           <Stagger i={6}>
-            <Card title="Acquéreurs compatibles" kicker="L3 · matching expliqué">
-              {[['Family Office L.', 97], ['M. Keller', 81], ['M. Serrano', 64]].map(([n, v]) => <div key={n as string} className="flex items-center gap-3 py-2"><span className="flex-1 text-[13px]">{n}</span><div className="h-1 w-24 rounded-full bg-white/10"><div className="h-1 rounded-full bg-champagne" style={{ width: `${v}%` }} /></div><span className="num w-8 text-right text-[12px]">{v}</span></div>)}
-              <Link to="/app/acquereurs" className="mt-3 block text-[12px] text-champagne-300">Voir le matching →</Link>
+            <Card title={t('dd.buyers')} kicker={t('dd.buyers.kicker')}>
+              {buyers.length === 0 && <p className="py-2 text-[13px] text-mist">{t('dd.buyers.none')}</p>}
+              {buyers.length > 0 && matches.length === 0 && <p className="py-2 text-[13px] text-mist">{t('dd.buyers.noMatch')}</p>}
+              {matches.map(({ b, score: v }) => <div key={b.id} className="flex items-center gap-3 py-2"><span className="flex-1 truncate text-[13px]">{b.name}</span><div className="h-1 w-24 rounded-full bg-white/10"><div className="h-1 rounded-full bg-champagne" style={{ width: `${v}%` }} /></div><span className="num w-8 text-right text-[12px]">{v}</span></div>)}
+              <Link to="/app/acquereurs" className="mt-3 block text-[12px] text-champagne-300">{t('dd.buyers.see')}</Link>
             </Card>
           </Stagger>
         </div>

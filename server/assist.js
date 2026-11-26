@@ -1,3 +1,4 @@
+import { actor } from './actor.js'
 // Assistant mesurable : temps gagné (corrections comprises), conformité FR/PT, factures de commissions,
 // plan d'action depuis un brief libre, veille marché. Code pur (aucune API Node) : il tourne aussi dans le navigateur.
 
@@ -99,7 +100,7 @@ export function planFromBrief(text, now = new Date()) {
   for (const s of sentences(text)) {
     const due = parseDue(s, now)
     const offer = /\boffre|contre-offre|proposta|contraproposta|\boferta/i.test(s)
-    if (/rappel|relanc|recontact|appeler|t[ée]l[ée]phoner|revenir vers|ligar|telefonar|contactar|voltar a falar/i.test(s)) {
+    if (/rappel|relanc|recontact|appeler|t[ée]l[ée]phoner|revenir vers|ligar|\bligo\b|ligarei|telefonar|telefono|contactar|contacto o|voltar a falar|volto a falar/i.test(s)) {
       const cond = s.match(/(?:apr[èe]s|depois d[oa]s?) (?:le |la |l’|l'|les )?([^,.]+)/i)?.[1]
       add({ type: 'relance', label: `Relancer le ${who(s)}${cond ? ` après ${cond.trim()}` : ''}`, due: due ?? later(2), source: s })
     }
@@ -115,6 +116,19 @@ export function planFromBrief(text, now = new Date()) {
     if (/factur|commission|honoraires? (?:à|a) encaisser|fatura|comiss[ãa]o/i.test(s)) add({ type: 'facture', label: 'Préparer la facture de commission', source: s })
     if (AML.test(s) && !items.some((x) => x.type === 'conformite')) add({ type: 'conformite', label: 'Vigilance LCB-FT : vérifier identité, bénéficiaire effectif et origine des fonds, consigner l’analyse de risque', source: s })
     if (/visite|rendez-vous|\brdv|visita|reuni[ãa]o|contre-visite/i.test(s) && due && !/rappel|relanc|ligar|telefonar/i.test(s) && !offer) add({ type: 'tache', label: `Organiser : ${s.replace(/\s+/g, ' ').slice(0, 90)}`, due, source: s })
+  }
+  // Fiche parcours : une relance vendeur garde le prix à confirmer dans le dossier et propose de surveiller
+  // les comparables jusqu’à l’appel (une baisse de prix sera signalée). La veille reste à cocher.
+  const callBack = items.find((x) => x.type === 'relance' && /vendeur|vendedor|propri/i.test(x.source ?? ''))
+  // Brief dicté en portugais : libellés en portugais pour les actions de rappel.
+  const pt = /\b(ao|vendedor|ligo|ligar|depois|amanh[ãa]|sexta|segunda)\b/i.test(text) && !/\b(le|la|les|vendeur|après)\b/i.test(text)
+  if (pt) for (const it of items) if (it.type === 'relance') {
+    const cond = it.source?.match(/depois d[oa]s? ([^,.]+)/i)?.[1]
+    it.label = `Ligar ao ${/comprador/i.test(it.source ?? '') ? 'comprador' : 'vendedor'}${cond ? ` depois do ${cond.trim()}` : ''}`
+  }
+  if (callBack) {
+    if (!items.some((x) => x.type === 'point' && /prix|pre[çc]o/i.test(x.label))) add({ type: 'point', label: pt ? 'Preço a confirmar na chamada' : 'Prix à confirmer lors de l’appel', source: callBack.source, suggested: true })
+    if (!items.some((x) => x.type === 'veille')) items.push({ id: `pl${items.length + 1}`, selected: false, type: 'veille', label: pt ? 'Acompanhar os comparáveis até à chamada (descida de preço assinalada)' : 'Surveiller les comparables jusqu’à l’appel (baisse de prix signalée)', source: callBack.source, suggested: true })
   }
   return items
 }
@@ -202,7 +216,7 @@ export function createAssist(db, deps = {}) {
       const samples = { ...cur.samples, [kind]: [...(cur.samples?.[kind] ?? []), Number(minutes)].slice(-20) }
       const values = { ...cur.values, [kind]: median(samples[kind]) }
       const s = put('settings', { id: 'time-baselines', values, samples })
-      activity('Claire Delmas', `a chronométré « ${KIND_LABELS[kind]} » fait à la main : ${minutes} min (référence ${values[kind]} min)`, 'neutral', '/app/temps')
+      activity(actor(), `a chronométré « ${KIND_LABELS[kind]} » fait à la main : ${minutes} min (référence ${values[kind]} min)`, 'neutral', '/app/temps')
       return s
     },
     'time.reset': ({ kind }) => {
@@ -218,11 +232,11 @@ export function createAssist(db, deps = {}) {
       const cur = db.get('compliance', `cmp-${dossierId}`) ?? evaluate(dossierId)
       if (!cur.items.some((i) => i.id === itemId)) throw new HttpError(404, 'Point de contrôle inconnu')
       if (state === 'ok' && !String(evidence).trim()) throw new HttpError(400, 'Indiquez la preuve ou la référence du document')
-      const items = cur.items.map((i) => (i.id === itemId ? { ...i, state, evidence, auto: false, by: 'Claire Delmas', updatedAt: new Date().toISOString() } : i))
+      const items = cur.items.map((i) => (i.id === itemId ? { ...i, state, evidence, auto: false, by: actor(), updatedAt: new Date().toISOString() } : i))
       put('compliance', { ...cur, items })
       // Journal horodaté en ajout seul (export de contrôle du Pack Preuves).
       const before = cur.items.find((i) => i.id === itemId)
-      put('cmplog', { dossierId, at: new Date().toISOString(), by: 'Claire Delmas', kind: 'checklist', itemId, from: before.state, to: state, what: `« ${before.label.split(' (')[0].slice(0, 80)} » : ${before.state} → ${state}${evidence ? ` — ${String(evidence).slice(0, 200)}` : ''}` })
+      put('cmplog', { dossierId, at: new Date().toISOString(), by: actor(), kind: 'checklist', itemId, from: before.state, to: state, what: `« ${before.label.split(' (')[0].slice(0, 80)} » : ${before.state} → ${state}${evidence ? ` — ${String(evidence).slice(0, 200)}` : ''}` })
       if (state === 'ok') logTime({ kind: 'conformite', dossierId, ref: `cmp-${dossierId}-${itemId}`, spent: 2, label: `Conformité : ${cur.items.find((i) => i.id === itemId).label.slice(0, 60)}` })
       return evaluate(dossierId)
     },
@@ -327,7 +341,7 @@ export function createAssist(db, deps = {}) {
       if (inv.status !== 'brouillon') return inv
       const number = nextNumber()
       addSpent(`inv-${id}`, REVIEW_MIN, false, { settle: true })
-      activity('Claire Delmas', `a validé la facture ${number} (${inv.ttc.toLocaleString('fr-FR')} € TTC)`, 'win', '/app/factures')
+      activity(actor(), `a validé la facture ${number} (${inv.ttc.toLocaleString('fr-FR')} € TTC)`, 'win', '/app/factures')
       return patch('invoices', id, { number, status: 'validée', validatedAt: new Date().toISOString() })
     },
     'invoice.send': ({ id }) => {
@@ -381,7 +395,7 @@ export function createAssist(db, deps = {}) {
           done.push({ ...it, result: 'checklist de conformité mise à jour' })
         }
       }
-      if (text && d) put('notes', { dossierId, text: `Brief : ${String(text).slice(0, 600)}`, at: new Date().toISOString(), by: 'Claire Delmas' }, { front: true })
+      if (text && d) put('notes', { dossierId, text: `Brief : ${String(text).slice(0, 600)}`, at: new Date().toISOString(), by: actor() }, { front: true })
       activity('Copilote', `a lancé ${done.length} action(s) depuis un brief — ${who}`, 'ai', d ? `/app/dossiers/${dossierId}` : '/app/taches')
       run('AUT-120', 'ok', `${done.length} action(s) créée(s) depuis un brief — ${who}`)
       return { done }
@@ -389,7 +403,7 @@ export function createAssist(db, deps = {}) {
 
     'feedback.send': ({ text, page, mood }) => {
       if (!String(text ?? '').trim()) throw new HttpError(400, 'Retour vide')
-      return put('feedback', { text: String(text).slice(0, 2000), page, mood, at: new Date().toISOString(), by: 'Claire Delmas' }, { front: true })
+      return put('feedback', { text: String(text).slice(0, 2000), page, mood, at: new Date().toISOString(), by: actor() }, { front: true })
     },
   }
 

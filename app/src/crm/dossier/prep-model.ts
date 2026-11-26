@@ -1,6 +1,7 @@
 // Extraction de champs D5 depuis un débrief vocal : règles simples et explicables, chaque proposition est validée par le conseiller.
 // ponytail: regex sur le texte, pas de NLP — suffisant pour un débrief dicté ; brancher le copilote serveur si le rappel devient trop faible.
 import type { Journey } from '../../data/dossier'
+import type { TFn, TKey } from '../../i18n'
 
 export type Proposal = { key: string; value: string; why: string }
 
@@ -65,11 +66,21 @@ export function extractFields(text: string): Proposal[] {
 // ——— Modèle partagé Préparation / Découverte ———
 
 /** Sections du parcours ajoutées par la préparation (stockées dans `journey`, fusion superficielle). */
-export type PrepState = { checklist?: Record<string, boolean>; identityConfirmed?: boolean; custom?: string[] }
+export type PrepState = { checklist?: Record<string, boolean>; identityConfirmed?: boolean; custom?: string[]; pieces?: Record<string, boolean> }
 export type JourneyX = Journey & { prep?: PrepState; photoRooms?: Record<string, string> }
 
 /** Champs sans lesquels L1–L9 ne peuvent pas être fiables. */
 export const CRITICAL = ['motivation', 'horizon', 'decideurs', 'prixSouhaite', 'surface', 'pieces', 'dpe', 'regime', 'taxeFonciere'] as const
+
+/** Portugal : mêmes champs D5 stockés (regime, taxeFonciere), libellés locaux, plus la licença de utilização. */
+export const CRITICAL_PT = ['motivation', 'horizon', 'decideurs', 'prixSouhaite', 'regime', 'taxeFonciere', 'licenca'] as const
+const PT_ALIAS: Record<string, string> = { regime: 'regimePT', taxeFonciere: 'imi' }
+const tx = (t: TFn, key: string, fallback: string) => { const s = t(key as TKey); return s === key ? fallback : s }
+
+/** Libellé traduit d’un champ D5, adapté au pays du bien (repli : libellé historique). */
+export const fieldLabel = (t: TFn, k: string, country: 'FR' | 'PT', fallback?: string) => tx(t, `prep.f.${country === 'PT' ? PT_ALIAS[k] ?? k : k}`, fallback ?? k)
+/** Question ouverte traduite d’un champ D5, adaptée au pays (repli : QUESTIONS en français). */
+export const questionOf = (t: TFn, k: string, country: 'FR' | 'PT') => tx(t, `prep.q.${country === 'PT' ? PT_ALIAS[k] ?? k : k}`, QUESTIONS[k] ?? '')
 
 /** Question ouverte à poser pour chaque champ du guide D5. */
 export const QUESTIONS: Record<string, string> = {

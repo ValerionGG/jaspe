@@ -180,3 +180,29 @@ test('panel clients : portugais, offre, signaux LCB-FT, dates locales, faux posi
   e = db.list('timelog').find((x) => x.ref === 'doc-d1-L7')
   assert.equal(e.pending, false); assert.equal(e.net, 42)
 })
+
+test('AUT-010 : prépare une seule fois, n’écrase pas un brouillon à valider, ne boucle pas sur un livrable bloqué', async () => {
+  const { db, engine } = createApp({ dbPath: ':memory:', delay: () => Promise.resolve() })
+  db.put('properties', { id: 'px', title: 'Moradia T5', city: 'Cascais', surface: 310, price: 2.4e6, dpe: 'C' })
+  db.put('dossiers', { id: 'dx', seller: 'Família Teste', propertyId: 'px', agentId: 'a1', stage: 'prep', deliverables: {} })
+  await engine.tick(['AUT-010'], true)
+  await new Promise((r) => setTimeout(r, 30))
+  const v1 = db.list('documents').filter((d) => d.dossierId === 'dx').map((d) => `${d.code}:${d.version}`).sort()
+  await engine.tick(['AUT-010'], true)
+  await engine.tick(['AUT-010'], true)
+  await new Promise((r) => setTimeout(r, 30))
+  const v3 = db.list('documents').filter((d) => d.dossierId === 'dx').map((d) => `${d.code}:${d.version}`).sort()
+  assert.ok(v1.length > 0, 'préparé au premier passage')
+  assert.deepEqual(v3, v1, 'aucune nouvelle version aux passages suivants')
+})
+
+test('fiche parcours : « je rappelle le vendeur vendredi après le diagnostic » → relance datée, prix à confirmer, veille proposée (FR et PT)', async () => {
+  const { planFromBrief } = await import('./assist.js')
+  const now = new Date(2026, 10, 26, 10) // jeudi
+  const fr = planFromBrief('Je rappelle le vendeur vendredi après le diagnostic.', now)
+  assert.deepEqual(fr.map((i) => i.type), ['relance', 'point', 'veille'])
+  assert.equal(fr[0].due, '2026-11-27'); assert.equal(fr[2].selected, false, 'la veille reste à cocher')
+  const pt = planFromBrief('Ligo ao vendedor na sexta-feira depois do certificado energético.', now)
+  assert.deepEqual(pt.map((i) => i.type), ['relance', 'point', 'veille'])
+  assert.match(pt[0].label, /^Ligar ao vendedor depois do certificado/); assert.equal(pt[0].due, '2026-11-27')
+})

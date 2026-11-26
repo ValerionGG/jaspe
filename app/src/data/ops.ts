@@ -206,7 +206,7 @@ export type Tx = {
   conditions: { k: string; l: string; owner: string; due: string; s: CondState; proof?: string; relance?: string }[]
   pieces: { l: string; s: 'reçue' | 'demandée' | 'manquante'; from: string }[]
   fees: number; feePayer: 'acquéreur' | 'vendeur'; split: { agency: string; pct: number; role: string }[]
-  deposit: number; sign: { m: number; d: number; h: number; label: string; place: string }
+  deposit: number; sign: { m: number; d: number; h: number; y?: number; label: string; place: string }
 }
 
 export const TXS: Tx[] = [

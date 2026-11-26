@@ -8,7 +8,7 @@ import { action } from '../../data/store'
 import { live } from '../../data/live'
 import { useConversations, useMessages, useReminders, useTemplates, useContacts } from '../../data/collections'
 import type { Channel } from '../../data/messaging'
-import { CH, waiting, me, type Conv, type Msg } from '../messages/shared'
+import { CH, waiting, useSelf, type Conv, type Msg } from '../messages/shared'
 import Inbox from '../messages/Inbox'
 import Reminders from '../messages/Reminders'
 import Templates from '../messages/Templates'
@@ -93,6 +93,7 @@ function SimulateModal({ open, onClose, current, onDone }: { open: boolean; onCl
 function NewConvModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (id: string) => void }) {
   const [, ops] = useConversations()
   const [contacts] = useContacts()
+  const me = useSelf()
   const [channel, setChannel] = useState<Channel>('whatsapp')
   return (
     <Modal open={open} onClose={onClose} title="Nouvelle conversation" kicker="Contact du registre">

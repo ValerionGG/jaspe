@@ -89,7 +89,7 @@ export default function StepMandate({ dossier, journey, save, goTo }: StepProps)
       <Stagger i={0}>
         <StepHead n={4} kicker="Mandat" progress={prog} next={next}
           title={<>Mandat <span className="italic text-champagne-300">{(m.type || 'à définir').toLowerCase()}</span></>}
-          sub={`${p.title} · ${p.address}, ${p.city} — mandant : ${dossier.seller}`}
+          sub={`${p.title} · ${[p.address, p.city].filter(Boolean).join(', ')} — mandant : ${dossier.seller}`}
           aside={<>{eff.inferred && <Pill tone="amber">Reconstitué depuis l’étape du dossier</Pill>}<Pill tone={saved.signature === 'signé' ? 'green' : saved.signature === 'envoyé' ? 'blue' : 'neutral'}>{saved.signature}</Pill>{saved.registry && <Pill tone="gold">{saved.registry}</Pill>}<Pill>{eur(m.price)}</Pill></>} />
       </Stagger>
 
@@ -196,7 +196,7 @@ export default function StepMandate({ dossier, journey, save, goTo }: StepProps)
             <h3 className="mt-5 font-serif text-[1.9rem] leading-tight">Mandat de vente {m.type ? m.type.toLowerCase() : '—'}</h3>
             <p className="mt-1 text-[12px] text-ink/55">Loi n° 70-9 du 2 janvier 1970 (Hoguet) et décret n° 72-678 du 20 juillet 1972</p>
             <div className="mt-5 grid gap-5 text-[13px] leading-relaxed text-ink/80 md:grid-cols-2">
-              <div><Eyebrow className="!text-ink/50">Mandant</Eyebrow><p className="mt-1">{dossier.seller}<br />{p.address}, {p.city}</p></div>
+              <div><Eyebrow className="!text-ink/50">Mandant</Eyebrow><p className="mt-1">{dossier.seller}<br />{[p.address, p.city].filter(Boolean).join(', ')}</p></div>
               <div><Eyebrow className="!text-ink/50">Mandataire</Eyebrow><p className="mt-1">Maison Riviera · Antibes — carte CPI 0605 2026 000 041 · représentée par {a.name}, {a.role.toLowerCase()}</p></div>
               <div><Eyebrow className="!text-ink/50">Désignation du bien</Eyebrow><p className="mt-1">{p.type} · {p.title}, {journey.discovery.surface?.v ?? p.surface} m² {p.type === 'Appartement' ? 'loi Carrez' : 'habitables'}{p.land ? ` sur ${p.land.toLocaleString('fr-FR')} m² de terrain` : ''} · {p.rooms} pièces · DPE {dpe}</p></div>
               <div><Eyebrow className="!text-ink/50">Prix et honoraires</Eyebrow><p className="mt-1">Prix de présentation {money(m.price)}. Honoraires {m.feesPct.toLocaleString('fr-FR')} % TTC soit {money(fees)}, à la charge de l’{m.feesPayer}.</p></div>

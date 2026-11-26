@@ -15,7 +15,7 @@ import { DELIVERABLES } from '../../data/mock'
 import type { Template } from '../../data/messaging'
 import {
   CH, rel, time, dayLabel, longDate, until, localInput, windowOpen, waiting, waitLabel, useConvContext, fill, missingVars, translate, isEnglish, useTags, useOutside,
-  ChannelBadge, ConvAvatar, TagChip, Menu, menuItem, eyebrow, me, type Conv, type Msg,
+  ChannelBadge, ConvAvatar, TagChip, Menu, menuItem, eyebrow, useSelf, type Conv, type Msg,
 } from './shared'
 import { SnoozeMenu } from './Context'
 
@@ -32,6 +32,7 @@ export default function Thread({ conv, messages, onBack, onContext, onMobileCont
   const [, msgOps] = useMessages()
   const [agents] = useAgents()
   const [tags] = useTags()
+  const me = useSelf()
   const { contact, property, vars } = useConvContext(conv)
   const [tagOpen, setTagOpen] = useState(false)
   const [snooze, setSnooze] = useState(false)

@@ -8,7 +8,7 @@ import { createApp } from './index.js'
 const PW = 'motdepasse-solide'
 
 async function boot(opts = {}) {
-  const app = createApp({ auth: true, dataDir: ':memory:', filesDir: join(tmpdir(), 'jaspe-test-files'), delay: () => Promise.resolve(), env: {}, fetch: () => { throw new Error('aucun appel réseau attendu') }, ...opts })
+  const app = createApp({ auth: true, dataDir: ':memory:', filesDir: join(tmpdir(), 'jaspe-test-files'), delay: () => Promise.resolve(), env: { JASPE_BETA: '0' }, fetch: () => { throw new Error('aucun appel réseau attendu') }, ...opts })
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r))
   const base = `http://127.0.0.1:${app.server.address().port}/api`
   /** Client avec son propre cookie de session. */
@@ -171,15 +171,15 @@ test('limite de dossiers actifs : 402 au-delà, lecture seule après retour à D
     assert.equal(over.status, 402); assert.match(over.json.error, /Découverte comprend 1 dossier actif/)
     const orgId = (await c.call('GET', '/me')).json.org.id
     app.accounts.updateOrg(orgId, { plan: 'solo', status: 'active' })
-    for (let i = 0; i < 7; i++) assert.equal((await c.call('POST', '/dossiers', { seller: `S${i}`, stage: 'rdv' })).status, 201)
-    assert.equal((await c.call('POST', '/dossiers', { seller: 'Neuvième', stage: 'rdv' })).status, 402, 'Solo : 8 dossiers actifs')
+    for (let i = 0; i < 19; i++) assert.equal((await c.call('POST', '/dossiers', { seller: `S${i}`, stage: 'rdv' })).status, 201)
+    assert.equal((await c.call('POST', '/dossiers', { seller: 'Vingt-et-unième', stage: 'rdv' })).status, 402, 'Solo : 20 dossiers actifs')
     const me = await c.call('GET', '/me')
-    assert.equal(me.json.usage.dossiers, 8); assert.equal(me.json.limits.dossiers, 8)
+    assert.equal(me.json.usage.dossiers, 20); assert.equal(me.json.limits.dossiers, 20)
 
     // Impayé : retour à Découverte, données conservées, dossiers au-delà du quota en lecture seule.
     app.accounts.updateOrg(orgId, { status: 'past_due' })
     const list = (await c.call('GET', '/dossiers')).json
-    assert.equal(list.length, 8, 'aucune donnée supprimée')
+    assert.equal(list.length, 20, 'aucune donnée supprimée')
     const [first, second] = list
     assert.equal((await c.call('PATCH', `/dossiers/${first.id}`, { next: 'ok' })).status, 200, 'le premier dossier reste modifiable')
     const ro = await c.call('PATCH', `/dossiers/${second.id}`, { next: 'refusé' })
@@ -200,4 +200,22 @@ test('mode démonstration inchangé : /api/me signale la démo, pas de comptes',
     assert.equal((await fetch(`${base}/billing/checkout`, { method: 'POST', body: '{}' })).status, 503)
     assert.equal((await fetch(`${base}/dossiers`)).status, 200, 'API ouverte comme avant')
   } finally { await new Promise((r) => app.server.close(r)) }
+})
+
+test('bêta sans paiement : sans clé Stripe, offre « Bêta gratuite » sans quota et profil au nom du compte', async () => {
+  const app = await boot({ env: {} })
+  try {
+    const c = app.client()
+    const r = await register(c, 'beta@x.fr')
+    assert.equal(r.status, 201)
+    assert.equal(r.json.plan.id, 'beta'); assert.equal(r.json.billing.beta, true); assert.equal(r.json.limits.dossiers, null)
+    for (const seller of ['Un', 'Deux', 'Trois']) assert.equal((await c.call('POST', '/dossiers', { seller, stage: 'prep' })).status < 300, true, `dossier ${seller}`)
+    const profile = (await c.call('GET', '/settings')).json.find((s) => s.id === 'profile')
+    assert.equal(profile.name, 'Anne Martin'); assert.equal(profile.email, 'beta@x.fr')
+    assert.doesNotMatch(JSON.stringify(profile), /Delmas/)
+    // Auteur des actions = utilisateur connecté (jamais le personnage de démo).
+    assert.equal((await c.call('POST', '/actions/feedback.send', { text: 'Test auteur', page: '/app' })).status < 300, true)
+    const fb = (await c.call('GET', '/feedback')).json.find((f) => f.text === 'Test auteur')
+    assert.equal(fb.by, 'Anne Martin')
+  } finally { await app.close() }
 })

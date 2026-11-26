@@ -37,7 +37,7 @@ function MiniToday() {
           <img src={img('villa-pool')} alt="" className="h-28 w-full object-cover" />
           <div className="p-3">
             <div className="text-[12.5px] font-medium">Villa contemporaine vue mer</div>
-            <div className="mt-2 grid grid-cols-7 gap-1">{['D1', 'D2', 'D3', 'D5', 'L1', 'L7', 'L9'].map((c, i) => <span key={c} className={`rounded-md py-1 text-center text-[9.5px] ${i < 5 ? 'bg-sage/15 text-sage' : i === 5 ? 'bg-champagne/20 text-champagne-300' : 'bg-coral/15 text-coral'}`}>{c}</span>)}</div>
+            <div className="mt-2 grid grid-cols-7 gap-1">{['Brief', 'Marché', 'Quartier', 'Débrief', 'Merci', 'Estim.', 'Copro'].map((c, i) => <span key={c} className={`truncate rounded-md py-1 text-center text-[9px] ${i < 5 ? 'bg-sage/15 text-sage' : i === 5 ? 'bg-champagne/20 text-champagne-300' : 'bg-coral/15 text-coral'}`}>{c}</span>)}</div>
           </div>
         </div>
         <div className="rounded-2xl bg-white/[0.03] p-3 ring-1 ring-white/[0.05]">
@@ -46,7 +46,7 @@ function MiniToday() {
         </div>
         <div className="rounded-2xl bg-white/[0.03] p-3 ring-1 ring-white/[0.05]">
           <div className="mb-2 flex items-center justify-between text-[11px] text-mist"><span>À valider</span><span className="num text-champagne-300">4</span></div>
-          {[['L7 · Estimation Martin', '14:00'], ['D5 · Débrief Haddad', 'Maintenant'], ['L4 · Kit social Costa', 'Aujourd’hui']].map(([a, b]) => (
+          {[['Estimation Martin', '14:00'], ['Compte rendu Haddad', 'Maintenant'], ['Kit social Costa', 'Aujourd’hui']].map(([a, b]) => (
             <div key={a} className="flex items-center justify-between border-t border-white/[0.05] py-2 text-[12px]"><span className="flex items-center gap-2"><Sparkle size={11} className="text-champagne" weight="fill" />{a}</span><span className="text-mist">{b}</span></div>
           ))}
         </div>
@@ -197,21 +197,21 @@ export function Bento() {
             <Bezel className="h-full" coreClassName="flex flex-col">
               <div className="flex-1"><BeforeAfter /></div>
               <div className="flex items-end justify-between gap-4 p-6">
-                <div><Pill tone="gold">L8 · Avant / après</Pill><h3 className="display mt-3 text-3xl md:text-4xl">Projeter sans tromper.</h3><p className="mt-2 max-w-md text-[13.5px] text-bone/60">Structure, ouvertures et volumes préservés. Décoration et travaux distingués, budget daté, original toujours accessible.</p></div>
+                <div><Pill tone="gold">Avant / après</Pill><h3 className="display mt-3 text-3xl md:text-4xl">Projeter sans tromper.</h3><p className="mt-2 max-w-md text-[13.5px] text-bone/60">Structure, ouvertures et volumes préservés. Décoration et travaux distingués, budget daté, original toujours accessible.</p></div>
               </div>
             </Bezel>
           </Reveal>
           <Reveal delay={0.08} className="md:col-span-5">
             <Bezel className="h-full" coreClassName="p-6">
-              <div className="flex items-center justify-between"><Pill tone="gold">L7 · Estimation argumentée</Pill><span className="num text-[11px] text-mist">5 comparables DVF</span></div>
+              <div className="flex items-center justify-between"><Pill tone="gold">Estimation argumentée</Pill><span className="num text-[11px] text-mist">5 comparables DVF</span></div>
               <div className="mt-4 flex items-baseline gap-3"><span className="display text-5xl">4,60 – 5,15</span><span className="text-bone/50">M€</span></div>
               <EstimationChart />
-              <p className="text-[12.5px] text-bone/55">Une fourchette qui reflète l’incertitude réelle — pas un chiffre arbitraire.</p>
+              <p className="text-[12.5px] text-bone/55">Une fourchette qui reflète l’incertitude réelle — pas un chiffre arbitraire. Même méthode pour un T3 à 280 k€ : 268 – 292 k€, 6 comparables.</p>
             </Bezel>
           </Reveal>
           <Reveal delay={0.14} className="md:col-span-5">
             <Bezel className="h-full" coreClassName="p-6">
-              <div className="flex items-center justify-between"><Pill tone="gold"><Microphone size={11} /> D5 · Débrief vocal</Pill><span className="num text-[11px] text-sage">● 01:48</span></div>
+              <div className="flex items-center justify-between"><Pill tone="gold"><Microphone size={11} /> Débrief vocal</Pill><span className="num text-[11px] text-sage">● 01:48</span></div>
               <div className="mt-5 flex h-12 items-center gap-[3px]">{Array.from({ length: 56 }).map((_, i) => <span key={i} className="flex-1 animate-wave rounded-full bg-bone/70" style={{ height: `${18 + ((i * 53) % 82)}%`, animationDelay: `${(i % 14) * 0.07}s` }} />)}</div>
               <div className="mt-5 flex flex-wrap gap-2">
                 {['Surface 286 m²', 'Piscine à débordement', 'Départ juin 2027', 'Exclusivité envisagée', 'DPE B'].map((c, i) => (
@@ -222,7 +222,7 @@ export function Bento() {
           </Reveal>
           <Reveal delay={0.06} className="md:col-span-4">
             <Bezel className="h-full" coreClassName="relative p-6">
-              <Pill tone="gold"><FileMagnifyingGlass size={11} /> L9 · Copro & diagnostics</Pill>
+              <Pill tone="gold"><FileMagnifyingGlass size={11} /> Copro & diagnostics</Pill>
               <div className="theme-dark relative mx-auto mt-5 h-40 w-32 overflow-hidden rounded-lg bg-bone-100 p-3 shadow-float">
                 {Array.from({ length: 11 }).map((_, i) => <div key={i} className="mb-1.5 h-1 rounded bg-ink/15" style={{ width: `${55 + ((i * 29) % 45)}%` }} />)}
                 <div className="absolute inset-x-0 top-0 h-6 animate-scan bg-gradient-to-b from-transparent via-champagne/50 to-transparent" />
@@ -235,7 +235,7 @@ export function Bento() {
           </Reveal>
           <Reveal delay={0.12} className="md:col-span-4">
             <Bezel className="h-full" coreClassName="relative p-6">
-              <Pill tone="gold">L4 · Kit social</Pill>
+              <Pill tone="gold">Kit social</Pill>
               <div className="group relative mt-6 flex h-48 items-center justify-center">
                 {[{ i: InstagramLogo, r: -10, x: -40, p: 'villa-pool' }, { i: LinkedinLogo, r: 0, x: 0, p: 'int-dining' }, { i: FacebookLogo, r: 10, x: 40, p: 'int-living' }].map((c, k) => (
                   <div key={k} className="absolute w-28 overflow-hidden rounded-xl bg-ink-700 shadow-float ring-1 ring-white/10 transition-all duration-700 ease-silk group-hover:translate-x-[var(--gx)] group-hover:rotate-[var(--gr)]" style={{ transform: `translateX(${c.x * 0.4}px) rotate(${c.r * 0.5}deg)`, ['--gx' as string]: `${c.x * 1.6}px`, ['--gr' as string]: `${c.r}deg`, zIndex: k === 1 ? 2 : 1 }}>
@@ -248,7 +248,7 @@ export function Bento() {
           </Reveal>
           <Reveal delay={0.18} className="md:col-span-4">
             <Bezel className="h-full" coreClassName="relative overflow-hidden p-6">
-              <Pill tone="gold">L3 · Matching acquéreurs</Pill>
+              <Pill tone="gold">Acquéreurs compatibles</Pill>
               <div className="mt-5 space-y-3">
                 {[['Family Office L.', 97, 'p-paul'], ['M. & Mme Verdier', 94, 'p-julien'], ['M. Keller', 88, 'p-thomas']].map(([n, v, p]) => (
                   <div key={n as string} className="flex items-center gap-3"><Avatar src={img(p as string)} size={34} /><div className="flex-1"><div className="text-[13px]">{n}</div><div className="text-[11px] text-mist">Budget, zone et financement compatibles</div></div><Ring value={v as number} size={40}><span className="num text-[10px]">{v}</span></Ring></div>

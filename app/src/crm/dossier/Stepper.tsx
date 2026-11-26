@@ -6,6 +6,7 @@ import { CheckCircle, ArrowRight } from '@phosphor-icons/react'
 import { EXPO } from '../../ui/kit'
 import { DISCOVERY_BLOCKS, type Journey } from '../../data/dossier'
 import type { Dossier, Stage } from '../../data/mock'
+import { useT } from '../../i18n'
 
 export type StepId = 'prep' | 'discovery' | 'deliverables' | 'mandate' | 'marketing' | 'offers' | 'closing' | 'after'
 export const STEPS: { id: StepId; label: string; caption: string; stages: Stage[] }[] = [
@@ -44,6 +45,8 @@ export function stepProgress(d: Dossier, j: Journey): Record<StepId, number> {
 export const currentStep = (d: Dossier): StepId => STEPS.find((s) => s.stages.includes(d.stage))?.id ?? 'prep'
 
 export function JourneyStepper({ dossier, journey, step, onStep }: { dossier: Dossier; journey: Journey; step: StepId; onStep: (s: StepId) => void }) {
+  const { t } = useT()
+  const lab = (id: StepId) => t(`jr.step.${id}`), cap = (id: StepId) => t(`jr.cap.${id}`)
   const prog = stepProgress(dossier, journey)
   const cur = STEPS.findIndex((s) => s.id === currentStep(dossier))
   const sel = STEPS.findIndex((s) => s.id === step)
@@ -55,11 +58,11 @@ export function JourneyStepper({ dossier, journey, step, onStep }: { dossier: Do
       <div className="flex flex-wrap items-center gap-3 rounded-[1.4rem] bg-ink-800/80 px-4 py-3 shadow-bezel ring-1 ring-white/[0.06]">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-champagne text-ink"><span className="num text-[13px]">{sel + 1}</span></span>
         <div className="min-w-0 flex-1">
-          <div className="text-[13.5px]">{s.label} <span className="num text-[11.5px] text-mist">· {prog[s.id]} %</span></div>
-          <div className="text-[11.5px] text-mist">Étape {sel + 1} sur {STEPS.length}{cur !== sel ? ` · en cours : ${STEPS[cur].label}` : ''}</div>
+          <div className="text-[13.5px]">{lab(s.id)} <span className="num text-[11.5px] text-mist">· {prog[s.id]} %</span></div>
+          <div className="text-[11.5px] text-mist">{t('jr.stepOf', { i: sel + 1, n: STEPS.length })}{cur !== sel ? t('jr.inProgress', { s: lab(STEPS[cur].id) }) : ''}</div>
         </div>
-        {sel < STEPS.length - 1 && <button onClick={() => onStep(next.id)} className="flex items-center gap-1.5 text-[12.5px] text-champagne-300 transition hover:gap-2.5">{next.label} <ArrowRight size={13} /></button>}
-        <button onClick={() => setFull(true)} className="text-[12px] text-bone/60 underline-offset-2 hover:text-bone hover:underline">Voir les {STEPS.length} étapes</button>
+        {sel < STEPS.length - 1 && <button onClick={() => onStep(next.id)} className="flex items-center gap-1.5 text-[12.5px] text-champagne-300 transition hover:gap-2.5">{lab(next.id)} <ArrowRight size={13} /></button>}
+        <button onClick={() => setFull(true)} className="text-[12px] text-bone/60 underline-offset-2 hover:text-bone hover:underline">{t('jr.seeAll', { n: STEPS.length })}</button>
       </div>
     )
   }
@@ -74,17 +77,17 @@ export function JourneyStepper({ dossier, journey, step, onStep }: { dossier: Do
             const r = 19, c = 2 * Math.PI * r
             return (
               <li key={s.id} className="relative z-10 flex w-[12%] flex-col items-center text-center">
-                <button onClick={() => onStep(s.id)} aria-current={active ? 'step' : undefined} aria-label={`${s.label} — ${p} %`} className="group flex flex-col items-center">
+                <button onClick={() => onStep(s.id)} aria-current={active ? 'step' : undefined} aria-label={`${lab(s.id)} — ${p} %`} className="group flex flex-col items-center">
                   <span className={clsx('relative flex h-11 w-11 items-center justify-center rounded-full transition-all duration-500 ease-silk', active ? 'bg-champagne text-ink shadow-glow' : done ? 'bg-sage/15 text-sage' : 'bg-ink-700 text-bone/60 group-hover:text-bone')}>
                     <svg className="absolute inset-0 -rotate-90" width="44" height="44" aria-hidden>
                       <circle cx="22" cy="22" r={r} fill="none" stroke="rgb(var(--tint) / .08)" strokeWidth="2" />
                       <motion.circle cx="22" cy="22" r={r} fill="none" stroke={active ? 'rgb(var(--ink-900) / .35)' : done ? 'rgb(var(--sage))' : 'rgb(var(--acc-500))'} strokeWidth="2" strokeLinecap="round" strokeDasharray={c} initial={{ strokeDashoffset: c }} animate={{ strokeDashoffset: c * (1 - p / 100) }} transition={{ duration: 1.1, ease: EXPO, delay: 0.1 + i * 0.05 }} />
                     </svg>
                     {done && !active ? <CheckCircle size={18} weight="fill" /> : <span className="num relative text-[13px]">{i + 1}</span>}
-                    {isCur && !active && <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-coral ring-2 ring-ink-800" title="Étape en cours" />}
+                    {isCur && !active && <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-coral ring-2 ring-ink-800" title={t('jr.current')} />}
                   </span>
-                  <span className={clsx('mt-2.5 text-[12.5px] leading-tight', active ? 'text-bone' : 'text-bone/70')}>{s.label}</span>
-                  <span className="mt-0.5 text-[10.5px] text-mist">{s.caption}</span>
+                  <span className={clsx('mt-2.5 text-[12.5px] leading-tight', active ? 'text-bone' : 'text-bone/70')}>{lab(s.id)}</span>
+                  <span className="mt-0.5 text-[10.5px] text-mist">{cap(s.id)}</span>
                   <span className={clsx('num mt-1 text-[10.5px]', done ? 'text-sage' : 'text-mist')}>{p} %</span>
                 </button>
               </li>
@@ -94,8 +97,8 @@ export function JourneyStepper({ dossier, journey, step, onStep }: { dossier: Do
       </div>
       {sel < STEPS.length - 1 && (
         <div className="flex items-center justify-between gap-3 px-5 py-3 text-[12.5px]">
-          <span className="text-mist">Étape en cours : <span className="text-bone">{STEPS[cur].label}</span>{cur !== sel && <> · vous consultez <span className="text-champagne-300">{STEPS[sel].label}</span></>}</span>
-          <button onClick={() => onStep(STEPS[Math.min(sel + 1, STEPS.length - 1)].id)} className="flex items-center gap-1.5 text-champagne-300 transition hover:gap-2.5">Étape suivante <ArrowRight size={13} /></button>
+          <span className="text-mist">{t('jr.currentL')}<span className="text-bone">{lab(STEPS[cur].id)}</span>{cur !== sel && <> · {t('jr.viewing')} <span className="text-champagne-300">{lab(STEPS[sel].id)}</span></>}</span>
+          <button onClick={() => onStep(STEPS[Math.min(sel + 1, STEPS.length - 1)].id)} className="flex items-center gap-1.5 text-champagne-300 transition hover:gap-2.5">{t('jr.next')} <ArrowRight size={13} /></button>
         </div>
       )}
     </div>

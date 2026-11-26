@@ -4,6 +4,7 @@ import { createMessaging } from './messaging.js'
 import { createAssist, REVIEW_MIN, CORRECTION_MIN } from './assist.js'
 import { createImporter } from './importer.js'
 import { createInvoicing } from './invoicing.js'
+import { actor } from './actor.js'
 
 const L_CODES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9']
 const hhmm = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -79,7 +80,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
     ...createInvoicing(db, { put, patch, activity, HttpError }).actions,
     'deliverable.generate': ({ dossierId, code }) => generate(dossierId, code),
     'deliverable.generateAll': ({ dossierId, codes }) => generateAll(dossierId, codes),
-    'deliverable.validate': ({ dossierId, code, by = 'Claire Delmas', reviewSec }) => {
+    'deliverable.validate': ({ dossierId, code, by = actor(), reviewSec }) => {
       const c = ctx(dossierId)
       assist.addSpent(`doc-${dossierId}-${code}`, reviewSec ? Math.round(reviewSec / 6) / 10 : REVIEW_MIN, false, { settle: true })
       const doc = db.get('documents', `${dossierId}-${code}`)
@@ -98,7 +99,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       }
       return { ok: true, outbox }
     },
-    'deliverable.reject': ({ dossierId, code, reason }) => { setDeliv(dossierId, code, 'blocked'); activity('Claire Delmas', `a renvoyé ${code} en correction : ${reason ?? 'sans motif'}`, 'warn'); return { ok: true } },
+    'deliverable.reject': ({ dossierId, code, reason }) => { setDeliv(dossierId, code, 'blocked'); activity(actor(), `a renvoyé ${code} en correction : ${reason ?? 'sans motif'}`, 'warn'); return { ok: true } },
     'deliverable.edit': ({ dossierId, code, body, subject, editSec }) => {
       const doc = db.get('documents', `${dossierId}-${code}`)
       if (!doc) throw new HttpError(404, 'Document introuvable')
@@ -111,7 +112,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       // Fin du rendez-vous vendeur : point de départ du délai « compte rendu < 24 h ».
       const d = patch('dossiers', id, stage === 'post' && before && !before.rdvEndedAt ? { stage, rdvEndedAt: new Date().toISOString() } : { stage })
       if (!d) throw new HttpError(404, 'Dossier introuvable')
-      activity('Claire Delmas', `a déplacé ${d.seller} vers « ${stage} »`, 'neutral', `/app/dossiers/${id}`)
+      activity(actor(), `a déplacé ${d.seller} vers « ${stage} »`, 'neutral', `/app/dossiers/${id}`)
       if (stage === 'post' && enabled('AUT-024')) generateAll(id).catch(() => {})
       if (stage === 'mandat') {
         put('tasks', { title: `Planifier shooting photo & visite 3D — ${d.seller}`, dossier: id, due: 'Sous 72 h', prio: 'haute', kind: 'document', ai: true, done: false }, { front: true })
@@ -125,7 +126,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       if (!q) throw new HttpError(404, 'Élément introuvable')
       if (q.code && q.dossier && decision === 'validé' && db.get('documents', `${q.dossier}-${q.code}`)) { const r = actions['deliverable.validate']({ dossierId: q.dossier, code: q.code }); db.remove('queue', id); emit('queue', id); return r }
       db.remove('queue', id); emit('queue', id)
-      activity('Claire Delmas', `${decision} : ${q.title}`, 'win')
+      activity(actor(), `${decision} : ${q.title}`, 'win')
       return { ok: true }
     },
     /** AUT-001 / AUT-003 : un lead entrant devient contact + tâche affectée au secteur. */
@@ -136,7 +137,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       put('tasks', { title: `Rappeler ${name} (${org ?? 'organisation ?'})${phone ? ` au ${phone}` : ''} — ${size ?? 'demande de démo'}`, due: 'Sous 2 h', prio: 'haute', kind: 'appeler', ai: true, done: false, leadId: lead.id }, { front: true })
       notify('Nouveau lead', `${name} · ${org ?? ''} demande une démonstration`, 'win', '/app/contacts')
       run('AUT-001', 'ok', `Lead reçu une fois — ${email}`, 12)
-      run('AUT-003', 'ok', 'Affecté à Claire Delmas (secteur Antibes)', 8)
+      run('AUT-003', 'ok', `Affecté à ${actor()}`, 8)
       activity('Routine AUT-001', `nouveau lead : ${name} — ${org ?? ''}`, 'win', '/app/contacts')
       return lead
     },
@@ -157,7 +158,8 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       const day = new Date().toISOString().slice(0, 10)
       if (db.get('documents', `brief-${day}`)) return ['skip', 'Brief du jour déjà prêt']
       const tasks = db.list('tasks').filter((t) => !t.done), q = db.list('queue')
-      assist.logTime({ kind: 'brief', ref: `brief-${day}` })
+      // Rien à résumer (base vide) : aucun temps gagné compté, sinon on gonfle la mesure.
+      if (q.length + tasks.length + db.list('dossiers').length > 0) assist.logTime({ kind: 'brief', ref: `brief-${day}` })
       put('documents', { id: `brief-${day}`, code: 'BRIEF', title: 'Brief du matin', kind: 'report', createdAt: new Date().toISOString(), body: [`${q.length} décision(s) en attente, ${tasks.length} tâche(s) ouvertes.`, ...q.slice(0, 3).map((x) => `• ${x.title}`)], sources: [{ label: 'Tâches, file de validation, agenda', date: day }] })
       return ['ok', `Brief prêt : ${q.length} validations, ${tasks.length} tâches`]
     },
@@ -189,8 +191,11 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
       return [fresh.length ? 'ok' : 'skip', `${offers.length} offre(s) suivie(s)`]
     },
     'AUT-010': () => { // préparation avant RDV : D1–D3 des dossiers en préparation
-      const prep = db.list('dossiers').filter((d) => d.stage === 'prep' && ['D1', 'D2', 'D3'].some((k) => d.deliverables?.[k] !== 'done' && d.deliverables?.[k] !== 'review'))
-      prep.forEach((d) => ['D1', 'D2', 'D3'].forEach((k) => d.deliverables?.[k] !== 'done' && generate(d.id, k, { quiet: true }).catch(() => {})))
+      // Seulement ce qui n’a jamais été préparé : un brouillon « à valider » n’est pas écrasé,
+      // un livrable bloqué (données manquantes) attend une relance manuelle au lieu d’être refait chaque minute.
+      const todo = (d) => ['D1', 'D2', 'D3'].filter((k) => !d.deliverables?.[k] || d.deliverables[k] === 'waiting')
+      const prep = db.list('dossiers').filter((d) => d.stage === 'prep' && todo(d).length)
+      prep.forEach((d) => todo(d).forEach((k) => generate(d.id, k, { quiet: true }).catch(() => {})))
       return [prep.length ? 'ok' : 'skip', prep.length ? `Brief préparé pour ${prep.map((d) => d.seller).join(', ')}` : 'Tous les RDV sont préparés']
     },
     'AUT-004': () => { // lead non traité

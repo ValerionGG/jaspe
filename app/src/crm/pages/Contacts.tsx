@@ -5,7 +5,9 @@ import clsx from 'clsx'
 import { MagnifyingGlass, Plus, UploadSimple, ShieldCheck, ShieldWarning, GitMerge, Phone, EnvelopeSimple, ChatCircleText, X, Check, Minus, Prohibit, Clock, MapPin, Translate, Sparkle, DownloadSimple, ArrowDownLeft, ArrowUpRight, CalendarBlank, Mailbox, PencilSimple, Trash } from '@phosphor-icons/react'
 import { PageHeader, Card, Tabs, SoftBtn, Stagger, IconBtn, Empty } from '../ui'
 import { Ring, EXPO } from '../../ui/kit'
-import { prop, type Dossier } from '../../data/mock'
+import { type Dossier } from '../../data/mock'
+import { usePropOf } from '../../data/people'
+import { useIdentity } from '../../data/identity'
 import { ROLE_L, PARTNER, CHANNELS, PURPOSES, type Contact, type Consent, type Role, type Channel } from '../../data/ops'
 import { useContacts, useDossiers } from '../../data/collections'
 import type { Doc, Ops } from '../../data/store'
@@ -36,6 +38,7 @@ function Face({ c, size = 34 }: { c: Contact; size?: number }) {
 
 export default function Contacts() {
   const [people, ops] = useContacts()
+  const propOf = usePropOf()
   const [dossiers] = useDossiers()
   const [tab, setTab] = useState<'all' | 'vendeur' | 'acquereur' | 'partner'>('all')
   const [q, setQ] = useState('')
@@ -179,7 +182,7 @@ export default function Contacts() {
                         </td>
                         <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{c.roles.map((r) => <span key={r} className={clsx('rounded-full px-2 py-px text-[10.5px] ring-1', PARTNER.includes(r) ? 'bg-sea/[0.08] text-sea ring-sea/20' : 'bg-white/[0.04] text-bone/70 ring-white/10')}>{ROLE_L[r]}</span>)}</div></td>
                         <td className="px-4 py-3">
-                          <div className="flex -space-x-2">{c.dossiers.slice(0, 3).map((id) => { const d = dossiers.find((x) => x.id === id); return d ? <img key={id} src={prop(d.propertyId).photo} title={d.ref} alt="" className="h-7 w-7 rounded-lg object-cover ring-2 ring-ink-800" /> : null })}{!c.dossiers.length && <span className="text-[11.5px] text-mist">—</span>}</div>
+                          <div className="flex -space-x-2">{c.dossiers.slice(0, 3).map((id) => { const d = dossiers.find((x) => x.id === id); const ph = d && propOf(d.propertyId)?.photo; return d ? (ph ? <img key={id} src={ph} title={d.ref} alt="" className="h-7 w-7 rounded-lg object-cover ring-2 ring-ink-800" /> : <span key={id} title={d.ref} className="h-7 w-7 rounded-lg bg-white/[0.06] ring-2 ring-ink-800" />) : null })}{!c.dossiers.length && <span className="text-[11.5px] text-mist">—</span>}</div>
                         </td>
                         <td className="px-4 py-3 text-[12px]"><div>{c.pref.ch}</div><div className="text-[11px] text-mist">{c.pref.slot}</div></td>
                         <td className="px-4 py-3">{isPartner(c) ? <span className="text-[12px] text-mist">Relation pro · B2B</span> : <span className={clsx('flex items-center gap-1.5 text-[12px]', ps.c)}><ps.I size={14} weight="light" />{ps.l}</span>}</td>
@@ -214,6 +217,7 @@ export default function Contacts() {
 }
 
 function ContactForm({ c, dossiers, onSave, onCancel }: { c?: C; dossiers: Dossier[]; onSave: (p: Partial<Contact>) => Promise<void>; onCancel: () => void }) {
+  const who = useIdentity()
   return (
     <AsyncForm submitLabel={c ? 'Enregistrer' : 'Créer le contact'} success={c ? 'Fiche mise à jour' : 'Contact créé · consentements à recueillir'} onCancel={onCancel} onSubmit={async (v) => {
       const fd = (n: string) => Array.from(document.querySelectorAll<HTMLInputElement>(`[data-ct-form] input[name="${n}"]:checked`)).map((x) => x.value)
@@ -229,9 +233,9 @@ function ContactForm({ c, dossiers, onSave, onCancel }: { c?: C; dossiers: Dossi
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nom complet"><Input name="name" required defaultValue={c?.name} placeholder="Hélène Martin" /></Field>
           <Field label="Société / étude"><Input name="org" defaultValue={c?.org} placeholder="Facultatif" /></Field>
-          <Field label="Téléphone"><Input name="phone" type="tel" defaultValue={c?.phone} placeholder="+33 6 …" /></Field>
+          <Field label="Téléphone"><Input name="phone" type="tel" defaultValue={c?.phone} placeholder={who.real && who.country === 'PT' ? '+351 9 …' : '+33 6 …'} /></Field>
           <Field label="Email"><Input name="email" type="email" defaultValue={c?.email} /></Field>
-          <Field label="Ville"><Input name="city" defaultValue={c?.city} placeholder="Antibes" /></Field>
+          <Field label="Ville"><Input name="city" defaultValue={c?.city} placeholder={who.real ? 'Ville' : 'Antibes'} /></Field>
           {c && <Field label="Score relation (0–100)"><Input name="score" type="number" min={0} max={100} defaultValue={c.score} /></Field>}
         </div>
         <Field label="Rôles">
@@ -261,6 +265,7 @@ function ContactForm({ c, dossiers, onSave, onCancel }: { c?: C; dossiers: Dossi
 
 function Sheet({ c, people, dossiers, ops, onClose, onMerge, onOpen, onEdit }: { c: C; people: C[]; dossiers: Dossier[]; ops: Ops<C>; onClose: () => void; onMerge: (dup: C, main: C) => Promise<void>; onOpen: (id: string) => void; onEdit: () => void }) {
   const [tab, setTab] = useState<'apercu' | 'echanges' | 'rgpd'>('apercu')
+  const propOf = usePropOf()
   const [cell, setCell] = useState<{ ch: Channel; p: string } | null>(null)
   const [adding, setAdding] = useState(false)
   const [opp, setOpp] = useState(false)
@@ -340,10 +345,10 @@ function Sheet({ c, people, dossiers, ops, onClose, onMerge, onOpen, onEdit }: {
                 <div className="mb-2.5 text-[10.5px] uppercase tracking-eyebrow text-mist">Dossiers liés</div>
                 {c.dossiers.length ? (
                   <div className="space-y-2">
-                    {c.dossiers.map((id) => { const d = dossiers.find((x) => x.id === id); if (!d) return null; const p = prop(d.propertyId); return (
+                    {c.dossiers.map((id) => { const d = dossiers.find((x) => x.id === id); if (!d) return null; const p = propOf(d.propertyId); return (
                       <Link key={id} to={`/app/dossiers/${id}`} className="group flex items-center gap-3 rounded-2xl bg-white/[0.025] p-2.5 ring-1 ring-white/[0.05] transition hover:ring-champagne/30">
-                        <img src={p.photo} alt="" className="h-12 w-16 rounded-xl object-cover" />
-                        <div className="min-w-0 flex-1"><div className="truncate text-[13px]">{p.title}</div><div className="flex items-center gap-1 text-[11px] text-mist"><MapPin size={10} />{p.district} · {d.ref}</div></div>
+                        {p ? <img src={p.photo} alt="" className="h-12 w-16 rounded-xl object-cover" /> : <span className="h-12 w-16 shrink-0 rounded-xl bg-white/[0.04]" />}
+                        <div className="min-w-0 flex-1"><div className="truncate text-[13px]">{p?.title ?? d.seller}</div><div className="flex items-center gap-1 text-[11px] text-mist"><MapPin size={10} />{p ? `${p.district} · ` : ''}{d.ref}</div></div>
                         <span className="hidden pr-2 text-[11px] text-mist group-hover:text-champagne-300 sm:block">{d.next}</span>
                       </Link>
                     ) })}

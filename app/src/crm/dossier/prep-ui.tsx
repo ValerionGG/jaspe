@@ -7,6 +7,7 @@ import { DELIVERABLES, type DelivState } from '../../data/mock'
 import { action } from '../../data/store'
 import type { DocumentDoc } from '../../data/collections'
 import { toast, errText } from '../forms'
+import { useT } from '../../i18n'
 
 export const todayFr = () => new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 export const nameOf = (code: string) => DELIVERABLES.find((x) => x.code === code)?.name ?? code
@@ -36,34 +37,37 @@ export function Sub({ title, kicker, action: act, children, className }: { title
 
 /** Sources datées d’un livrable (celles du document généré, sinon les sources prévues). */
 export function Sources({ doc, planned }: { doc?: DocumentDoc; planned: string[] }) {
+  const { t } = useT()
   const items = doc?.sources?.length ? doc.sources : planned.map((label) => ({ label, date: '' }))
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-      <span className="mr-1 flex items-center gap-1 text-mist"><Database size={12} weight="light" />Sources</span>
-      {items.map((s) => <span key={s.label} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-bone/70 ring-1 ring-white/[0.06]">{s.label}{s.date ? <span className="num text-mist"> · {s.date}</span> : <span className="text-mist"> · à consulter</span>}</span>)}
+      <span className="mr-1 flex items-center gap-1 text-mist"><Database size={12} weight="light" />{t('src.label')}</span>
+      {items.map((s) => <span key={s.label} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-bone/70 ring-1 ring-white/[0.06]">{s.label}{s.date ? <span className="num text-mist"> · {s.date}</span> : <span className="text-mist">{t('src.toCheck')}</span>}</span>)}
     </div>
   )
 }
 
 /** En-tête d’un livrable : code, nom, statut, génération ou ouverture du tiroir d’aperçu. */
-export function DelivHead({ code, state, doc, dossierId, onOpen, lead }: { code: string; state: DelivState; doc?: DocumentDoc; dossierId: string; onOpen: (c: string) => void; lead: string }) {
+export function DelivHead({ code, state, doc, dossierId, onOpen, lead, name }: { code: string; state: DelivState; doc?: DocumentDoc; dossierId: string; onOpen: (c: string) => void; lead: string; name?: string }) {
   const [busy, setBusy] = useState(false)
+  const { t } = useT()
+  const title = name ?? nameOf(code)
   const generate = async () => {
     setBusy(true)
-    try { await action('deliverable.generate', { dossierId, code }); toast(`${code} · ${nameOf(code)} généré — à relire`) } catch (x) { toast(errText(x), 'error') } finally { setBusy(false) }
+    try { await action('deliverable.generate', { dossierId, code }); toast(t('deliv.generated', { code, name: title })) } catch (x) { toast(errText(x), 'error') } finally { setBusy(false) }
   }
   const canOpen = !!doc || state === 'done' || state === 'review'
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2"><span className="num rounded-full bg-champagne/15 px-2.5 py-1 text-[12px] text-champagne-300">{code}</span><StatePill state={state} />{doc && <span className="num flex items-center gap-1 text-[11px] text-mist"><ClockCounterClockwise size={12} />v{doc.version} · {new Date(doc.createdAt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</span>}</div>
-        <h3 className="display mt-3 text-[2.1rem] md:text-[2.6rem]">{nameOf(code).split(' ').slice(0, -1).join(' ')} <span className="italic text-champagne-300">{nameOf(code).split(' ').at(-1)}</span></h3>
+        <h3 className="display mt-3 text-[2.1rem] md:text-[2.6rem]">{title.split(' ').slice(0, -1).join(' ')} <span className="italic text-champagne-300">{title.split(' ').at(-1)}</span></h3>
         <p className="mt-1.5 max-w-xl text-[13px] text-bone/55">{lead}</p>
       </div>
       <div className="flex shrink-0 gap-2">
         {canOpen
-          ? <button onClick={() => onOpen(code)} className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-4 py-2 text-[13px] font-medium ring-1 ring-white/[0.08] transition hover:bg-white/[0.08]"><ArrowUpRight size={14} />Ouvrir {code}</button>
-          : <button onClick={generate} disabled={busy || state === 'running'} className="inline-flex items-center gap-2 rounded-full bg-champagne px-4 py-2 text-[13px] font-medium text-ink ring-1 ring-champagne transition hover:bg-champagne-300 disabled:opacity-60"><Sparkle size={14} weight="fill" />{busy ? 'Génération…' : state === 'running' ? 'En cours…' : `Générer ${code}`}</button>}
+          ? <button onClick={() => onOpen(code)} className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] px-4 py-2 text-[13px] font-medium ring-1 ring-white/[0.08] transition hover:bg-white/[0.08]"><ArrowUpRight size={14} />{t('deliv.open', { code })}</button>
+          : <button onClick={generate} disabled={busy || state === 'running'} className="inline-flex items-center gap-2 rounded-full bg-champagne px-4 py-2 text-[13px] font-medium text-ink ring-1 ring-champagne transition hover:bg-champagne-300 disabled:opacity-60"><Sparkle size={14} weight="fill" />{busy ? t('deliv.generating') : state === 'running' ? t('deliv.inProgress') : t('deliv.generate', { code })}</button>}
       </div>
     </div>
   )

@@ -5,7 +5,8 @@ import clsx from 'clsx'
 import { Plus, CheckCircle, XCircle, PaperPlaneTilt, CalendarPlus, MapPin, Bell, Sparkle, Bank, Ruler, House, ShieldCheck, Clock, Lightning, PencilSimple, Trash, Warning, ArrowUpRight, CalendarX } from '@phosphor-icons/react'
 import { PageHeader, Card, Stat, Tabs, SoftBtn, IconBtn, Stagger, Heat, Empty } from '../ui'
 import { Pill, Ring, EXPO } from '../../ui/kit'
-import { eur, me, type Buyer } from '../../data/mock'
+import { eur, me as DEMO_ME, type Buyer } from '../../data/mock'
+import { useIdentity } from '../../data/identity'
 import { ZONES, WISHES, dist, type Listing } from '../../data/geo'
 import { useBuyers, useProperties, useDossiers, useEvents, type DocumentDoc } from '../../data/collections'
 import { action, useDoc, type Doc } from '../../data/store'
@@ -23,7 +24,20 @@ const initials = (n: string) => n.replace(/^(M\.|Mme|Dr\.)\s*(&\s*(Mme|M\.)\s*)?
 const wishesOf = (b: B) => b.wishes ?? WISHES[b.id] ?? []
 const modeOf = (b: B): AlertMode => b.alert ?? (b.heat === 3 ? 'instant' : 'daily')
 // ponytail: créneaux fixes de la semaine prochaine ; brancher l'agenda Google pour de vraies disponibilités vendeur
-const SLOTS = [{ l: 'Mer. 14 oct. · 10:00', day: 14, start: '10:00', end: '11:00' }, { l: 'Jeu. 15 oct. · 17:30', day: 15, start: '17:30', end: '18:30' }, { l: 'Sam. 17 oct. · 11:00', day: 17, start: '11:00', end: '12:00' }]
+type Slot = { l: string; day: number; start: string; end: string }
+const DEMO_SLOTS: Slot[] = [{ l: 'Mer. 14 oct. · 10:00', day: 14, start: '10:00', end: '11:00' }, { l: 'Jeu. 15 oct. · 17:30', day: 15, start: '17:30', end: '18:30' }, { l: 'Sam. 17 oct. · 11:00', day: 17, start: '11:00', end: '12:00' }]
+/** Compte réel : prochains mercredi, jeudi et samedi à partir d’aujourd’hui (même convention de jour que l’agenda). */
+function realSlots(): Slot[] {
+  const hours: Record<number, [string, string]> = { 3: ['10:00', '11:00'], 4: ['17:30', '18:30'], 6: ['11:00', '12:00'] }
+  const t = new Date(), out: Slot[] = []
+  for (let i = 1; out.length < 3 && i < 14; i++) {
+    const d = new Date(t.getFullYear(), t.getMonth(), t.getDate() + i), h = hours[d.getDay()]
+    if (!h) continue
+    const lbl = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/^./, (c) => c.toUpperCase())
+    out.push({ l: `${lbl} · ${h[0]}`, day: Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(2026, 9, 0)) / 864e5), start: h[0], end: h[1] })
+  }
+  return out
+}
 
 type Crit = { l: string; ok: boolean; d: string }
 /** Matching recalculé à chaque rendu sur les biens vivants : 90 pts de critères durs + 10 pts de souhaits. */
@@ -50,6 +64,8 @@ const matchesFor = (b: B, props: Listing[], min = 60) => props.filter((p) => p.s
 function L3Modal({ b, p, dossierId, onClose, onDone }: { b: B; p: Listing; dossierId?: string; onClose: () => void; onDone: (docId: string) => void }) {
   const [, ops] = useBuyers()
   const [ok, setOk] = useState([false, false, false, false])
+  const who = useIdentity()
+  const me = who.real ? { name: who.name, agency: who.orgName } : DEMO_ME
   const [busy, setBusy] = useState(false)
   const all = ok.every(Boolean)
   const send = async () => {
@@ -155,6 +171,8 @@ export default function Acquereurs() {
   const [confirmDel, setConfirmDel] = useState(false)
 
   const props = rawProps as Listing[]
+  const real = useIdentity().real
+  const SLOTS = useMemo(() => (real ? realSlots() : DEMO_SLOTS), [real])
   const b = buyers.find((x) => x.id === sel) ?? buyers[0]
   const list = buyers.filter((x) => filter === 'all' || (filter === 'hot' ? x.heat === 3 : x.financing === 'Validé'))
   const matches = useMemo(() => (b ? matchesFor(b, props).slice(0, 5) : []), [b, props])
@@ -166,7 +184,7 @@ export default function Acquereurs() {
   const l3Count = buyers.reduce((s, x) => s + Object.keys(x.l3 ?? {}).length, 0)
   const alerts = useMemo(() => buyers.filter((x) => modeOf(x) !== 'off').flatMap((x) => matchesFor(x, props, 80).slice(0, 2).filter((m) => !x.dismissed?.includes(m.p.id)).map((m) => ({ b: x, p: m.p, score: m.score, sent: !!x.l3?.[m.p.id] }))).sort((a, c) => Number(a.sent) - Number(c.sent) || c.score - a.score).slice(0, 8), [buyers, props])
 
-  const plan = async (bid: string, p: Listing, s: (typeof SLOTS)[number]) => {
+  const plan = async (bid: string, p: Listing, s: Slot) => {
     const buyer = buyers.find((x) => x.id === bid)!
     try {
       await evOps.create({ day: s.day, start: s.start, end: s.end, title: `Visite — ${p.title}`, who: `${buyer.name} · acquéreur`, place: `${p.address}, ${p.city}`, kind: 'visite', dossier: dossierOf(p.id), source: 'nxt', buyerId: bid, propertyId: p.id } as never)
@@ -182,7 +200,7 @@ export default function Acquereurs() {
   const l3b = l3 && buyers.find((x) => x.id === l3.b), l3p = l3 && props.find((x) => x.id === l3.p)
   const editing = form?.id ? buyers.find((x) => x.id === form.id) : undefined
   const F = b ? FIN[b.financing] ?? FIN['À vérifier'] : FIN['À vérifier']
-  const busy = (s: (typeof SLOTS)[number]) => visits.some((e) => e.day === s.day && e.start === s.start)
+  const busy = (s: Slot) => visits.some((e) => e.day === s.day && e.start === s.start)
 
   return (
     <div>

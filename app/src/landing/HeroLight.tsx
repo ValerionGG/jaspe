@@ -6,7 +6,7 @@ import { img } from '../data/mock'
 
 /** Badge circulaire au texte tournant. */
 function Seal({ className }: { className?: string }) {
-  const text = 'COPILOTE · ANTIBES · CÔTE D’AZUR · 2026 · '
+  const text = 'COPILOTE · FRANCE · PORTUGAL · 2026 · '
   return (
     <div className={className}>
       <motion.svg viewBox="0 0 200 200" className="h-full w-full" animate={{ rotate: 360 }} transition={{ duration: 38, repeat: Infinity, ease: 'linear' }}>
@@ -50,22 +50,22 @@ export function HeroLight({ ready }: { ready: boolean }) {
       <div className="relative mx-auto grid max-w-[1440px] gap-12 px-5 md:px-10 lg:grid-cols-12 lg:gap-6">
         <motion.div style={{ y: textY }} className="flex flex-col justify-center lg:col-span-6 lg:pt-10">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={go ? { opacity: 1, y: 0 } : {}} transition={{ delay: 0.3, duration: 1, ease: EXPO }} className="mb-7 flex flex-wrap items-center gap-3">
-            <span className="eyebrow bg-champagne/[0.08] text-champagne-300 ring-1 ring-champagne/20"><Sparkle size={11} weight="fill" /> Copilote proactif</span>
-            <span className="text-[12px] text-mist">pour agences & réseaux immobiliers</span>
+            <span className="eyebrow bg-champagne/[0.08] text-champagne-300 ring-1 ring-champagne/20"><Sparkle size={11} weight="fill" /> Bêta gratuite</span>
+            <span className="text-[12px] text-mist">pour conseillers, mandataires et agences · France & Portugal</span>
           </motion.div>
           {go && (
             <MaskLines trigger="mount" delay={0.35} className="display text-[16vw] leading-[0.88] sm:text-[11vw] lg:text-[7.4vw]"
-              lines={[<>L’immobilier</>, <>d’exception,</>, <span className="italic text-champagne-300">orchestré<span className="text-coral">.</span></span>]} />
+              lines={[<>L’après</>, <>rendez-vous,</>, <span className="italic text-champagne-300">rendu<span className="text-coral">.</span></span>]} />
           )}
           <motion.p initial={{ opacity: 0, y: 20 }} animate={go ? { opacity: 1, y: 0 } : {}} transition={{ delay: 0.95, duration: 1.1, ease: EXPO }} className="mt-8 max-w-[34rem] text-[16px] leading-relaxed text-bone/70">
-            Jaspe prépare chaque rendez-vous, structure la découverte vendeur, rédige les neuf livrables et fait tourner votre agence — pour que vos conseillers ne fassent plus que l’essentiel : <span className="font-serif text-[19px] italic text-bone">la relation.</span>
+            Votre CRM fait tourner l’agence. Jaspe vous rend le temps d’après rendez-vous — et vous montre combien, <span className="font-serif text-[19px] italic text-bone">corrections comprises.</span>
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={go ? { opacity: 1, y: 0 } : {}} transition={{ delay: 1.1, duration: 1.1, ease: EXPO }} className="mt-9 flex flex-wrap items-center gap-3">
-            <Button size="lg" href="#demo">Réserver une démonstration</Button>
-            <Button size="lg" variant="ghost" href="/app">Explorer le CRM</Button>
+            <Button size="lg" href="/inscription">Essayer gratuitement</Button>
+            <Button size="lg" variant="ghost" href="#demo">Réserver une démonstration</Button>
           </motion.div>
           <motion.div initial={{ opacity: 0 }} animate={go ? { opacity: 1 } : {}} transition={{ delay: 1.4, duration: 1 }} className="mt-14 grid max-w-[34rem] grid-cols-3 gap-6 border-t border-white/10 pt-6">
-            {[['14', 'livrables par RDV'], ['60+', 'routines métier'], ['−6 h', 'de saisie / semaine*']].map(([k, v]) => (
+            {[['9', 'documents à relire après chaque RDV'], ['7', 'moments suivis jusqu’à l’acte'], ['−6 h', 'de saisie / semaine*']].map(([k, v]) => (
               <div key={v}><div className="display text-4xl">{k}</div><div className="mt-1 text-[12px] text-mist">{v}</div></div>
             ))}
           </motion.div>
@@ -77,7 +77,7 @@ export function HeroLight({ ready }: { ready: boolean }) {
             className="absolute right-0 top-0 h-[88%] w-[78%] overflow-hidden rounded-t-full shadow-float ring-[10px] ring-ink-800">
             <motion.img src={img('cap-villa-rocks')} alt="Villa sur les rochers du Cap d’Antibes" style={{ scale: photoScale }} className="h-full w-full object-cover" />
             <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/30 to-transparent" />
-            <span className="theme-dark absolute right-[18%] top-[30%] whitespace-nowrap rounded-full bg-ink/50 px-4 py-1.5 text-[11px] uppercase tracking-eyebrow text-bone backdrop-blur-md">Cap d’Antibes · 4,95 M€</span>
+            <span className="theme-dark absolute right-[18%] top-[30%] whitespace-nowrap rounded-full bg-ink/50 px-4 py-1.5 text-[11px] uppercase tracking-eyebrow text-bone backdrop-blur-md">Du T3 à 280 k€ à la villa du Cap</span>
           </motion.div>
           <motion.div style={{ y: smallY, x: my }} initial={{ opacity: 0, y: 60 }} animate={go ? { opacity: 1, y: 0 } : {}} transition={{ duration: 1.4, delay: 0.7, ease: EXPO }}
             className="absolute bottom-[4%] left-0 h-[44%] w-[38%] overflow-hidden rounded-t-full shadow-float ring-[8px] ring-ink-800">
@@ -90,13 +90,13 @@ export function HeroLight({ ready }: { ready: boolean }) {
           <motion.div initial={{ opacity: 0, x: -30 }} animate={go ? { opacity: 1, x: 0 } : {}} transition={{ delay: 1.5, duration: 1.1, ease: EXPO }} className="absolute left-[8%] top-[46%] z-10 hidden md:block">
             <div className="glass flex w-[280px] animate-float items-start gap-3 rounded-2xl p-3.5 shadow-float ring-1 ring-white/10">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-champagne text-ink"><CalendarCheck size={17} weight="light" /></span>
-              <span><span className="block text-[13px] font-medium">Brief prêt · 07:42</span><span className="block text-[11.5px] text-mist">RDV Famille Costa · D1 D2 D3 complets</span></span>
+              <span><span className="block text-[13px] font-medium">Brief de rendez-vous prêt · 07:42</span><span className="block text-[11.5px] text-mist">M. et Mme Roux · appartement T3, Antibes</span></span>
             </div>
           </motion.div>
           <motion.div initial={{ opacity: 0, x: 30 }} animate={go ? { opacity: 1, x: 0 } : {}} transition={{ delay: 1.75, duration: 1.1, ease: EXPO }} className="absolute bottom-[14%] right-[4%] z-10">
             <div className="glass flex w-[270px] animate-float items-center gap-3 rounded-2xl p-3.5 shadow-float ring-1 ring-white/10" style={{ animationDelay: '1.2s' }}>
               <div className="flex -space-x-2">{['p-paul', 'p-julien', 'p-thomas'].map((p) => <Avatar key={p} src={img(p)} size={28} />)}</div>
-              <span><span className="flex items-center gap-1.5 text-[13px] font-medium"><UsersThree size={14} /> 3 acquéreurs à 94 %</span><span className="block text-[11.5px] text-mist">Villa Mimosas · financement validé</span></span>
+              <span><span className="flex items-center gap-1.5 text-[13px] font-medium"><UsersThree size={14} /> Relance prête · vendredi</span><span className="block text-[11.5px] text-mist">Rappeler le vendeur après le diagnostic</span></span>
             </div>
           </motion.div>
         </div>

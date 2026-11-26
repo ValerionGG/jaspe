@@ -4,6 +4,7 @@ import { X, Sparkle, PaperPlaneRight, Microphone, CheckCircle, Link as LinkIcon 
 import { useNavigate } from 'react-router-dom'
 import { EXPO } from '../ui/kit'
 import { askCopilot } from '../data/store'
+import { useIdentity } from '../data/identity'
 
 type Msg = { from: 'me' | 'ai'; text: string; cites?: string[]; actions?: string[]; link?: string }
 
@@ -11,8 +12,14 @@ const SEED: Msg[] = [
   { from: 'ai', text: 'Bonjour Claire. Trois sujets demandent votre attention avant midi : l’estimation Martin (L7) attend votre validation, la contre-offre Dubreuil expire à 18 h, et le débrief de M. Haddad propose 12 champs à confirmer.', cites: ['Agenda', 'Dossier VND-0412', 'Dossier VND-0371'], actions: ['Ouvrir L7', 'Relire le débrief'] },
 ]
 
+/** Compte réel : accueil et suggestions neutres, sans dossiers ni personnes de démonstration. */
+const realSeed = (firstName: string): Msg[] => [{ from: 'ai', text: `Bonjour ${firstName}. Posez une question sur vos dossiers, votre agenda ou vos pièces : chaque réponse cite ses sources et rien ne part sans votre accord.` }]
+const REAL_SUGGEST = ['Mandats sans visite depuis 14 j', 'Préparer mon prochain RDV', 'Livrables à valider']
+const DEMO_SUGGEST = ['Mandats sans visite depuis 14 j', 'Préparer le RDV Laurent', 'État des livrables Martin']
+
 /** Réponses scénarisées — démonstrateur sans appel à un modèle. */
-function answer(q: string): Msg {
+function answer(q: string, real = false): Msg {
+  if (real) return { from: 'ai', text: 'Le copilote est injoignable pour le moment. Réessayez dans un instant : vos données restent enregistrées.', cites: ['Hors ligne'] }
   const n = q.toLowerCase()
   if (n.includes('visite') || n.includes('14')) return { from: 'ai', text: 'Deux mandats n’ont reçu aucune visite depuis plus de 14 jours : la Bastide La Salis (prix au-dessus du haut de fourchette de 4 %) et l’appartement Belle Époque (annonce sans plan ni visite 3D). Je propose un diagnostic d’exposition pour chacun.', cites: ['DVF 2025-S2', 'Portails · statistiques du 10/10'], actions: ['Préparer les diagnostics', 'Planifier un point vendeur'] }
   if (n.includes('laurent') || n.includes('rdv') || n.includes('prépar')) return { from: 'ai', text: 'Le brief du RDV Laurent est prêt à 78 % : D1 et D2 sont complets, le radar D3 attend la couche PLU. Points à confirmer : répartition entre les trois héritiers et date du dernier DPE.', cites: ['D1 · 10/10 09:12', 'D2 · 5 comparables', 'IGN · GPU'], actions: ['Ouvrir le brief', 'Lancer D4 · simulation'] }
@@ -21,7 +28,8 @@ function answer(q: string): Msg {
 }
 
 export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [msgs, setMsgs] = useState<Msg[]>(SEED)
+  const who = useIdentity()
+  const [msgs, setMsgs] = useState<Msg[]>(() => (who.real ? realSeed(who.firstName) : SEED))
   const [q, setQ] = useState('')
   const [typing, setTyping] = useState(false)
   const end = useRef<HTMLDivElement>(null)
@@ -35,7 +43,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
       const r = await askCopilot(t, history)
       setMsgs((m) => [...m, { from: 'ai', text: r.text, cites: [...(r.cites ?? []), ...(r.warning ? [r.warning] : [])], actions: r.link ? ['Ouvrir'] : r.actions, link: r.link }])
     } catch {
-      setMsgs((m) => [...m, { ...answer(t), cites: ['Hors ligne · réponse locale'] }])
+      setMsgs((m) => [...m, who.real ? answer(t, true) : { ...answer(t), cites: ['Hors ligne · réponse locale'] }])
     } finally { setTyping(false) }
   }
   return (
@@ -68,7 +76,7 @@ export function CopilotDrawer({ open, onClose }: { open: boolean; onClose: () =>
           </div>
           <div className="border-t border-white/[0.06] p-4">
             <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-none">
-              {['Mandats sans visite depuis 14 j', 'Préparer le RDV Laurent', 'État des livrables Martin'].map((s) => <button key={s} onClick={() => send(s)} className="shrink-0 rounded-full bg-white/[0.04] px-3 py-1.5 text-[11.5px] text-bone/70 ring-1 ring-white/[0.07] hover:text-bone">{s}</button>)}
+              {(who.real ? REAL_SUGGEST : DEMO_SUGGEST).map((s) => <button key={s} onClick={() => send(s)} className="shrink-0 rounded-full bg-white/[0.04] px-3 py-1.5 text-[11.5px] text-bone/70 ring-1 ring-white/[0.07] hover:text-bone">{s}</button>)}
             </div>
             <form onSubmit={(e) => { e.preventDefault(); send(q) }} className="flex items-center gap-2 rounded-2xl bg-white/[0.04] p-1.5 pl-4 ring-1 ring-white/[0.08] focus-within:ring-champagne/50">
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Demandez, dictez, déléguez…" className="flex-1 bg-transparent text-[13.5px] outline-none placeholder:text-mist" />

@@ -100,7 +100,11 @@ export function Counter({ to, decimals = 0, suffix = '', prefix = '', duration =
   return <span ref={ref} className={className}>{prefix}{v.toLocaleString('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}</span>
 }
 
-export function Avatar({ src, size = 32, ring = true, className }: { src: string; size?: number; ring?: boolean; className?: string }) {
+export function Avatar({ src, size = 32, ring = true, className, name }: { src?: string; size?: number; ring?: boolean; className?: string; name?: string }) {
+  if (!src) {
+    const ini = (name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '·'
+    return <span aria-hidden className={clsx('inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-champagne/70 to-champagne-700 font-medium text-ink', ring && 'ring-2 ring-ink-800', className)} style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }}>{ini}</span>
+  }
   return <img src={src} alt="" width={size} height={size} className={clsx('rounded-full object-cover', ring && 'ring-2 ring-ink-800', className)} style={{ width: size, height: size }} />
 }
 

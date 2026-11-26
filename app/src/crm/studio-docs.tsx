@@ -2,6 +2,8 @@ import { useState, type ReactNode } from 'react'
 import { CheckCircle, Warning, XCircle, Sparkle, Heart, ChatCircle, ShareFat, ThumbsUp, PaperPlaneTilt, BookmarkSimple, ArrowsLeftRight } from '@phosphor-icons/react'
 import { eur, type Dossier, type Property, type Agent } from '../data/mock'
 import type { StudioDocument } from '../data/studio'
+import { useIdentity, initials } from '../data/identity'
+import { useMe } from '../data/store'
 
 // Rendu « papier » d'un livrable réellement généré (collection documents). Les habillages riches
 // (e-mail, messagerie, posts, courrier, avant/après…) ne sont utilisés que si le document porte les champs correspondants.
@@ -16,9 +18,10 @@ export const AiBadge = ({ className = '', label = 'Image retouchée — IA' }: {
 )
 
 function Letterhead({ right }: { right: string }) {
+  const who = useIdentity()
   return (
     <div className="flex items-center justify-between border-b border-ink/10 pb-4">
-      <span className="text-[22px] italic leading-none">Maison Riviera<span className="text-champagne-600">.</span></span>
+      <span className="text-[22px] italic leading-none">{who.real ? who.orgName : 'Maison Riviera'}<span className="text-champagne-600">.</span></span>
       <span className="font-sans text-[10px] uppercase tracking-eyebrow text-ink/45">{right}</span>
     </div>
   )
@@ -27,29 +30,36 @@ function Letterhead({ right }: { right: string }) {
 const mailOf = (name: string) => `${name.toLowerCase().replace(' ', '.').normalize('NFD').replace(/[̀-ͯ]/g, '')}@maison-riviera.fr`
 
 function Email({ to, subject, children, a }: { to: string; subject?: string; children: ReactNode; a: Agent }) {
+  const acc = useMe()
+  const real = acc?.mode === 'auth'
+  // Compte réel : l’adresse est celle du compte connecté (jamais un domaine de démonstration).
+  const from = real ? (acc.user.name === a.name || !a.name ? `${acc.user.name || acc.user.email} · ${acc.user.email}` : a.name) : `${a.name} · ${mailOf(a.name)}`
   return (
     <div>
       <div className="space-y-1.5 border-b border-ink/10 pb-4 font-sans text-[12.5px]">
-        {[['De', `${a.name} · ${mailOf(a.name)}`], ['À', to], ['Objet', subject ?? '—']].map(([k, v]) => (
+        {[['De', from], ['À', to], ['Objet', subject ?? '—']].map(([k, v]) => (
           <div key={k} className="flex gap-3"><span className="w-12 shrink-0 text-ink/45">{k}</span><span className={k === 'Objet' ? 'font-medium text-ink' : 'text-ink/75'}>{v}</span></div>
         ))}
       </div>
       <div className="space-y-4 pt-6">{children}</div>
       <div className="mt-8 flex items-center gap-3 border-t border-ink/10 pt-4 font-sans">
-        <img src={a.photo} alt="" className="h-10 w-10 rounded-full object-cover" />
-        <div className="text-[12px] leading-tight"><div className="font-medium">{a.name}</div><div className="text-ink/50">{a.role} · {a.agency}</div><div className="text-ink/40">Carte T CPI 0605 2026 000 041 · RCP Hiscox</div></div>
+        {a.photo ? <img src={a.photo} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink text-[13px] italic text-champagne-300">{initials(a.name)}</span>}
+        <div className="text-[12px] leading-tight"><div className="font-medium">{a.name}</div><div className="text-ink/50">{[a.role, a.agency].filter(Boolean).join(' · ')}</div>{!real && <div className="text-ink/40">Carte T CPI 0605 2026 000 041 · RCP Hiscox</div>}</div>
       </div>
     </div>
   )
 }
 
 function Post({ net, photo, label, children }: { net: string; photo: string; label?: string; children: ReactNode }) {
+  const who = useIdentity()
+  const org = who.real ? who.orgName : 'Maison Riviera'
+  const handle = who.real ? org.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '') : 'maison.riviera'
   const ratio = net === 'Instagram' ? 'aspect-square' : net === 'LinkedIn' ? 'aspect-[1.91/1]' : 'aspect-[4/3]'
   return (
     <div className="overflow-hidden rounded-xl bg-white font-sans ring-1 ring-ink/[0.07]">
       <div className="flex items-center gap-2 px-3 py-2.5">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink text-[11px] italic text-champagne-300" style={{ fontFamily: 'Instrument Serif' }}>MR</span>
-        <div className="min-w-0 flex-1 leading-tight"><div className="truncate text-[12px] font-medium">{net === 'Instagram' ? 'maison.riviera' : 'Maison Riviera Immobilier'}</div><div className="text-[10px] text-ink/45">{net} · brouillon à valider</div></div>
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink text-[11px] italic text-champagne-300" style={{ fontFamily: 'Instrument Serif' }}>{who.real ? initials(org) : 'MR'}</span>
+        <div className="min-w-0 flex-1 leading-tight"><div className="truncate text-[12px] font-medium">{net === 'Instagram' ? handle : who.real ? org : 'Maison Riviera Immobilier'}</div><div className="text-[10px] text-ink/45">{net} · brouillon à valider</div></div>
       </div>
       <div className={`relative ${ratio} overflow-hidden`}>
         <img src={photo} alt="" className="h-full w-full object-cover" />
@@ -84,6 +94,7 @@ const ICON = { ok: <CheckCircle size={16} weight="fill" className="text-sage-600
 
 /** Document réel, habillé selon son type. */
 export function StudioDoc({ doc, d, p, a }: { doc: StudioDocument; d: Dossier; p: Property; a: Agent }) {
+  const who = useIdentity()
   const body = doc.body ?? []
   if (doc.kind === 'email') {
     return (
@@ -123,7 +134,7 @@ export function StudioDoc({ doc, d, p, a }: { doc: StudioDocument; d: Dossier; p
         <div className="mt-6 font-sans text-[11px] text-ink/50">À : {doc.to ?? '—'}</div>
         <div className="mt-1 text-right font-sans text-[11px] text-ink/50">{p.city}, le {fr(doc.editedAt ?? doc.createdAt)}</div>
         <Paras body={body} className="mt-6 text-[14px]" />
-        <div className="mt-8 border-t border-ink/10 pt-3 font-sans text-[8.5px] leading-snug text-ink/40">Adresses issues de la zone de diffusion validée, hors registre des oppositions. Aucune donnée personnelle n’est conservée. Carte T CPI 0605 2026 000 041.</div>
+        <div className="mt-8 border-t border-ink/10 pt-3 font-sans text-[8.5px] leading-snug text-ink/40">Adresses issues de la zone de diffusion validée, hors registre des oppositions. Aucune donnée personnelle n’est conservée.{who.real ? '' : ' Carte T CPI 0605 2026 000 041.'}</div>
       </div>
     )
   }

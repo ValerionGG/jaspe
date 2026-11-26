@@ -2,18 +2,22 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import clsx from 'clsx'
-import { Sparkle, CheckCircle, Circle, Question, UserFocus, Seal, ChatCircleText, Warning, ArrowRight, Target, ChartLineUp, ShieldCheck, Lightbulb, Plus, X } from '@phosphor-icons/react'
+import { Sparkle, CheckCircle, Circle, Question, UserFocus, Seal, ChatCircleText, Warning, ArrowRight, Target, ChartLineUp, ShieldCheck, Lightbulb, Plus, X, ArrowsClockwise } from '@phosphor-icons/react'
 import { Card, SoftBtn } from '../ui'
 import { Avatar, Spark, EXPO } from '../../ui/kit'
-import { prop, agent, eur, fmt, AGENCIES, type DelivState } from '../../data/mock'
+import { prop, eur, fmt, AGENCIES, type DelivState } from '../../data/mock'
 import { DISCOVERY_BLOCKS } from '../../data/dossier'
 import { compsFor, priceSeries, meters } from '../../data/geo'
-import { useDocuments } from '../../data/collections'
+import { useDocuments, useAgents, type DocumentDoc } from '../../data/collections'
+import { factSource, isDemoProperty, countryOf, estimateRange, useCurrentUserName, useMeMode, type LooseProperty } from './facts'
+import { useT } from '../../i18n'
+import { useIdentity } from '../../data/identity'
+import { useRealMarket, median } from './market-real'
 import { useCollection, action, type Doc } from '../../data/store'
 import { toast, errText } from '../forms'
 import type { StepProps } from './index'
-import { CRITICAL, QUESTIONS, type JourneyX, type PrepState } from './prep-model'
-import { DelivHead, Sources, Sub, StatePill, nameOf, todayFr, useLatest } from './prep-ui'
+import { CRITICAL, CRITICAL_PT, fieldLabel, questionOf, type JourneyX, type PrepState } from './prep-model'
+import { DelivHead, Sources, Sub, StatePill, todayFr, useLatest } from './prep-ui'
 import RadarPanel from './prep-radar'
 
 type Code = 'D1' | 'D2' | 'D3' | 'D4'
@@ -27,6 +31,8 @@ const CHECKLIST = [
 
 export default function StepPrep({ dossier: d, journey, save, openDeliverable, goTo }: StepProps) {
   const j = journey as JourneyX
+  const { t } = useT()
+  const dName = (c: Code) => t(`deliv.${c}`)
   const [docs] = useDocuments()
   const [sel, setSel] = useState<Code>(() => CODES.find((c) => d.deliverables[c] !== 'done') ?? 'D1')
   const [busy, setBusy] = useState(false)
@@ -46,7 +52,7 @@ export default function StepPrep({ dossier: d, journey, save, openDeliverable, g
 
   const prepareAll = async () => {
     setBusy(true)
-    try { await action('deliverable.generateAll', { dossierId: d.id, codes: missing }); toast(`${missing.join(', ')} en préparation — résultats en temps réel`) } catch (x) { toast(errText(x), 'error') } finally { setBusy(false) }
+    try { await action('deliverable.generateAll', { dossierId: d.id, codes: missing }); toast(t('prep.allToast', { codes: missing.join(', ') })) } catch (x) { toast(errText(x), 'error') } finally { setBusy(false) }
   }
 
   return (
@@ -61,24 +67,24 @@ export default function StepPrep({ dossier: d, journey, save, openDeliverable, g
             </div>
             <div className="min-w-0">
               <div className="text-[10.5px] uppercase tracking-eyebrow text-mist">{d.next} · {d.due}</div>
-              <div className="display mt-1.5 text-[1.9rem] leading-none md:text-[2.2rem]">Préparation prête à <span className="whitespace-nowrap italic text-champagne-300">{ready} %</span></div>
+              <div className="display mt-1.5 text-[1.9rem] leading-none md:text-[2.2rem]">{t('prep.readyAt')} <span className="whitespace-nowrap italic text-champagne-300">{ready} %</span></div>
               <div className="mt-1.5 text-[12.5px] text-bone/55">{d.seller} · {prop(d.propertyId).district}</div>
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            <SoftBtn tone="gold" disabled={busy || !missing.length} onClick={prepareAll} icon={<Sparkle size={14} weight="fill" />}>{busy ? 'Lancement…' : missing.length ? 'Tout préparer' : 'D1–D3 lancés'}</SoftBtn>
-            <SoftBtn onClick={() => goTo('discovery')} icon={<ArrowRight size={14} />}>Entretien D5</SoftBtn>
+            <SoftBtn tone="gold" disabled={busy || !missing.length} onClick={prepareAll} icon={<Sparkle size={14} weight="fill" />}>{busy ? t('prep.launching') : missing.length ? t('prep.all') : t('prep.allLaunched')}</SoftBtn>
+            <SoftBtn onClick={() => goTo('discovery')} icon={<ArrowRight size={14} />}>{t('prep.interview')}</SoftBtn>
           </div>
         </div>
         <div className="mt-5 grid grid-cols-5 gap-2 border-t border-white/[0.05] pt-4">
-          {[...CODES.map((c) => ({ k: c, v: WEIGHT[state(c)], l: nameOf(c) })), { k: 'RDV', v: parts[4], l: `Check-list ${checked}/${items.length}` }].map((x) => (
+          {[...CODES.map((c) => ({ k: c, v: WEIGHT[state(c)], l: dName(c) })), { k: 'RDV', v: parts[4], l: t('prep.checklist', { a: checked, b: items.length }) }].map((x) => (
             <div key={x.k} title={x.l} className="min-w-0">
               <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.07]"><motion.div className={clsx('h-full rounded-full', x.v >= 1 ? 'bg-sage' : 'bg-champagne')} initial={{ width: 0 }} animate={{ width: `${x.v * 100}%` }} transition={{ duration: 1, ease: EXPO }} /></div>
               <div className="mt-1.5 flex items-baseline gap-1.5"><span className="num text-[10.5px] text-champagne-300">{x.k}</span><span className="hidden truncate text-[11px] text-mist sm:inline">{x.l}</span></div>
             </div>
           ))}
         </div>
-        {missing.length > 0 && <p className="mt-3 text-[11.5px] text-mist">« Tout préparer » lance {missing.join(', ')} en parallèle ; chaque livrable arrive « à valider » dans la file.</p>}
+        {missing.length > 0 && <p className="mt-3 text-[11.5px] text-mist">{t('prep.allHint', { codes: missing.join(', ') })}</p>}
       </Card>
 
       {/* Sous-navigation D1–D4 */}
@@ -89,7 +95,7 @@ export default function StepPrep({ dossier: d, journey, save, openDeliverable, g
             <button key={c} onClick={() => setSel(c)} className={clsx('relative rounded-[1.2rem] p-4 text-left ring-1 transition-colors duration-300', on ? 'ring-champagne/40' : 'bg-white/[0.02] ring-white/[0.06] hover:bg-white/[0.04]')}>
               {on && <motion.span layoutId="prep-tile" className="absolute inset-0 rounded-[1.2rem] bg-champagne/[0.08]" transition={{ duration: 0.5, ease: EXPO }} />}
               <span className="relative flex items-center justify-between"><span className={clsx('num text-[12px]', on ? 'text-champagne-300' : 'text-mist')}>{c}</span><StatePill state={state(c)} /></span>
-              <span className="relative mt-3 block text-[14px] leading-tight">{nameOf(c)}</span>
+              <span className="relative mt-3 block text-[14px] leading-tight">{dName(c)}</span>
             </button>
           )
         })}
@@ -98,10 +104,10 @@ export default function StepPrep({ dossier: d, journey, save, openDeliverable, g
       <AnimatePresence mode="wait">
         <motion.div key={sel} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.45, ease: EXPO }}>
           <Card>
-            {sel === 'D1' && <BriefPanel {...{ d, j, prep, savePrep }} head={<DelivHead code="D1" state={state('D1')} doc={docOf('D1')} dossierId={d.id} onOpen={openDeliverable} lead="Préparation relationnelle à partir de faits déclarés ou publics autorisés — jamais de traits sensibles déduits." />} foot={<Sources doc={docOf('D1')} planned={['Fiche dossier', 'Agenda', 'Découverte D5']} />} />}
-            {sel === 'D2' && <MarketPanel d={d} head={<DelivHead code="D2" state={state('D2')} doc={docOf('D2')} dossierId={d.id} onOpen={openDeliverable} lead="Prix vendus (DVF) et prix affichés distingués, échantillon visible, fourchette qui reflète l’incertitude." />} foot={<Sources doc={docOf('D2')} planned={['DVF · Etalab 2026-S1', 'Annonces actives du secteur']} />} />}
-            {sel === 'D3' && <RadarPanel d={d} head={<DelivHead code="D3" state={state('D3')} doc={docOf('D3')} dossierId={d.id} onOpen={openDeliverable} lead="Carte, faits établis et impacts supposés séparés, statut et date de chaque projet." />} foot={<Sources doc={docOf('D3')} planned={['IGN Géoplateforme', 'Géoportail de l’urbanisme', 'Géorisques']} />} />}
-            {sel === 'D4' && <CoachPanel {...{ d, j, prep, items, savePrep }} head={<DelivHead code="D4" state={state('D4')} doc={docOf('D4')} dossierId={d.id} onOpen={openDeliverable} lead="Répétition des objections probables à partir de D1–D3, évaluation observable — pas de jugement de personnalité." />} foot={<Sources doc={docOf('D4')} planned={['Simulation Jaspe Coaching', 'Brief D1', 'Marché D2']} />} />}
+            {sel === 'D1' && <BriefPanel {...{ d, j, prep, savePrep }} head={<DelivHead code="D1" state={state('D1')} doc={docOf('D1')} dossierId={d.id} onOpen={openDeliverable} name={dName('D1')} lead={t('prep.d1.lead')} />} foot={<Sources doc={docOf('D1')} planned={[t('prep.src.file'), t('prep.src.agenda'), t('prep.src.d5')]} />} />}
+            {sel === 'D2' && <D2 d={d} docOf={docOf} state={state('D2')} onOpen={openDeliverable} />}
+            {sel === 'D3' && <RadarPanel d={d} head={<DelivHead code="D3" state={state('D3')} doc={docOf('D3')} dossierId={d.id} onOpen={openDeliverable} name={dName('D3')} lead="Carte, faits établis et impacts supposés séparés, statut et date de chaque projet." />} foot={<Sources doc={docOf('D3')} planned={['IGN Géoplateforme', 'Géoportail de l’urbanisme', 'Géorisques']} />} />}
+            {sel === 'D4' && <CoachPanel {...{ d, j, prep, items, savePrep }} head={<DelivHead code="D4" state={state('D4')} doc={docOf('D4')} dossierId={d.id} onOpen={openDeliverable} name={dName('D4')} lead="Répétition des objections probables à partir de D1–D3, évaluation observable — pas de jugement de personnalité." />} foot={<Sources doc={docOf('D4')} planned={['Simulation Jaspe Coaching', 'Brief D1', 'Marché D2']} />} />}
           </Card>
         </motion.div>
       </AnimatePresence>
@@ -113,54 +119,66 @@ type Base = { d: StepProps['dossier']; head: React.ReactNode; foot: React.ReactN
 
 /* ——— D1 · Brief relationnel ——— */
 function BriefPanel({ d, j, prep, savePrep, head, foot }: Base & { j: JourneyX; prep: PrepState; savePrep: (p: PrepState) => Promise<void> }) {
-  const p = prop(d.propertyId), a = agent(d.agentId), disc = j.discovery
+  const p = prop(d.propertyId) as LooseProperty, disc = j.discovery
+  const { t } = useT()
+  const id = useIdentity()
+  const [agents] = useAgents()
+  const a = agents.find((x) => x.id === d.agentId)
+  const userName = useCurrentUserName(), mode = useMeMode()
+  const follower = a?.name ?? (mode === 'auth' ? userName : null)
+  const demo = isDemoProperty(p, mode)
+  const country = demo ? 'FR' : countryOf(p, id.country)
+  const src = (legacy: string) => factSource(p, demo, legacy, t)
   const val = (k: string) => disc[k]?.v?.trim()
+  const lab = (k: string) => fieldLabel(t, k, country, LABEL[k] ?? k)
   const facts = [
-    { l: 'Surface habitable', v: `${p.surface} m²`, s: 'Plan géomètre' },
-    ...(p.land ? [{ l: 'Terrain', v: `${fmt(p.land)} m²`, s: 'Cadastre PCI' }] : []),
-    { l: 'Année de construction', v: String(p.year), s: 'Acte de propriété' },
-    { l: 'DPE', v: `Classe ${p.dpe}`, s: 'Observatoire ADEME' },
-    ...Object.entries(disc).filter(([k, f]) => f?.v && (f.origin === 'pièce' || f.origin === 'vérifié') && !['surface', 'terrain', 'annee', 'dpe'].includes(k)).map(([k, f]) => ({ l: LABEL[k] ?? k, v: f.v, s: f.origin === 'pièce' ? 'Pièce déposée' : 'Vérifié' })),
+    ...(p.surface ? [{ l: t('prep.facts.surface'), v: `${p.surface} m²`, s: src('Plan géomètre') }] : []),
+    ...(p.land ? [{ l: t('prep.facts.land'), v: `${fmt(p.land)} m²`, s: src('Cadastre PCI') }] : []),
+    ...(p.year ? [{ l: t('prep.facts.year'), v: String(p.year), s: src('Acte de propriété') }] : []),
+    ...(p.dpe ? [{ l: t('prep.facts.dpe'), v: t('prep.facts.dpeClass', { c: p.dpe }), s: src('Observatoire ADEME') }] : []),
+    ...Object.entries(disc).filter(([k, f]) => f?.v && (f.origin === 'pièce' || f.origin === 'vérifié') && !['surface', 'terrain', 'annee', 'dpe'].includes(k)).map(([k, f]) => ({ l: lab(k), v: f.v, s: f.origin === 'pièce' ? t('prep.facts.piece') : t('prep.facts.verified') })),
   ]
+  const critical: readonly string[] = country === 'PT' ? CRITICAL_PT : CRITICAL
   const toConfirm = [
-    ...Object.entries(disc).filter(([, f]) => f?.v && f.origin === 'à confirmer').map(([k, f]) => ({ k, l: LABEL[k] ?? k, v: f.v })),
-    ...CRITICAL.filter((k) => !val(k) && !['surface', 'pieces', 'dpe'].includes(k)).map((k) => ({ k, l: LABEL[k], v: '' })), // ponytail: surface, pièces et DPE connus par la fiche bien
+    ...Object.entries(disc).filter(([, f]) => f?.v && f.origin === 'à confirmer').map(([k, f]) => ({ k, l: lab(k), v: f.v })),
+    ...critical.filter((k) => !val(k) && !['surface', 'pieces', 'dpe'].includes(k)).map((k) => ({ k, l: lab(k), v: '' })), // ponytail: surface, pièces et DPE connus par la fiche bien
   ]
-  const prefs = (['contactPref', 'craintes', 'experience', 'decideurs'] as const).map((k) => ({ k, l: LABEL[k], v: val(k) }))
-  const questions = [...new Set(toConfirm.map((x) => x.k))].map((k) => QUESTIONS[k]).filter(Boolean).slice(0, 6)
+  const prefs = (['contactPref', 'craintes', 'experience', 'decideurs'] as const).map((k) => ({ k, l: lab(k), v: val(k) }))
+  const questions = [...new Set(toConfirm.map((x) => x.k))].map((k) => questionOf(t, k, country)).filter(Boolean).slice(0, 6)
   return (
     <div className="space-y-5">
       {head}
       <div className="grid gap-4 lg:grid-cols-5">
-        <Sub kicker="Contexte vendeur" className="lg:col-span-2">
-          <div className="flex items-center gap-3"><Avatar src={d.sellerPhoto ?? '/img/p-paul.webp'} size={44} /><div><div className="text-[15px]">{d.seller}</div><div className="text-[11.5px] text-mist">Suivi par {a.name}</div></div></div>
+        <Sub kicker={t('prep.ctx.kicker')} className="lg:col-span-2">
+          <div className="flex items-center gap-3"><Avatar src={d.sellerPhoto ?? (demo ? '/img/p-paul.webp' : undefined)} name={d.seller} size={44} /><div><div className="text-[15px]">{d.seller}</div>{follower && <div className="text-[11.5px] text-mist">{t('prep.ctx.followed', { name: follower })}</div>}</div></div>
           <dl className="mt-4 space-y-2 text-[13px]">
-            <div className="flex justify-between gap-3"><dt className="text-mist">Projet</dt><dd className="text-right">{val('motivation') ?? d.motivation}</dd></div>
-            <div className="flex justify-between gap-3"><dt className="text-mist">Horizon</dt><dd className="text-right">{val('horizon') ?? d.timeline}</dd></div>
-            <div className="flex justify-between gap-3"><dt className="text-mist">Bien</dt><dd className="text-right">{p.title}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-mist">{t('prep.ctx.project')}</dt><dd className="text-right">{val('motivation') ?? d.motivation}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-mist">{t('prep.ctx.horizon')}</dt><dd className="text-right">{val('horizon') ?? d.timeline}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-mist">{t('prep.ctx.property')}</dt><dd className="text-right">{p.title}</dd></div>
           </dl>
-          <div className="mt-3 flex flex-wrap gap-1.5">{d.tags.map((t) => <span key={t} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[11px] ring-1 ring-white/[0.07]">{t}</span>)}</div>
+          <div className="mt-3 flex flex-wrap gap-1.5">{d.tags.map((tag) => <span key={tag} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[11px] ring-1 ring-white/[0.07]">{tag}</span>)}</div>
         </Sub>
-        <Sub kicker="Faits sourcés" title={`${facts.length} faits vérifiables`} className="lg:col-span-3">
+        <Sub kicker={t('prep.facts.kicker')} title={facts.length ? t('prep.facts.count', { n: facts.length }) : t('prep.facts.none')} className="lg:col-span-3">
+          {facts.length === 0 && <p className="text-[13px] text-mist">{t('prep.facts.empty')}</p>}
           <ul className="divide-y divide-white/[0.05]">
             {facts.slice(0, 8).map((f) => <li key={f.l} className="flex items-center justify-between gap-3 py-2 text-[13px]"><span className="text-mist">{f.l}</span><span className="flex min-w-0 items-center gap-2"><span className="truncate">{f.v}</span><span className="shrink-0 rounded-full bg-sage/10 px-2 py-0.5 text-[10px] text-sage ring-1 ring-sage/20">{f.s}</span></span></li>)}
           </ul>
         </Sub>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <Sub kicker="Points à confirmer" title={toConfirm.length ? `${toConfirm.length} point(s) ouverts` : 'Tout est confirmé'}>
-          {toConfirm.length === 0 && <p className="text-[13px] text-mist">Aucun champ critique manquant ni en attente de confirmation.</p>}
-          <ul className="space-y-1.5">{toConfirm.slice(0, 7).map((x) => <li key={x.k + x.v} className="flex items-start gap-2.5 text-[13px]"><Warning size={15} weight="light" className="mt-0.5 shrink-0 text-coral" /><span><span className="text-bone/85">{x.l}</span>{x.v ? <span className="text-mist"> — {x.v}</span> : <span className="text-coral/80"> — non renseigné</span>}</span></li>)}</ul>
+        <Sub kicker={t('prep.tc.kicker')} title={toConfirm.length ? t('prep.tc.open', { n: toConfirm.length }) : t('prep.tc.allDone')}>
+          {toConfirm.length === 0 && <p className="text-[13px] text-mist">{t('prep.tc.none')}</p>}
+          <ul className="space-y-1.5">{toConfirm.slice(0, 7).map((x) => <li key={x.k + x.v} className="flex items-start gap-2.5 text-[13px]"><Warning size={15} weight="light" className="mt-0.5 shrink-0 text-coral" /><span><span className="text-bone/85">{x.l}</span>{x.v ? <span className="text-mist"> — {x.v}</span> : <span className="text-coral/80">{t('prep.tc.missing')}</span>}</span></li>)}</ul>
         </Sub>
-        <Sub kicker="Préférences déclarées" title="Ce que le vendeur a dit lui-même">
-          <ul className="space-y-2">{prefs.map((x) => <li key={x.k} className="text-[13px]"><div className="text-[11px] text-mist">{x.l}</div><div className={x.v ? 'text-bone/85' : 'text-mist italic'}>{x.v ?? 'À recueillir pendant l’entretien'}</div></li>)}</ul>
+        <Sub kicker={t('prep.pref.kicker')} title={t('prep.pref.title')}>
+          <ul className="space-y-2">{prefs.map((x) => <li key={x.k} className="text-[13px]"><div className="text-[11px] text-mist">{x.l}</div><div className={x.v ? 'text-bone/85' : 'text-mist italic'}>{x.v ?? t('prep.pref.empty')}</div></li>)}</ul>
         </Sub>
-        <Sub kicker="Identité & incertitude" title="Homonymie">
-          <p className="text-[13px] leading-relaxed text-bone/70">« {d.seller} » : plusieurs homonymes dans les annuaires publics du secteur. Seules la fiche dossier et les pièces fournies font foi ; aucune recherche sur la vie privée, aucun trait sensible déduit (RGPD, accès limité au dossier).</p>
-          <button onClick={() => savePrep({ identityConfirmed: !prep.identityConfirmed }).then(() => toast(prep.identityConfirmed ? 'Identité remise à confirmer' : 'Identité confirmée'))} className={clsx('mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] ring-1 transition', prep.identityConfirmed ? 'bg-sage/15 text-sage ring-sage/25' : 'bg-white/[0.04] text-bone/80 ring-white/[0.08] hover:bg-white/[0.08]')}>{prep.identityConfirmed ? <Seal size={14} weight="fill" /> : <UserFocus size={14} />}{prep.identityConfirmed ? 'Identité confirmée par le vendeur' : 'Marquer l’identité confirmée'}</button>
+        <Sub kicker={t('prep.id.kicker')} title={t('prep.id.title')}>
+          <p className="text-[13px] leading-relaxed text-bone/70">{t('prep.id.body', { name: d.seller })}</p>
+          <button onClick={() => savePrep({ identityConfirmed: !prep.identityConfirmed }).then(() => toast(prep.identityConfirmed ? t('prep.id.resetToast') : t('prep.id.confirmedToast')))} className={clsx('mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] ring-1 transition', prep.identityConfirmed ? 'bg-sage/15 text-sage ring-sage/25' : 'bg-white/[0.04] text-bone/80 ring-white/[0.08] hover:bg-white/[0.08]')}>{prep.identityConfirmed ? <Seal size={14} weight="fill" /> : <UserFocus size={14} />}{prep.identityConfirmed ? t('prep.id.confirmed') : t('prep.id.mark')}</button>
         </Sub>
-        <Sub kicker="Questions à poser" title="Ouvertes, issues du guide D5">
-          <ol className="space-y-2">{(questions.length ? questions : [QUESTIONS.motivation, QUESTIONS.experience, QUESTIONS.strategie]).map((q, i) => <li key={q} className="flex gap-2.5 text-[13px]"><span className="num mt-0.5 text-[11px] text-champagne-300">{String(i + 1).padStart(2, '0')}</span><span className="text-bone/85">{q}</span></li>)}</ol>
+        <Sub kicker={t('prep.qs.kicker')} title={t('prep.qs.title')}>
+          <ol className="space-y-2">{(questions.length ? questions : ['motivation', 'experience', 'strategie'].map((k) => questionOf(t, k, country))).map((q, i) => <li key={q} className="flex gap-2.5 text-[13px]"><span className="num mt-0.5 text-[11px] text-champagne-300">{String(i + 1).padStart(2, '0')}</span><span className="text-bone/85">{q}</span></li>)}</ol>
         </Sub>
       </div>
       {foot}
@@ -169,6 +187,76 @@ function BriefPanel({ d, j, prep, savePrep, head, foot }: Base & { j: JourneyX; 
 }
 
 /* ——— D2 · Marché & comparables ——— */
+/** Démo : échantillon synthétique historique. Compte réel : ventes réelles (DVF / Casafari) ou état vide honnête. */
+function D2({ d, docOf, state, onOpen }: { d: StepProps['dossier']; docOf: (c: string) => DocumentDoc | undefined; state: DelivState; onOpen: (c: string) => void }) {
+  const { t } = useT()
+  const id = useIdentity(), mode = useMeMode()
+  const p = prop(d.propertyId) as LooseProperty
+  const demo = isDemoProperty(p, mode)
+  const country = countryOf(p, id.country)
+  const doc = docOf('D2')
+  const head = <DelivHead code="D2" state={state} doc={doc} dossierId={d.id} onOpen={onOpen} name={t('deliv.D2')} lead={demo ? t('prep.d2.lead') : t('prep.d2.leadReal')} />
+  const planned = demo ? ['DVF · Etalab 2026-S1', 'Annonces actives du secteur'] : country === 'PT' ? [t('mk.srcPT'), t('mk.srcINE')] : ['DVF · Etalab (data.gouv.fr)']
+  const foot = <Sources doc={doc} planned={planned} />
+  return demo ? <MarketPanel d={d} head={head} foot={foot} /> : <RealMarketPanel p={p} country={country} head={head} foot={foot} />
+}
+
+function RealMarketPanel({ p, country, head, foot }: { p: LooseProperty; country: 'FR' | 'PT'; head: React.ReactNode; foot: React.ReactNode }) {
+  const { t, num, eur: money } = useT()
+  const { m, comps, loading, busy, load } = useRealMarket(p.id)
+  const has = comps.length > 0
+  const med = has ? (m?.medianPpm && Number.isFinite(m.medianPpm) && m.medianPpm > 0 ? m.medianPpm : Math.round(median(comps.map((c) => c.ppm)))) : 0
+  const ppm = p.price && p.surface && p.price > 0 && p.surface > 0 ? Math.round(p.price / p.surface) : null
+  const gap = ppm && med ? Math.round(((ppm - med) / med) * 100) : null
+  const range = estimateRange(p)
+  const kpis: [string, string, string][] = [
+    [t('mk.medianSold'), has ? `${num(med)} €/m²` : '—', has ? t('mk.salesN', { n: comps.length, src: m?.source ?? '' }) : country === 'PT' ? t('mk.srcPT') : 'DVF'],
+    [t('mk.askPpm'), ppm ? `${num(ppm)} €/m²` : '—', gap !== null ? t('mk.vsMedian', { x: `${gap > 0 ? '+' : ''}${gap}` }) : ppm ? '' : t('mk.noPrice')],
+    [t('mk.range'), range ? `${money(range[0])} – ${money(range[1])}` : t('mk.noRange'), range ? (p.surface ? `${num(Math.round(range[0] / p.surface))} – ${num(Math.round(range[1] / p.surface))} €/m²` : '') : t('mk.noRangeHint')],
+    [t('mk.period'), has && m?.period ? `${m.period.from} → ${m.lastDate ?? m.period.to}` : '—', has ? m?.commune ?? '' : ''],
+  ]
+  const empty = country === 'PT' ? t('mk.emptyPT') : m && m.status !== 'absent' ? m.note ?? t('mk.noSales', { s: m.status }) : t('mk.emptyFR')
+  return (
+    <div className="space-y-5">
+      {head}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {kpis.map(([l, v, h]) => <Sub key={l}><div className="text-[11px] text-mist">{l}</div><div className="display mt-1 text-[1.5rem] leading-tight">{v}</div>{h && <div className="mt-1.5 text-[11px] text-bone/45">{h}</div>}</Sub>)}
+      </div>
+      <Sub kicker={t('mk.h.ppm')} title={has ? t('mk.compsTitle', { n: comps.length }) : t('mk.compsTitle', { n: 0 })} action={<SoftBtn icon={<ArrowsClockwise size={13} className={busy ? 'animate-spin' : ''} />} disabled={busy} onClick={() => load(has)}>{has ? t('mk.reread') : country === 'PT' ? t('mk.queryPT') : t('mk.query')}</SoftBtn>}>
+        {loading ? <p className="text-[12.5px] text-mist">{t('mk.loading')}</p> : has ? (
+          <>
+            <div className="thin-scroll -mx-1 overflow-x-auto">
+              <table className="w-full min-w-[620px] text-[12.5px]">
+                <thead><tr className="text-left text-[10.5px] uppercase tracking-eyebrow text-mist">{(['mk.h.addr', 'mk.h.date', 'mk.h.surface', 'mk.h.price', 'mk.h.ppm', 'mk.h.source'] as const).map((h) => <th key={h} className="px-1 pb-2 font-normal">{t(h)}</th>)}</tr></thead>
+                <tbody>
+                  {comps.slice(0, 40).map((c) => (
+                    <tr key={c.id} className="border-t border-white/[0.05]">
+                      <td className="px-1 py-2"><div className="truncate">{c.address || '—'}</div>{(c.commune || c.type) && <div className="text-[10.5px] text-mist">{[c.commune, c.type].filter(Boolean).join(' · ')}</div>}</td>
+                      <td className="num px-1 py-2 text-mist">{c.date}</td>
+                      <td className="num px-1 py-2">{c.surface} m²</td>
+                      <td className="num px-1 py-2">{money(c.price)}</td>
+                      <td className={clsx('num px-1 py-2', ppm && c.ppm > ppm ? 'text-sage' : 'text-bone/80')}>{num(c.ppm)}</td>
+                      <td className="px-1 py-2">{c.sourceUrl ? <a href={c.sourceUrl} target="_blank" rel="noreferrer" className="text-[11px] text-champagne-300 hover:underline">{c.source}</a> : <span className="text-[11px] text-mist">{c.source}</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-[11px] text-mist">{t('mk.footer', { src: m?.source ?? '', from: m?.period?.from ?? '?', to: m?.lastDate ?? '?', at: String(m?.fetchedAt ?? '').slice(0, 10) })}{m?.sourceUrl && <> · <a href={m.sourceUrl} target="_blank" rel="noreferrer" className="text-champagne-300 hover:underline">{t('mk.dataset')}</a></>} · {t('mk.honest')}</p>
+          </>
+        ) : (
+          <div className="rounded-xl border border-dashed border-white/10 p-5 text-[12.5px] text-bone/60">
+            <p>{empty}</p>
+            {country === 'PT' && m?.note && m.status !== 'absent' && <p className="mt-2 text-[11px] text-mist">{m.note}</p>}
+          </div>
+        )}
+        <Link to="/app/marche" className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] text-champagne-300 transition hover:gap-2.5">{t('mk.openMarket')} <ArrowRight size={13} /></Link>
+      </Sub>
+      {foot}
+    </div>
+  )
+}
+
 function MarketPanel({ d, head, foot }: Base) {
   const p = prop(d.propertyId)
   const comps = useMemo(() => compsFor(p), [p])

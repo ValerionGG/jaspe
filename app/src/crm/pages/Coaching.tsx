@@ -6,6 +6,7 @@ import { EXPO } from '../../ui/kit'
 import { img } from '../../data/mock'
 import { useCollection, type Doc } from '../../data/store'
 import { toast, errText } from '../forms'
+import { useIdentity } from '../../data/identity'
 
 type Scn = 'honoraires' | 'prix' | 'exclu' | 'succession'
 const SCENARIOS: { id: Scn; title: string; persona: string; photo: string; ctx: string; open: string; focus: string; skill: number }[] = [
@@ -70,7 +71,9 @@ function evaluate(s: (typeof SCENARIOS)[number], level: Level, planned: number, 
 }
 
 export default function Coaching() {
-  const [raw, ops] = useCollection<Session & Doc>('coaching', SEED as (Session & Doc)[])
+  const who = useIdentity()
+  // Compte réel : aucune session d’exemple, seulement celles réellement jouées.
+  const [raw, ops] = useCollection<Session & Doc>('coaching', who.real ? [] : SEED as (Session & Doc)[])
   const sessions = useMemo(() => [...raw].filter((x) => Array.isArray(x.skills)).sort((a, b) => a.at.localeCompare(b.at)), [raw])
   const [phase, setPhase] = useState<'setup' | 'live' | 'feedback'>('setup')
   const [scn, setScn] = useState<Scn>('honoraires')
@@ -84,7 +87,7 @@ export default function Coaching() {
     const ev = evaluate(s, level, +dur, t)
     if (!ev) { toast('Session trop courte : aucune réplique à évaluer, rien n’est enregistré', 'info'); setPhase('setup'); return }
     try {
-      const saved = await ops.create({ ...ev, share: 'prive', at: new Date().toISOString(), by: 'Claire Delmas' })
+      const saved = await ops.create({ ...ev, share: 'prive', at: new Date().toISOString(), by: who.name })
       setCurrentId(saved.id); setPhase('feedback'); toast(`Session enregistrée · score ${ev.score}`)
     } catch (e) { toast(errText(e), 'error') }
   }
@@ -92,7 +95,7 @@ export default function Coaching() {
     try { await ops.remove(id); toast('Session supprimée'); if (id === current?.id) { setCurrentId(null); setPhase('setup') } } catch (e) { toast(errText(e), 'error') }
   }
   const setShare = async (id: string, share: Session['share']) => {
-    try { await ops.update(id, { share }); toast(share === 'prive' ? 'Session repassée en privé' : 'Score partagé avec Marc Olivieri', 'info') } catch (e) { toast(errText(e), 'error') }
+    try { await ops.update(id, { share }); toast(share === 'prive' ? 'Session repassée en privé' : (who.real ? 'Score partagé avec votre responsable' : 'Score partagé avec Marc Olivieri'), 'info') } catch (e) { toast(errText(e), 'error') }
   }
   const openSession = (id: string) => { setCurrentId(id); setPhase('feedback') }
 
@@ -328,6 +331,7 @@ function Progress({ sessions, highlight }: { sessions: Session[]; highlight?: st
 }
 
 function Feedback({ session, sessions, onShare, onRemove, onRetry, onNew }: { session: Session; sessions: Session[]; onShare: (v: Session['share']) => void; onRemove: () => void; onRetry: () => void; onNew: () => void }) {
+  const who = useIdentity()
   const idx = sessions.findIndex((x) => x.id === session.id)
   const prev = idx > 0 ? sessions[idx - 1] : undefined
   const window8 = sessions.slice(Math.max(0, idx - 7), idx + 1)
@@ -384,7 +388,7 @@ function Feedback({ session, sessions, onShare, onRemove, onRetry, onNew }: { se
         </Stagger>
         <Stagger i={3}>
           <Card title="Confidentialité" kicker="Enregistrée avec la session">
-            <Tabs id="coach-share" value={session.share} onChange={onShare} items={[{ id: 'prive', label: <span className="flex items-center gap-1.5"><LockSimple size={13} />Privé</span> }, { id: 'manager', label: <span className="flex items-center gap-1.5"><UsersThree size={13} />Partagé avec Marc O.</span> }]} />
+            <Tabs id="coach-share" value={session.share} onChange={onShare} items={[{ id: 'prive', label: <span className="flex items-center gap-1.5"><LockSimple size={13} />Privé</span> }, { id: 'manager', label: <span className="flex items-center gap-1.5"><UsersThree size={13} />{who.real ? 'Partagé avec votre responsable' : 'Partagé avec Marc O.'}</span> }]} />
             <AnimatePresence mode="wait">
               <motion.p key={session.share} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: EXPO }} className="mt-3 text-[12.5px] leading-relaxed text-bone/60">
                 {session.share === 'prive' ? 'Seule vous avez accès au score, aux compétences et aux moments clés. Rien ne remonte dans le pilotage d’agence.' : 'Votre manager voit le score et les compétences, jamais la transcription. Vous pouvez retirer le partage à tout moment.'}

@@ -1,5 +1,7 @@
 # Jaspe — v2 fonctionnelle
 
+> **Développeurs : commencez par [REPRISE.md](REPRISE.md)** (état, architecture, démarrage, priorités).
+
 **En ligne :** https://valeriongg.github.io/jaspe/ — portail de tous les accès : https://valeriongg.github.io/jaspe/#/portail
 
 Landing animée + CRM/back-office complet, branchés sur une vraie API (Node 24 + SQLite natif), en mode **clair « Calcaire & Azur »** et **sombre « Nocturne Riviera »**. Aucun code repris des anciens ZIP ni de la v0.23.
@@ -29,6 +31,11 @@ Landing sur `/`, portail des raccourcis sur `/portail`, offre commerciale sur `/
   - `src/data/store.ts` : cache par collection, mutations optimistes, temps réel, repli hors ligne (localStorage).
   - `src/data/collections.ts` : un hook par collection avec son amorce.
   - `src/ui/theme.tsx` : clair / sombre / système, sans flash au chargement.
+
+## En ligne
+
+- **Production réelle (comptes, données persistantes)** : https://jaspe.217-160-124-232.nip.io, sur Dokploy. Notice : [deploy/dokploy/README.md](deploy/dokploy/README.md).
+- **Démo statique** : https://valeriongg.github.io/jaspe/ (données dans le navigateur).
 
 ## Version en ligne (GitHub Pages)
 `npm --prefix app run build:static` produit `app/dist-static` : routes par ancre (`#/app`), chemins relatifs, et **moteur métier embarqué** (le même `server/engine.js` exécuté dans le navigateur) avec stockage local. Le copilote y répond par réponses préparées ; les fichiers déposés sont limités à 1,5 Mo.
@@ -74,7 +81,7 @@ Réponse aux retours des testeurs (étude complète : `research/05-etude-concurr
 ## Vague 3 : se brancher partout
 - **Serveur MCP** (`server/mcp.js`, `server/mcp-stdio.js`) : 9 outils (5 de lecture, 4 de préparation). Les outils d’écriture ne font que **proposer** dans « Tâches & validations » ; `mcp.approve` exécute après accord du conseiller. HTTP sur `/mcp` avec jeton d’agence (`Authorization: Bearer jsp.…`, empreinte seule stockée) ou stdio (`node server/mcp-stdio.js`). Configuration à copier dans Réglages › Intégrations.
 - **Lecture du compromis / CPCV** (`server/contract.js`, étape Compromis & acte) : PDF lu avec unpdf ; Claude Opus 5.5 en sortie structurée si `ANTHROPIC_API_KEY`, sinon règles FR/PT. Chaque date, condition et pièce cite son extrait ; rien n’est appliqué sans case cochée ; relances J-7 créées aux échéances.
-- **Débrief par WhatsApp** (`server/whatsapp.js`, webhook `/api/whatsapp/webhook`) : texte ou vocal d’un numéro de conseiller enregistré → transcription (service tiers compatible « audio transcriptions » : `JASPE_STT_URL`, `JASPE_STT_KEY`, `JASPE_STT_MODEL`) → plan proposé à valider. Variables `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`. Signature `X-Hub-Signature-256` vérifiée. Démo locale uniquement pour l’instant (routage numéro → agence à faire en mode comptes).
+- **Débrief par WhatsApp** (`server/whatsapp.js`, webhook `/api/whatsapp/webhook`) : texte ou vocal d’un numéro de conseiller enregistré → transcription (service tiers compatible « audio transcriptions » : `JASPE_STT_URL`, `JASPE_STT_KEY`, `JASPE_STT_MODEL`) → plan proposé à valider. Variables `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`. Signature `X-Hub-Signature-256` vérifiée. En mode comptes, un seul webhook pour toutes les agences : chaque numéro de conseiller est rattaché à une seule agence (table `waroutes`, conflit refusé en 409) et le message part dans la base de cette agence ; numéro inconnu ignoré.
 - **IMPIC** : échéance à la fin du trimestre suivant (« a confirmar »), rappels J-15 et J-3, export CSV de l’anexo.
 
 ## Vague 4 : le monde réel
@@ -86,9 +93,13 @@ Réponse aux retours des testeurs (étude complète : `research/05-etude-concurr
 Clés et comptes : Stripe (produits, prix, webhook), InvoiceXpress, SMTP, WhatsApp Business (Meta) et service de transcription, éventuellement Casafari et `ANTHROPIC_API_KEY`. Relecture juridique FR et PT (checklists, grille LCB-FT, mentions de factures, durées de conservation, échéance IMPIC). Confirmation des en-têtes d’export eGO / Hektor sur un vrai fichier.
 
 ## Comptes et paiement (vague 2)
-Activer : `JASPE_AUTH=1` (comptes, une base par agence dans `server/data/orgs/<orgId>.sqlite`, comptes et abonnements dans `server/data/accounts.sqlite`). Paiement : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_SOLO_MONTH`, `STRIPE_PRICE_SOLO_YEAR`, `STRIPE_PRICE_AGENCE`, `STRIPE_PRICE_SEAT`, `STRIPE_PRICE_PREUVES`, `STRIPE_PRICE_DONNEES` ; option `JASPE_PUBLIC_URL` pour les URL de retour. Webhook Stripe : `POST /api/billing/webhook` (événements checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed). Sans clé : 503 « Paiement non configuré ». Pages publiques `/tarifs`, `/connexion`, `/inscription`, `/invitation/:token`. Remboursement 15 jours et garantie « 2 h gagnées » : traités à la main. Pas de réinitialisation de mot de passe par e-mail (aucun envoi réel).
+Activer : `JASPE_AUTH=1` (comptes, une base par agence dans `server/data/orgs/<orgId>.sqlite`, comptes et abonnements dans `server/data/accounts.sqlite`). Paiement : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_SOLO_MONTH`, `STRIPE_PRICE_SOLO_YEAR`, `STRIPE_PRICE_AGENCE`, `STRIPE_PRICE_SEAT`, `STRIPE_PRICE_PREUVES`, `STRIPE_PRICE_DONNEES` ; option `JASPE_PUBLIC_URL` pour les URL de retour. Webhook Stripe : `POST /api/billing/webhook` (événements checkout.session.completed, customer.subscription.updated/deleted, invoice.payment_failed). Sans clé Stripe : **bêta gratuite** automatique (offre « Bêta gratuite », dossiers illimités, 7 conseillers, aucun prélèvement) ; `JASPE_BETA=0` force les quotas de l’offre Découverte, et les routes de paiement répondent 503 « Paiement non configuré ». Pages publiques `/tarifs`, `/connexion`, `/inscription`, `/invitation/:token`. Remboursement 15 jours et garantie « 2 h gagnées » : traités à la main. Pas de réinitialisation de mot de passe par e-mail (aucun envoi réel).
 
 Tests serveur : `npm test` (84 tests, aucun appel réseau réel : Stripe, InvoiceXpress, WhatsApp, SMTP, DVF et Claude sont simulés).
 
 ## Recherche
 `research/` : inspiration (Dribbble/Behance/Awwwards/sites), motion (MotionSites & co), benchmark de ~55 acteurs, 398 idées + 100 routines — consultables dans le CRM, page « Étude & benchmark ».
+
+## Audit du 26 novembre 2026
+
+Test réel en mode comptes, note 53/100 au départ, 84/100 après deux vagues de corrections : voir [docs/audit-2026-11/AUDIT.md](docs/audit-2026-11/AUDIT.md) (captures incluses).
