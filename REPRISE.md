@@ -24,11 +24,11 @@ Positionnement retenu (retours terrain de Christophe) : « Votre CRM fait tourne
 | Quoi | Où |
 |---|---|
 | Code | GitHub `ValerionGG/jaspe` (public) |
-| Travail récent | branche `fix/audit-compte-reel-beta`, **PR #2 ouverte** (https://github.com/ValerionGG/jaspe/pull/2) : à relire puis fusionner dans `main` |
+| Branche | `main` (PR #1 et #2 fusionnées le 26/11/2026) |
 | Production réelle | https://jaspe.217-160-124-232.nip.io (Dokploy M3, projet « Jaspe », application « app ») |
 | Démo statique | https://valeriongg.github.io/jaspe/ (branche `gh-pages`, données dans le navigateur) |
 
-Après la fusion de la PR #2 : dans Dokploy › Jaspe › app › General, passer la branche à `main`.
+La production Dokploy suit `main` (déploiement automatique à chaque push).
 
 ## 3. Démarrer en local
 

@@ -7,7 +7,7 @@ Le serveur est partagé avec d’autres projets : ne toucher qu’au projet Jasp
 | Réglage | Valeur |
 |---|---|
 | Type | Application, source **Git** publique `https://github.com/ValerionGG/jaspe.git` |
-| Branche | `fix/audit-compte-reel-beta` (PR #2) tant qu’elle n’est pas fusionnée, puis `main` |
+| Branche | `main` (déploiement automatique à chaque push) |
 | Build | **Dockerfile**, chemin `deploy/dokploy/Dockerfile`, contexte `.` (racine) |
 | Port du conteneur | `5318` |
 | Domaine | `jaspe.217-160-124-232.nip.io`, HTTPS Let’s Encrypt (nip.io : pas de DNS à créer) |
