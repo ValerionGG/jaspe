@@ -100,7 +100,7 @@ export function planFromBrief(text, now = new Date()) {
   for (const s of sentences(text)) {
     const due = parseDue(s, now)
     const offer = /\boffre|contre-offre|proposta|contraproposta|\boferta/i.test(s)
-    if (/rappel|relanc|recontact|appeler|t[ée]l[ée]phoner|revenir vers|ligar|telefonar|contactar|voltar a falar/i.test(s)) {
+    if (/rappel|relanc|recontact|appeler|t[ée]l[ée]phoner|revenir vers|ligar|\bligo\b|ligarei|telefonar|telefono|contactar|contacto o|voltar a falar|volto a falar/i.test(s)) {
       const cond = s.match(/(?:apr[èe]s|depois d[oa]s?) (?:le |la |l’|l'|les )?([^,.]+)/i)?.[1]
       add({ type: 'relance', label: `Relancer le ${who(s)}${cond ? ` après ${cond.trim()}` : ''}`, due: due ?? later(2), source: s })
     }
@@ -116,6 +116,19 @@ export function planFromBrief(text, now = new Date()) {
     if (/factur|commission|honoraires? (?:à|a) encaisser|fatura|comiss[ãa]o/i.test(s)) add({ type: 'facture', label: 'Préparer la facture de commission', source: s })
     if (AML.test(s) && !items.some((x) => x.type === 'conformite')) add({ type: 'conformite', label: 'Vigilance LCB-FT : vérifier identité, bénéficiaire effectif et origine des fonds, consigner l’analyse de risque', source: s })
     if (/visite|rendez-vous|\brdv|visita|reuni[ãa]o|contre-visite/i.test(s) && due && !/rappel|relanc|ligar|telefonar/i.test(s) && !offer) add({ type: 'tache', label: `Organiser : ${s.replace(/\s+/g, ' ').slice(0, 90)}`, due, source: s })
+  }
+  // Fiche parcours : une relance vendeur garde le prix à confirmer dans le dossier et propose de surveiller
+  // les comparables jusqu’à l’appel (une baisse de prix sera signalée). La veille reste à cocher.
+  const callBack = items.find((x) => x.type === 'relance' && /vendeur|vendedor|propri/i.test(x.source ?? ''))
+  // Brief dicté en portugais : libellés en portugais pour les actions de rappel.
+  const pt = /\b(ao|vendedor|ligo|ligar|depois|amanh[ãa]|sexta|segunda)\b/i.test(text) && !/\b(le|la|les|vendeur|après)\b/i.test(text)
+  if (pt) for (const it of items) if (it.type === 'relance') {
+    const cond = it.source?.match(/depois d[oa]s? ([^,.]+)/i)?.[1]
+    it.label = `Ligar ao ${/comprador/i.test(it.source ?? '') ? 'comprador' : 'vendedor'}${cond ? ` depois do ${cond.trim()}` : ''}`
+  }
+  if (callBack) {
+    if (!items.some((x) => x.type === 'point' && /prix|pre[çc]o/i.test(x.label))) add({ type: 'point', label: pt ? 'Preço a confirmar na chamada' : 'Prix à confirmer lors de l’appel', source: callBack.source, suggested: true })
+    if (!items.some((x) => x.type === 'veille')) items.push({ id: `pl${items.length + 1}`, selected: false, type: 'veille', label: pt ? 'Acompanhar os comparáveis até à chamada (descida de preço assinalada)' : 'Surveiller les comparables jusqu’à l’appel (baisse de prix signalée)', source: callBack.source, suggested: true })
   }
   return items
 }

@@ -99,7 +99,7 @@ test('webhook : signature valide, invalide, périmée ; cycle de vie de l’abon
     const ok = await app.hook(completed)
     assert.equal(ok.status, 200); assert.equal(ok.json.result, 'abonnement activé')
     let me = (await app.call('GET', '/me')).json
-    assert.equal(me.plan.id, 'solo'); assert.equal(me.plan.status, 'active'); assert.equal(me.limits.dossiers, 8)
+    assert.equal(me.plan.id, 'solo'); assert.equal(me.plan.status, 'active'); assert.equal(me.limits.dossiers, 20)
     assert.equal((await app.hook(completed)).json.duplicate, true, 'événement rejoué ignoré')
 
     // Passage à Agence avec 3 sièges en plus et l’option Données marché.

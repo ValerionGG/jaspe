@@ -4,7 +4,7 @@ import clsx from 'clsx'
 import { Timer, DownloadSimple, ArrowCounterClockwise, Info, ArrowSquareOut, Copy, Printer, Hourglass } from '@phosphor-icons/react'
 import { PageHeader, Card, Stat, SoftBtn, Stagger, Empty } from '../ui'
 import { Pill } from '../../ui/kit'
-import { useTimelog, useSettings, useDossiers } from '../../data/collections'
+import { useTimelog, useSettings, useDossiers, useAgents } from '../../data/collections'
 import { BASELINES, KIND_LABELS, type TimeEntry } from '../../data/assist'
 import { action } from '../../data/store'
 import { REVIEW_MIN, CORRECTION_MIN } from '../../../../server/assist.js'
@@ -48,6 +48,7 @@ export default function TempsGagne() {
   const [log] = useTimelog()
   const [settings] = useSettings()
   const [dossiers] = useDossiers()
+  const [agents] = useAgents()
   const [withDemo, setWithDemo] = useState(readDemo)
   const [kind, setKind] = useState<string>('L7')
   const [minutes, setMinutes] = useState('')
@@ -89,6 +90,15 @@ export default function TempsGagne() {
       corrections: sum(es, 'corrections'), net: sum(es, 'net'),
     })).sort((a, b) => b.net - a.net)
   }, [entries])
+
+  // Par conseiller (pour le responsable) : le gain est rattaché au conseiller du dossier.
+  const agentName = (id?: string) => (id ? (agents as { id: string; name: string }[]).find((a) => a.id === id)?.name : undefined)
+  const byAgent = useMemo(() => {
+    const m = new Map<string, TimeEntry[]>()
+    for (const e of entries) { const k = (e.dossierId ? dossierOf(e.dossierId)?.agentId : undefined) ?? '—'; m.set(k, [...(m.get(k) ?? []), e]) }
+    return [...m.entries()].map(([id, es]) => ({ id, name: agentName(id) ?? t('tg.noAgent'), n: es.length, net: sum(es, 'net'), spent: sum(es, 'spent'), corrections: es.filter((e) => e.corrections > 0).length }))
+      .sort((a, b) => b.net - a.net)
+  }, [entries, dossiers, agents]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const rateN = Number(rate.replace(',', '.')) || 0, subN = Number(sub.replace(',', '.')) || 0
   const value4 = (net4 / 60) * rateN
@@ -150,8 +160,8 @@ export default function TempsGagne() {
 
   const exportCsv = () => {
     const esc = (v: unknown) => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
-    const head = ['date', 'type', 'libelle', 'dossier', 'vendeur', 'reference_min', 'passe_min', 'corrections', 'net_min', 'demo']
-    const rows = entries.map((e) => { const d = dossierOf(e.dossierId); return [new Date(e.at).toISOString(), e.kind, e.label, d?.ref ?? e.dossierId ?? '', d?.seller ?? '', e.baseline, e.spent, e.corrections, e.net, e.demo ? 'oui' : 'non'] })
+    const head = ['date', 'type', 'libelle', 'dossier', 'vendeur', 'conseiller', 'reference_min', 'passe_min', 'corrections', 'net_min', 'demo']
+    const rows = entries.map((e) => { const d = dossierOf(e.dossierId); return [new Date(e.at).toISOString(), e.kind, e.label, d?.ref ?? e.dossierId ?? '', d?.seller ?? '', agentName(d?.agentId) ?? '', e.baseline, e.spent, e.corrections, e.net, e.demo ? 'oui' : 'non'] })
     const csv = '﻿' + [head, ...rows].map((r) => r.map(esc).join(';')).join('\r\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
@@ -242,6 +252,29 @@ export default function TempsGagne() {
             </Card>
           </Stagger>
         </div>
+        {byAgent.length > 0 && (
+          <Stagger i={4} className="mt-4">
+            <Card title={t('tg.perAgent')} kicker={t('tg.perAgentK')} pad={false}>
+              <div className="overflow-x-auto px-5 pb-4">
+                <table className="w-full min-w-[480px] text-[13px]">
+                  <thead><tr className="text-left text-[11px] uppercase tracking-eyebrow text-mist">
+                    <th className="py-2 font-normal">{t('tg.th.agent')}</th><th className="py-2 text-right font-normal">{t('tg.th.n')}</th><th className="py-2 text-right font-normal">{t('tg.th.spent')}</th><th className="py-2 text-right font-normal">{t('tg.th.corr')}</th><th className="py-2 text-right font-normal">{t('tg.th.net')}</th><th className="py-2 text-right font-normal">{t('tg.th.value')}</th>
+                  </tr></thead>
+                  <tbody>{byAgent.map((r) => (
+                    <tr key={r.id} className="border-t border-white/[0.05]">
+                      <td className="py-2.5 pr-3 text-bone">{r.name}</td>
+                      <td className="num py-2.5 text-right text-bone/70">{r.n}</td>
+                      <td className="num py-2.5 text-right text-bone/70">{hours(r.spent)}</td>
+                      <td className={clsx('num py-2.5 text-right', r.corrections ? 'text-coral' : 'text-bone/40')}>{r.corrections}</td>
+                      <td className="num py-2.5 text-right text-sage">{hours(r.net)}</td>
+                      <td className="num py-2.5 text-right text-bone/70">{eur.format((r.net / 60) * rateN)}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </Card>
+          </Stagger>
+        )}
       </>)}
 
       {drafts.length > 0 && (

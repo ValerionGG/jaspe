@@ -331,6 +331,7 @@ function Progress({ sessions, highlight }: { sessions: Session[]; highlight?: st
 }
 
 function Feedback({ session, sessions, onShare, onRemove, onRetry, onNew }: { session: Session; sessions: Session[]; onShare: (v: Session['share']) => void; onRemove: () => void; onRetry: () => void; onNew: () => void }) {
+  const who = useIdentity()
   const idx = sessions.findIndex((x) => x.id === session.id)
   const prev = idx > 0 ? sessions[idx - 1] : undefined
   const window8 = sessions.slice(Math.max(0, idx - 7), idx + 1)
@@ -387,7 +388,7 @@ function Feedback({ session, sessions, onShare, onRemove, onRetry, onNew }: { se
         </Stagger>
         <Stagger i={3}>
           <Card title="Confidentialité" kicker="Enregistrée avec la session">
-            <Tabs id="coach-share" value={session.share} onChange={onShare} items={[{ id: 'prive', label: <span className="flex items-center gap-1.5"><LockSimple size={13} />Privé</span> }, { id: 'manager', label: <span className="flex items-center gap-1.5"><UsersThree size={13} />Partagé avec Marc O.</span> }]} />
+            <Tabs id="coach-share" value={session.share} onChange={onShare} items={[{ id: 'prive', label: <span className="flex items-center gap-1.5"><LockSimple size={13} />Privé</span> }, { id: 'manager', label: <span className="flex items-center gap-1.5"><UsersThree size={13} />{who.real ? 'Partagé avec votre responsable' : 'Partagé avec Marc O.'}</span> }]} />
             <AnimatePresence mode="wait">
               <motion.p key={session.share} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: EXPO }} className="mt-3 text-[12.5px] leading-relaxed text-bone/60">
                 {session.share === 'prive' ? 'Seule vous avez accès au score, aux compétences et aux moments clés. Rien ne remonte dans le pilotage d’agence.' : 'Votre manager voit le score et les compétences, jamais la transcription. Vous pouvez retirer le partage à tout moment.'}

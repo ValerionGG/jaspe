@@ -1,10 +1,11 @@
 // Gabarits déterministes des livrables D1–D3 / L1–L9 : uniquement des faits présents dans le dossier.
-const eur = (n) => (n >= 1e6 ? `${(n / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} M€` : `${Math.round(n / 1000).toLocaleString('fr-FR')} k€`)
-const fmt = (n) => Number(n).toLocaleString('fr-FR')
+const ok = (n) => typeof n === 'number' && Number.isFinite(n) && n > 0
+const eur = (n) => !ok(n) ? 'à établir' : (n >= 1e6 ? `${(n / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} M€` : `${Math.round(n / 1000).toLocaleString('fr-FR')} k€`)
+const fmt = (n) => (Number.isFinite(Number(n)) && n !== null && n !== '' ? Number(n).toLocaleString('fr-FR') : '—')
 const today = () => new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 // Portugais européen (pt-PT) : « 2,8 M€ », « 850 mil € », « 15 000 €/m² », « 26 de novembro de 2026 ».
-const eurPt = (n) => (n >= 1e6 ? `${(n / 1e6).toLocaleString('pt-PT', { maximumFractionDigits: 2 })} M€` : `${Math.round(n / 1000).toLocaleString('pt-PT')} mil €`)
-const fmtPt = (n) => Number(n).toLocaleString('pt-PT')
+const eurPt = (n) => !ok(n) ? 'a definir' : (n >= 1e6 ? `${(n / 1e6).toLocaleString('pt-PT', { maximumFractionDigits: 2 })} M€` : `${Math.round(n / 1000).toLocaleString('pt-PT')} mil €`)
+const fmtPt = (n) => (Number.isFinite(Number(n)) && n !== null && n !== '' ? Number(n).toLocaleString('pt-PT') : '—')
 const todayPt = () => new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
 /** Langue des livrables : portugais si l’agence l’a choisi ou exerce au Portugal. */
 export const docLang = (settings = {}) => (settings?.lang === 'pt' || settings?.country === 'PT' ? 'pt' : 'fr')
@@ -35,25 +36,29 @@ function matchBuyers(p, buyers) {
     .sort((a, b) => b.score - a.score)
 }
 
-function draft(code, { dossier: d, property: p, agent: a, buyers = [], settings = {} }) {
+function draft(code, { dossier: d0, property: p0, agent: a, buyers = [], settings = {} }) {
+  // Dossier réel (créé dans l’app) : aucune pièce ni valeur supposée ; démo : données complètes d’origine.
+  const real = !/^d\d+$/.test(String(d0?.id ?? ''))
+  const d = { ...d0, motivation: d0?.motivation || 'projet à préciser', timeline: d0?.timeline || 'à préciser', tags: d0?.tags ?? [], seller: d0?.seller || 'Vendeur' }
+  const p = { ...p0, title: p0?.title || 'Bien', address: p0?.address || '', city: p0?.city || '', district: p0?.district || p0?.city || '', features: p0?.features ?? [], dpe: p0?.dpe || 'non renseigné', type: p0?.type || 'Bien' }
   const agency = settings.agencyName ?? 'Maison Riviera · Antibes'
   const sign = `${a?.name ?? 'Votre conseiller'}\n${a?.role ?? ''} · ${agency}`
   const seller = d.seller
   const civil = seller.startsWith('Famille') ? `Chère famille ${seller.replace('Famille ', '')}` : `Madame, Monsieur`
-  const ppm = Math.round(p.price / p.surface)
+  const ppm = ok(p.price) && ok(p.surface) ? Math.round(p.price / p.surface) : NaN
   const base = { id: `${d.id}-${code}`, dossierId: d.id, code, title: NAMES[code], createdAt: new Date().toISOString(), status: 'review', version: 1 }
   const src = (label, date = today()) => ({ label, date })
   switch (code) {
     case 'D1': return { ...base, kind: 'report', body: [
       `Brief avant rendez-vous — ${seller}`,
       `Projet déclaré : ${d.motivation}. Horizon : ${d.timeline}.`,
-      `Bien : ${p.title}, ${p.address}, ${p.city} — ${p.surface} m², ${p.rooms} pièces${p.land ? `, terrain ${fmt(p.land)} m²` : ''}.`,
+      `Bien : ${[p.title, p.address, p.city].filter(Boolean).join(', ')} — ${fmt(p.surface)} m², ${fmt(p.rooms)} pièces${p.land ? `, terrain ${fmt(p.land)} m²` : ''}.`,
       `À confirmer pendant l’entretien : décideurs et accord commun, prix souhaité, calendrier de départ, pièces disponibles (DPE, taxe foncière, titre).`,
       `Points d’attention : ${d.tags.join(', ') || 'aucun signalé'}.`,
     ], sources: [src('Fiche dossier'), src('Agenda')] }
     case 'D2': return { ...base, kind: 'report', body: [
       `Marché — ${p.district}, ${p.city}`,
-      `Prix de présentation envisagé : ${eur(p.price)} (${fmt(ppm)} €/m²).`,
+      `Prix de présentation envisagé : ${eur(p.price)}${ok(ppm) ? ` (${fmt(ppm)} €/m²)` : ''}.`,
       `Fourchette issue des comparables : ${eur(p.estimateLow)} – ${eur(p.estimateHigh)}.`,
       `Les prix vendus (DVF) et les prix affichés (annonces) sont distingués ; l’échantillon et ses limites sont détaillés dans l’analyse L7.`,
     ], sources: [src('DVF · Etalab, millésime 2026-S1'), src('Annonces actives du secteur')] }
@@ -72,7 +77,7 @@ function draft(code, { dossier: d, property: p, agent: a, buyers = [], settings 
     ], sources: [src('Découverte et brief D1'), src('Comparables D2')] }
     case 'L1': return { ...base, kind: 'email', to: seller, subject: `Merci pour votre accueil — ${p.title}`, body: [
       `${civil},`,
-      `Merci pour le temps que vous m’avez accordé et pour la visite de votre bien ${p.address}. Votre projet — ${d.motivation.toLowerCase()} — est clair, et nous construirons un calendrier qui le respecte.`,
+      `Merci pour le temps que vous m’avez accordé et pour la visite de votre bien${p.address ? ` ${p.address}` : ''}. Votre projet — ${d.motivation.toLowerCase()} — est clair, et nous construirons un calendrier qui le respecte.`,
       d.clientNextStep ? `Prochaine étape convenue : ${d.clientNextStep}.` : `Comme convenu, je reviens vers vous très prochainement avec l’analyse de valeur argumentée de votre bien, puis nous fixerons ensemble la suite.`,
       `Je reste à votre disposition pour toute question.`,
       sign,
@@ -112,9 +117,11 @@ function draft(code, { dossier: d, property: p, agent: a, buyers = [], settings 
       `4. Suivi : bilan régulier des visites et retours, au rythme convenu.`,
       `Seuls les services réellement disponibles dans l’agence sont présentés.`,
     ], sources: [src('Catalogue de services agence')] }
-    case 'L7': return { ...base, kind: 'report', range: [p.estimateLow, p.estimateHigh], body: [
+    case 'L7': return { ...base, kind: 'report', range: ok(p.estimateLow) && ok(p.estimateHigh) ? [p.estimateLow, p.estimateHigh] : null, body: [
       `Analyse de valeur — ${p.title}`,
-      `Fourchette retenue : ${eur(p.estimateLow)} – ${eur(p.estimateHigh)}, soit ${fmt(Math.round(p.estimateLow / p.surface))} à ${fmt(Math.round(p.estimateHigh / p.surface))} €/m².`,
+      ok(p.estimateLow) && ok(p.estimateHigh)
+        ? `Fourchette retenue : ${eur(p.estimateLow)} – ${eur(p.estimateHigh)}${ok(p.surface) ? `, soit ${fmt(Math.round(p.estimateLow / p.surface))} à ${fmt(Math.round(p.estimateHigh / p.surface))} €/m²` : ''}.`
+        : `Fourchette à établir : elle sera calculée à partir des ventes réelles comparables du secteur, puis relue par le conseiller.`,
       `Prix de présentation envisagé : ${eur(p.price)}.`,
       `Méthode : ventes comparables DVF ajustées (vue, état, terrain, étage) ; les annonces actives ne servent que de repère de concurrence.`,
       `Cette analyse est un avis de valeur professionnel, pas une expertise ; elle requiert la validation du conseiller.`,
@@ -124,7 +131,9 @@ function draft(code, { dossier: d, property: p, agent: a, buyers = [], settings 
       `Variantes proposées : éclairage naturel corrigé, mobilier contemporain, sols harmonisés. Structure, ouvertures et volumes préservés.`,
       `Chaque image est étiquetée « Image virtuelle — IA » (AI Act, août 2026) ; les originaux restent accessibles.`,
     ], sources: [src('Photos originales du dossier')] }
-    case 'L9': return { ...base, kind: 'checklist', items: [
+    case 'L9': return { ...base, kind: 'checklist', items: real ? [
+      'Titre de propriété', 'DPE', 'Diagnostics amiante / plomb / électricité', 'État des risques (ERP)', 'PV d’assemblée générale (3 derniers)', 'Règlement de copropriété / ASL',
+    ].map((label) => ({ label, state: 'missing', ref: '—' })) : [
       { label: 'Titre de propriété', state: 'ok', ref: 'p.1-14' }, { label: 'DPE', state: 'ok', ref: 'p.2' },
       { label: 'Diagnostics amiante / plomb / électricité', state: 'ok', ref: 'p.1-3' }, { label: 'État des risques (ERP)', state: 'ok', ref: 'Géorisques' },
       { label: 'PV d’assemblée générale (3 derniers)', state: 'missing', ref: '—' }, { label: 'Règlement de copropriété / ASL', state: 'check', ref: 'à vérifier' },

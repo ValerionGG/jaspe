@@ -36,6 +36,7 @@ const pt: Record<keyof typeof fr, string> = {
   'today.realEmpty': 'A sua base está vazia. Importe os seus imóveis do eGO ou do Hektor, ou crie um primeiro processo de venda: o copiloto prepara depois as suas reuniões.',
   'today.realBrief': '{n} processo ativo ·|{n} processos ativos ·', 'today.realEvents': '{n} reunião hoje|{n} reuniões hoje', 'today.importCta': 'Importar do meu CRM',
   'today.kpiDossiers': 'Processos ativos', 'today.kpiDossiersHint': 'dos quais {n} em preparação|dos quais {n} em preparação', 'today.kpiConvHintReal': 'Angariações assinadas / processos abertos',
+  'tg.perAgent': 'Por consultor', 'tg.perAgentK': 'Ganho líquido validado, correções descontadas · para exportar para o diretor', 'tg.th.agent': 'Consultor', 'tg.th.value': 'Valor', 'tg.noAgent': 'Sem consultor atribuído',
   'today.hello': 'Bom dia, {name}', 'today.briefBy': 'Briefing do copiloto · gerado às {time}', 'today.briefSources': 'Fontes: agenda, 8 processos, 2 rotinas',
   'today.brief1': 'Dia intenso, mas controlado.', 'today.pending': '{n} decisão pendente|{n} decisões pendentes',
   'today.brief2': ', das quais três contam antes das 14h: validar a avaliação da Villa Martin, rever o resumo do Sr. Haddad, enviar a contraproposta Dubreuil antes de expirar às 18h. A sua reunião das 11h está',

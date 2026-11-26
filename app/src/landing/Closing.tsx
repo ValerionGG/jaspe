@@ -6,12 +6,14 @@ import { Plus, Check, ShieldCheck } from '@phosphor-icons/react'
 import { Logo } from './chrome'
 import { action, ApiError } from '../data/store'
 import { useTheme } from '../ui/theme'
+import { PLANS, PLAN_OPTIONS, type PlanKey } from '../data/plans'
 
 const PERSONAS = [
   { who: 'Conseiller terrain', photo: 'p-claire', q: 'Je sors d’un rendez-vous, je dicte deux minutes dans la voiture. À mon retour, le mail de remerciement, la synthèse équipe et l’estimation m’attendent — je relis, je valide.', gain: 'Préparation, découverte, livrables' },
   { who: 'Directeur d’agence', photo: 'p-marc', q: 'Le lundi, je sais quels dossiers bloquent, qui a besoin d’aide et pourquoi. La réunion commerciale se prépare toute seule, avec des chiffres que tout le monde comprend.', gain: 'Pilotage, coaching, réunions' },
   { who: 'Coordinatrice transaction', photo: 'p-ines', q: 'Chaque pièce manquante a un responsable, une échéance et une relance. Du compromis à l’acte, plus rien ne dépend de ma mémoire.', gain: 'Pièces, échéances, notaires' },
-  { who: 'Direction réseau', photo: 'p-thomas', q: 'Une méthode, une marque, des routines déployées dans 40 agences — et une vision claire de l’adoption et des coûts, agence par agence.', gain: 'Gouvernance, marque, adoption' },
+  { who: 'Mandataire indépendant', photo: 'p-thomas', q: 'Je travaille seul, sur des T2 et des T3 à moins de 300 k€. Le compte rendu part le soir même, la relance est prête pour vendredi, et je vois chaque semaine le temps récupéré, corrections comprises.', gain: 'Comptes rendus, relances, temps gagné' },
+  { who: 'Consultora · Lisboa', photo: 'p-sofia', q: 'Apartamento T2 em Arroios : je dicte le débrief en sortant, le compte rendu et le message au vendeur sont prêts à relire, la facture de commission part par InvoiceXpress.', gain: 'Portugal, débrief, facturation' },
 ]
 
 export function Personas() {
@@ -49,24 +51,20 @@ export function Personas() {
   )
 }
 
-const PLANS = [
-  { n: 'Overlay', p: 49, u: '/ siège / mois HT', d: 'Sur votre CRM actuel — Apimo, Hektor, Modelo.', f: ['Parcours D1 → L9 complet', 'Débrief vocal & validation', 'Synchronisation CRM existant', 'Routines essentielles'], cta: 'Commencer' },
-  { n: 'Agence', p: 249, u: '/ mois HT · 5 sièges', d: 'Le poste de travail complet pour une agence.', f: ['Tout Overlay, plus :', 'CRM vendeur & acquéreur natif', 'Matching & kit marketing', '60 routines configurables', 'Marque agence & modèles'], cta: 'Réserver une démo', hi: true },
-  { n: 'Réseau', p: 990, u: '/ mois HT + 149 € / agence', d: 'Gouvernance, marque et pilotage multi-sites.', f: ['Tout Agence, plus :', 'Console réseau & héritage', 'Coopération inter-agences', 'SSO, audit, budget IA', 'Accompagnement au déploiement'], cta: 'Parler à l’équipe' },
-]
+const CTA: Record<PlanKey, [string, string]> = { decouverte: ['Créer mon compte gratuit', '/inscription'], solo: ['Commencer avec Solo', '/inscription'], agence: ['Réserver une démo', '#demo'] }
 
 export function Pricing() {
-  const [annual, setAnnual] = useState(true)
+  const [annual, setAnnual] = useState(false)
   return (
     <section id="tarifs" className="relative bg-ink px-4 py-32 md:px-10 md:py-44">
       <div className="mx-auto max-w-[1400px]">
         <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
           <div>
             <Eyebrow>Tarifs</Eyebrow>
-            <MaskLines className="display mt-6 text-5xl md:text-7xl" lines={[<>L’IA incluse.</>, <span className="italic text-champagne-300">Jamais en option.</span>]} />
+            <MaskLines className="display mt-6 text-5xl md:text-7xl" lines={[<>Gratuit pendant la bêta.</>, <span className="italic text-champagne-300">Simple ensuite.</span>]} />
           </div>
           <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1 ring-1 ring-white/10">
-            {[[false, 'Mensuel'], [true, 'Annuel · −15 %']].map(([v, l]) => (
+            {[[false, 'Mensuel'], [true, 'Annuel (Solo)']].map(([v, l]) => (
               <button key={String(v)} onClick={() => setAnnual(v as boolean)} className="relative rounded-full px-4 py-2 text-[13px]">
                 {annual === v && <motion.span layoutId="billing" className="absolute inset-0 rounded-full bg-bone" transition={{ duration: 0.6, ease: EXPO }} />}
                 <span className={`relative ${annual === v ? 'text-ink' : 'text-bone/70'}`}>{l as string}</span>
@@ -75,35 +73,40 @@ export function Pricing() {
           </div>
         </div>
         <div className="mt-16 grid gap-5 md:grid-cols-3">
-          {PLANS.map((p, i) => (
-            <Reveal key={p.n} delay={i * 0.1}>
-              <Bezel className={`h-full ${p.hi ? '!ring-champagne/40' : ''}`} coreClassName={`flex h-full flex-col p-8 ${p.hi ? 'bg-gradient-to-b from-champagne/[0.12] to-ink-800' : ''}`}>
-                <div className="flex items-center justify-between"><span className="text-[15px] font-medium">{p.n}</span>{p.hi && <span className="eyebrow bg-champagne text-ink">Recommandé</span>}</div>
-                <p className="mt-2 text-[13px] text-bone/55">{p.d}</p>
-                <div className="mt-8 flex items-baseline gap-2">
-                  <span className="relative inline-block overflow-hidden"><AnimatePresence mode="popLayout" initial={false}><motion.span key={String(annual)} initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '-100%', opacity: 0 }} transition={{ duration: 0.6, ease: EXPO }} className="display inline-block text-7xl">{Math.round(annual ? p.p * 0.85 : p.p)}</motion.span></AnimatePresence></span><span className="text-2xl text-bone/60">€</span>
-                </div>
-                <div className="text-[12px] text-mist">{p.u}</div>
-                <ul className="mt-8 flex-1 space-y-3">
-                  {p.f.map((f) => <li key={f} className="flex items-start gap-2.5 text-[13.5px] text-bone/75"><Check size={15} className="mt-0.5 shrink-0 text-champagne" />{f}</li>)}
-                </ul>
-                <div className="mt-10"><Button variant={p.hi ? 'gold' : 'ghost'} href="#demo" className="w-full justify-between">{p.cta}</Button></div>
-              </Bezel>
-            </Reveal>
-          ))}
+          {PLANS.map((p, i) => {
+            const hi = p.id === 'solo'
+            const year = annual && p.yearly ? p.yearly.split(' € ') : null // « 99 € / an » → ['99', '/ an']
+            const [cta, href] = CTA[p.id]
+            return (
+              <Reveal key={p.id} delay={i * 0.1}>
+                <Bezel className={`h-full ${hi ? '!ring-champagne/40' : ''}`} coreClassName={`flex h-full flex-col p-8 ${hi ? 'bg-gradient-to-b from-champagne/[0.12] to-ink-800' : ''}`}>
+                  <div className="flex items-center justify-between"><span className="text-[15px] font-medium">{p.name}</span>{hi && <span className="eyebrow bg-champagne text-ink">Le plus choisi</span>}</div>
+                  <p className="mt-2 text-[13px] text-bone/55">{p.pitch}</p>
+                  <div className="mt-8 flex items-baseline gap-2">
+                    <span className="relative inline-block overflow-hidden"><AnimatePresence mode="popLayout" initial={false}><motion.span key={String(!!year)} initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '-100%', opacity: 0 }} transition={{ duration: 0.6, ease: EXPO }} className="display inline-block text-7xl">{year ? year[0] : p.price}</motion.span></AnimatePresence></span><span className="text-xl text-bone/60">{year ? `€ ${year[1]}` : p.unit}</span>
+                  </div>
+                  <div className="text-[12px] text-mist">{p.dossiers} · {p.seats}{!year && p.yearly ? ` · ou ${p.yearly}` : ''}</div>
+                  <ul className="mt-8 flex-1 space-y-3">
+                    {p.features.map((f) => <li key={f} className="flex items-start gap-2.5 text-[13.5px] text-bone/75"><Check size={15} className="mt-0.5 shrink-0 text-champagne" />{f}</li>)}
+                  </ul>
+                  <div className="mt-10"><Button variant={hi ? 'gold' : 'ghost'} href={href} className="w-full justify-between">{cta}</Button></div>
+                </Bezel>
+              </Reveal>
+            )
+          })}
         </div>
-        <p className="mt-6 text-[12px] text-mist">Tarifs indicatifs de lancement, à confirmer pendant le pilote. Dossiers vendeurs supplémentaires au-delà du forfait : 9 € HT.</p>
+        <p className="mt-6 text-[12px] text-mist">Bêta en cours : tout est ouvert et gratuit, aucune carte demandée. Prix HT ensuite · options {PLAN_OPTIONS.map((o) => `${o.name} ${o.price}`).join(', ')} · <a href="/tarifs" className="underline underline-offset-2 hover:text-champagne-300">détail des tarifs</a>.</p>
       </div>
     </section>
   )
 }
 
 const FAQ = [
-  ['Faut-il abandonner notre CRM actuel ?', 'Non. Le mode Overlay se branche sur Apimo, Hektor ou Modelo : Jaspe lit vos biens et contacts, prépare et rédige, puis réécrit ce que vous validez. Vous pouvez migrer plus tard vers le CRM natif, sans ressaisie.'],
+  ['Faut-il abandonner notre CRM actuel ?', 'Non. Votre CRM fait tourner l’agence et garde la diffusion ; Jaspe travaille à côté. Vous importez vos biens et contacts depuis eGO ou Hektor (fichier CSV), puis Jaspe prépare le brief, le compte rendu, les documents et les relances que vous validez.'],
   ['Les textes et chiffres sont-ils fiables ?', 'Chaque chiffre est calculé hors génération de texte, daté et relié à sa source (DVF, INSEE, IGN, pièces du dossier). Une estimation affiche sa fourchette et ses limites ; un document manquant n’est jamais présenté comme « sans point bloquant ».'],
   ['Qu’est-ce qui part chez le client sans validation ?', 'Rien par défaut. Chaque routine a un niveau d’autonomie : automatique pour les tâches internes, validé par le conseiller pour tout ce qui sort de l’agence. Vous gardez la main sur les destinataires, les engagements et les dates.'],
-  ['Et la conformité — RGPD, prospection, AI Act ?', 'Registre des consentements, opposition propagée à toutes les séquences, prospection sans démarchage téléphonique non consenti, images de valorisation étiquetées et original conservé, journal d’audit complet et hébergement européen.'],
-  ['Combien de temps pour démarrer ?', 'Une agence est opérationnelle en une journée : connexion de l’agenda et du CRM, import de la marque, activation des routines essentielles. Un réseau se déploie par vagues d’agences pilotes.'],
+  ['Et la conformité — RGPD, prospection, AI Act ?', 'Registre des consentements, opposition propagée à toutes les séquences, prospection sans démarchage téléphonique non consenti, images de valorisation étiquetées et original conservé, journal d’audit complet. Hébergement européen prévu à l’ouverture, données jamais revendues.'],
+  ['Combien de temps pour démarrer ?', 'Quelques minutes. Vous créez votre compte (bêta gratuite, aucune carte demandée), importez vos biens et contacts depuis eGO ou Hektor en CSV, puis préparez le brief de votre prochain rendez-vous.'],
 ]
 
 export function Faq() {
@@ -183,7 +186,7 @@ export function Cta() {
                     </label>
                     {err && <p role="alert" className="text-[12.5px] text-coral">{err}</p>}
                     <div className="pt-3"><Magnetic className="w-full"><Button type="submit" size="lg" className="w-full justify-between">{sent === 'sending' ? 'Envoi…' : 'Réserver ma démonstration'}</Button></Magnetic></div>
-                    <p className="flex items-center gap-2 pt-1 text-[11px] text-mist"><ShieldCheck size={13} /> Hébergement européen · aucune revente de données</p>
+                    <p className="flex items-center gap-2 pt-1 text-[11px] text-mist"><ShieldCheck size={13} /> Hébergement européen prévu à l’ouverture · données jamais revendues</p>
                   </motion.form>
                 )}
               </AnimatePresence>
@@ -200,8 +203,8 @@ export function Footer() {
     <footer className="relative overflow-hidden bg-ink px-4 pb-8 pt-24 md:px-10">
       <div className="mx-auto max-w-[1400px]">
         <div className="grid gap-12 border-b border-white/[0.07] pb-16 md:grid-cols-12">
-          <div className="md:col-span-4"><Logo /><p className="mt-5 max-w-xs text-[13px] leading-relaxed text-mist">Le copilote proactif des agences et réseaux immobiliers. Conçu sur la Côte d’Azur.</p></div>
-          {([['Produit', [['Parcours vendeur', '#parcours'], ['CRM & dossiers', '/app/dossiers'], ['Automatisations', '#automatisations'], ['Console réseau', '/app/pilotage'], ['Messagerie & WhatsApp', '/app/messages']]], ['Découvrir', [['Portail · tous les accès', '/portail'], ['Offre Essentiel', '/essentiel'], ['CRM Essentiel', '/essentiel/app'], ['Tutoriels', '/app/aide'], ['Étude & benchmark', '/app/etude']]], ['Ressources', [['Tarifs', '#tarifs'], ['Questions fréquentes', '#demo'], ['Feuille de route', '/app/idees']]]] as const).map(([t, l]) => (
+          <div className="md:col-span-4"><Logo /><p className="mt-5 max-w-xs text-[13px] leading-relaxed text-mist">Le copilote des conseillers immobiliers, en France et au Portugal. Votre CRM fait tourner l’agence ; Jaspe vous rend le temps d’après rendez-vous.</p></div>
+          {([['Produit', [['Parcours vendeur', '#parcours'], ['CRM & dossiers', '/app/dossiers'], ['Automatisations', '#automatisations'], ['Console réseau', '/app/pilotage'], ['Messagerie & WhatsApp', '/app/messages']]], ['Découvrir', [['Portail · tous les accès', '/portail'], ['Offre Essentiel', '/essentiel'], ['CRM Essentiel', '/essentiel/app'], ['Tutoriels', '/app/aide'], ['Étude & benchmark', '/app/etude']]], ['Ressources', [['Tarifs', '/tarifs'], ['Questions fréquentes', '#demo'], ['Feuille de route', '/app/idees']]]] as const).map(([t, l]) => (
             <div key={t} className="md:col-span-2">
               <div className="text-[11px] uppercase tracking-eyebrow text-mist">{t}</div>
               <ul className="mt-4 space-y-2.5">{l.map(([x, h]) => <li key={x}><a href={h} {...(h.startsWith('http') ? { target: '_blank', rel: 'noreferrer' } : {})} className="text-[14px] text-bone/70 transition hover:text-champagne-300">{x}</a></li>)}</ul>

@@ -39,7 +39,7 @@ export function Preloader({ onDone }: { onDone: () => void }) {
       {!out && (
         <motion.div className="fixed inset-0 z-[90] flex flex-col justify-between bg-ink p-6 md:p-10" exit={{ y: '-100%' }} transition={{ duration: 1.1, ease: [0.76, 0, 0.24, 1] }}>
           <div className="flex items-center justify-between text-[11px] uppercase tracking-eyebrow text-mist">
-            <span>Côte d’Azur · 2026</span><span>Plateforme immobilière proactive</span>
+            <span>France · Portugal · 2026</span><span>Plateforme immobilière proactive</span>
           </div>
           <div className="overflow-hidden">
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ duration: 1.2, ease: EXPO }} className="display pb-[0.12em] text-[22vw] leading-[0.9] text-bone md:text-[16vw]">

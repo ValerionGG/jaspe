@@ -34,6 +34,7 @@ const fr = {
   'today.realEmpty': 'Votre base est vide. Importez vos biens depuis eGO ou Hektor, ou créez un premier dossier vendeur : le copilote prépare ensuite vos rendez-vous.',
   'today.realBrief': '{n} dossier actif ·|{n} dossiers actifs ·', 'today.realEvents': '{n} rendez-vous aujourd’hui|{n} rendez-vous aujourd’hui', 'today.importCta': 'Importer depuis mon CRM',
   'today.kpiDossiers': 'Dossiers actifs', 'today.kpiDossiersHint': 'dont {n} en préparation|dont {n} en préparation', 'today.kpiConvHintReal': 'Mandats signés / dossiers ouverts',
+  'tg.perAgent': 'Par conseiller', 'tg.perAgentK': 'Gain net validé, corrections déduites · à exporter pour le responsable', 'tg.th.agent': 'Conseiller', 'tg.th.value': 'Valeur', 'tg.noAgent': 'Sans conseiller attribué',
   'today.hello': 'Bonjour {name}', 'today.briefBy': 'Brief du copilote · généré à {time}', 'today.briefSources': 'Sources : agenda, 8 dossiers, 2 routines',
   'today.brief1': 'Journée dense mais maîtrisée.', 'today.pending': '{n} décision en attente|{n} décisions en attente',
   'today.brief2': ', dont trois comptent avant 14 h : valider l’estimation de la Villa Martin, relire le débrief de M. Haddad, envoyer la contre-offre Dubreuil avant son expiration à 18 h. Votre rendez-vous de 11 h est',

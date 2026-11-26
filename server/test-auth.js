@@ -171,15 +171,15 @@ test('limite de dossiers actifs : 402 au-delà, lecture seule après retour à D
     assert.equal(over.status, 402); assert.match(over.json.error, /Découverte comprend 1 dossier actif/)
     const orgId = (await c.call('GET', '/me')).json.org.id
     app.accounts.updateOrg(orgId, { plan: 'solo', status: 'active' })
-    for (let i = 0; i < 7; i++) assert.equal((await c.call('POST', '/dossiers', { seller: `S${i}`, stage: 'rdv' })).status, 201)
-    assert.equal((await c.call('POST', '/dossiers', { seller: 'Neuvième', stage: 'rdv' })).status, 402, 'Solo : 8 dossiers actifs')
+    for (let i = 0; i < 19; i++) assert.equal((await c.call('POST', '/dossiers', { seller: `S${i}`, stage: 'rdv' })).status, 201)
+    assert.equal((await c.call('POST', '/dossiers', { seller: 'Vingt-et-unième', stage: 'rdv' })).status, 402, 'Solo : 20 dossiers actifs')
     const me = await c.call('GET', '/me')
-    assert.equal(me.json.usage.dossiers, 8); assert.equal(me.json.limits.dossiers, 8)
+    assert.equal(me.json.usage.dossiers, 20); assert.equal(me.json.limits.dossiers, 20)
 
     // Impayé : retour à Découverte, données conservées, dossiers au-delà du quota en lecture seule.
     app.accounts.updateOrg(orgId, { status: 'past_due' })
     const list = (await c.call('GET', '/dossiers')).json
-    assert.equal(list.length, 8, 'aucune donnée supprimée')
+    assert.equal(list.length, 20, 'aucune donnée supprimée')
     const [first, second] = list
     assert.equal((await c.call('PATCH', `/dossiers/${first.id}`, { next: 'ok' })).status, 200, 'le premier dossier reste modifiable')
     const ro = await c.call('PATCH', `/dossiers/${second.id}`, { next: 'refusé' })

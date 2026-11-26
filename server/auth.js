@@ -22,7 +22,7 @@ const INACTIVE = new Set(['acte', 'archive', 'archivé', 'archived'])
 /** Grille fixée par la stratégie. `dossiers` : dossiers actifs simultanés (null = illimité). */
 export const PLANS = {
   decouverte: { label: 'Découverte', dossiers: 1, seats: 1, price: 0 },
-  solo: { label: 'Solo', dossiers: 8, seats: 1, price: 9.9, priceYear: 99 },
+  solo: { label: 'Solo', dossiers: 20, seats: 1, price: 9.9, priceYear: 99 },
   agence: { label: 'Agence', dossiers: null, seats: 7, price: 49, seatPrice: 6 },
   /** Bêta sans paiement (aucune clé Stripe) : tout ouvert, gratuit, jusqu’à l’ouverture des abonnements. */
   beta: { label: 'Bêta gratuite', dossiers: null, seats: 7, price: 0 },

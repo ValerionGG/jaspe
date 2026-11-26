@@ -195,3 +195,14 @@ test('AUT-010 : prépare une seule fois, n’écrase pas un brouillon à valider
   assert.ok(v1.length > 0, 'préparé au premier passage')
   assert.deepEqual(v3, v1, 'aucune nouvelle version aux passages suivants')
 })
+
+test('fiche parcours : « je rappelle le vendeur vendredi après le diagnostic » → relance datée, prix à confirmer, veille proposée (FR et PT)', async () => {
+  const { planFromBrief } = await import('./assist.js')
+  const now = new Date(2026, 10, 26, 10) // jeudi
+  const fr = planFromBrief('Je rappelle le vendeur vendredi après le diagnostic.', now)
+  assert.deepEqual(fr.map((i) => i.type), ['relance', 'point', 'veille'])
+  assert.equal(fr[0].due, '2026-11-27'); assert.equal(fr[2].selected, false, 'la veille reste à cocher')
+  const pt = planFromBrief('Ligo ao vendedor na sexta-feira depois do certificado energético.', now)
+  assert.deepEqual(pt.map((i) => i.type), ['relance', 'point', 'veille'])
+  assert.match(pt[0].label, /^Ligar ao vendedor depois do certificado/); assert.equal(pt[0].due, '2026-11-27')
+})

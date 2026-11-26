@@ -3,11 +3,12 @@ import { useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   Clock, FileText, BellRinging, SealCheck, Check, Plus, WhatsappLogo, EnvelopeSimple, ChatText,
-  Storefront, Hash, ShieldCheck, Sparkle, Prohibit, Scales, Lock, Megaphone, Users, Buildings, ImageSquare, Newspaper,
+  Hash, ShieldCheck, Sparkle, Prohibit, Scales, Lock, Megaphone, Users, Buildings, ImageSquare, Newspaper,
   BookOpenText, ClipboardText, ChartLineUp, HandHeart, type Icon,
 } from '@phosphor-icons/react'
 import { Eyebrow, EXPO } from '../ui/kit'
 import { img } from '../data/mock'
+import { PLANS } from '../data/plans'
 
 /* ——— Briques communes de la page Essentiel ——— */
 
@@ -43,7 +44,7 @@ const PilotTag = () => <span className="rounded-full bg-champagne/10 px-2 py-0.5
 
 const BENEFITS: { k: string; u: string; t: string; d: string; icon: Icon }[] = [
   { k: '−5 h', u: 'de saisie par semaine', t: 'Fini les soirées de rédaction', d: 'Brief, comptes rendus, estimation : rédigés à partir de vos rendez-vous et de sources datées (DVF, INSEE, pièces du dossier).', icon: Clock },
-  { k: '10 min', u: 'pour relire les 9 livrables', t: 'Un suivi vendeur qui impressionne', d: 'Remerciement, estimation, kit social, courrier voisinage… prêts à relire quelques minutes après votre débrief.', icon: FileText },
+  { k: '10 min', u: 'pour relire les 9 documents', t: 'Un suivi vendeur qui impressionne', d: 'Remerciement, estimation, kit social, courrier voisinage… prêts à relire quelques minutes après votre débrief.', icon: FileText },
   { k: '−30 %', u: 'de rendez-vous non honorés', t: 'Des clients qui se sentent suivis', d: 'Rappels J-1 et H-2 sur WhatsApp, relances acquéreurs et bilans vendeur programmés pour vous.', icon: BellRinging },
 ]
 
@@ -65,7 +66,7 @@ export function Benefits() {
           </In>
         ))}
       </div>
-      <p className="mt-5 text-[12px] text-mist">Objectifs fixés pour le pilote Côte d’Azur 2026, mesurés pendant votre essai — pas des résultats garantis.</p>
+      <p className="mt-5 text-[12px] text-mist">Objectifs fixés pour la bêta 2026, mesurés sur vos vrais dossiers, corrections comprises — pas des résultats garantis.</p>
     </Section>
   )
 }
@@ -102,7 +103,7 @@ function IllusVoice() {
 function IllusValidate() {
   return (
     <div className="space-y-2">
-      {['L1 · Remerciement', 'L7 · Estimation', 'L5 · Courrier voisinage'].map((t) => (
+      {['Remerciement', 'Estimation', 'Courrier voisinage'].map((t) => (
         <div key={t} className="flex items-center gap-3 rounded-xl bg-white/[0.03] px-3 py-2.5 text-[12.5px] ring-1 ring-white/[0.06]">
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sage/15 text-sage"><Check size={11} weight="bold" /></span>{t}
           <span className="ml-auto text-[11px] text-sage">validé</span>
@@ -114,15 +115,15 @@ function IllusValidate() {
 }
 
 const STEPS = [
-  { n: '01', t: 'Connectez votre agenda', d: 'Google ou Outlook, et votre CRM si vous en avez un (Apimo, Hektor, Modelo). Jaspe repère vos rendez-vous vendeurs et prépare le brief la veille.', time: '10 minutes, une seule fois', el: <IllusAgenda /> },
+  { n: '01', t: 'Importez vos dossiers', d: 'Vos biens et contacts depuis eGO ou Hektor, en fichier CSV. Jaspe travaille à côté de votre CRM et prépare le brief de chaque rendez-vous vendeur.', time: '10 minutes, une seule fois', el: <IllusAgenda /> },
   { n: '02', t: 'Dictez deux minutes', d: 'En sortant du rendez-vous, racontez ce que vous avez appris. Le copilote structure la découverte : projet, délais, travaux, points sensibles.', time: '2 minutes par rendez-vous', el: <IllusVoice /> },
-  { n: '03', t: 'Relisez, validez', d: 'Les neuf livrables vous attendent. Vous corrigez si besoin, vous validez : rien ne part chez un client sans votre clic.', time: '10 minutes de relecture', el: <IllusValidate /> },
+  { n: '03', t: 'Relisez, validez', d: 'Le compte rendu et les documents vous attendent. Vous corrigez si besoin, vous validez : rien ne part chez un client sans votre clic.', time: '10 minutes de relecture', el: <IllusValidate /> },
 ]
 
 export function Steps() {
   return (
     <Section id="comment">
-      <Head kicker="Comment ça marche" title="Trois gestes," accent="c’est tout." sub="Pas de formation de trois jours, pas de nouveau logiciel à apprendre : Jaspe travaille autour de votre agenda." />
+      <Head kicker="Comment ça marche" title="Trois gestes," accent="c’est tout." sub="Pas de formation de trois jours, pas de CRM à remplacer : Jaspe travaille à côté du vôtre." />
       <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-3">
         {STEPS.map((s, i) => (
           <In key={s.n} delay={i * 0.08} className={clsx(card, 'flex flex-col p-6')}>
@@ -235,11 +236,11 @@ export function DayCompare() {
 
 const LIVRABLES: { c: string; t: string; d: string; to: string; icon: Icon }[] = [
   { c: 'L1', t: 'Remerciement', d: 'Mail personnalisé reprenant ce que le vendeur vous a confié.', to: 'Vendeur', icon: HandHeart },
-  { c: 'L2', t: 'Synthèse équipe', d: 'Fiche bien, projet, délais et points sensibles pour vos collègues.', to: 'Interne', icon: Users },
+  { c: 'L2', t: 'Compte rendu équipe', d: 'Fiche bien, projet, délais et points sensibles pour vos collègues.', to: 'Interne', icon: Users },
   { c: 'L3', t: 'Avant-première acquéreurs', d: 'Les acquéreurs compatibles prévenus avant la mise en ligne.', to: 'Acquéreurs', icon: Megaphone },
   { c: 'L4', t: 'Kit social', d: 'Posts Instagram et Facebook aux couleurs de votre agence.', to: 'Réseaux sociaux', icon: Newspaper },
   { c: 'L5', t: 'Courrier voisinage', d: 'Lettre aux voisins pour trouver l’acquéreur… ou le prochain vendeur.', to: 'Voisinage', icon: EnvelopeSimple },
-  { c: 'L6', t: 'Book services', d: 'Votre méthode et vos services, mis en page pour ce vendeur.', to: 'Vendeur', icon: BookOpenText },
+  { c: 'L6', t: 'Présentation de vos services', d: 'Votre méthode et vos services, mis en page pour ce vendeur.', to: 'Vendeur', icon: BookOpenText },
   { c: 'L7', t: 'Estimation', d: 'Fourchette argumentée, comparables DVF datés et sourcés.', to: 'Vendeur', icon: ChartLineUp },
   { c: 'L8', t: 'Avant / après', d: 'Valorisation photo, images IA étiquetées, original conservé.', to: 'Diffusion', icon: ImageSquare },
   { c: 'L9', t: 'Copro & diagnostics', d: 'Pièces à réunir, diagnostics manquants, échéances.', to: 'Vendeur', icon: ClipboardText },
@@ -254,7 +255,7 @@ export function Deliverables() {
           <In key={l.c} delay={(i % 3) * 0.06} className={clsx(card, 'group flex gap-4 p-5 transition-colors duration-500 ease-silk hover:bg-ink-700')}>
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-champagne-300 ring-1 ring-white/[0.08]"><l.icon size={18} weight="light" /></span>
             <div className="min-w-0">
-              <div className="flex items-center gap-2"><span className="num text-[11.5px] text-champagne-300">{l.c}</span><span className="text-[15px] font-medium">{l.t}</span></div>
+              <div className="text-[15px] font-medium">{l.t}</div>
               <p className="mt-1 text-[13px] leading-relaxed text-bone/55">{l.d}</p>
               <span className="mt-3 inline-block rounded-full bg-white/[0.04] px-2.5 py-0.5 text-[10.5px] text-mist ring-1 ring-white/[0.06]">→ {l.to}</span>
             </div>
@@ -326,11 +327,11 @@ export function Reminders() {
 
 /* ——— Messagerie unifiée ——— */
 
-const CHANNELS: [Icon, string, number][] = [[WhatsappLogo, 'WhatsApp', 4], [EnvelopeSimple, 'E-mail', 7], [ChatText, 'SMS', 1], [Storefront, 'Portails', 3], [Hash, 'Équipe', 2]]
+const CHANNELS: [Icon, string, number][] = [[WhatsappLogo, 'WhatsApp', 4], [EnvelopeSimple, 'E-mail', 7], [Hash, 'Équipe', 2]]
 const CONVS: { ch: Icon; who: string; t: string; tag: string; tone: string; h: string }[] = [
   { ch: WhatsappLogo, who: 'Mme Costa', t: 'Merci pour ce matin ! On prépare les diagnostics ?', tag: 'Vendeur', tone: 'bg-champagne/10 text-champagne-300 ring-champagne/25', h: '10:31' },
   { ch: EnvelopeSimple, who: 'Paul Garnier', t: 'Financement validé, quand peut-on revisiter ?', tag: 'Acquéreur chaud', tone: 'bg-sage/10 text-sage ring-sage/25', h: '10:12' },
-  { ch: Storefront, who: 'SeLoger', t: 'Demande de visite — 3 pièces, Juan-les-Pins', tag: 'Nouveau contact', tone: 'bg-sea/10 text-sea ring-sea/25', h: '09:47' },
+  
   { ch: ChatText, who: 'Me Ravel, notaire', t: 'Projet de compromis envoyé pour relecture.', tag: 'Transaction', tone: 'bg-white/[0.05] text-bone/70 ring-white/10', h: '09:20' },
   { ch: Hash, who: '#équipe · Julien', t: '@Claire je prends la visite de 17 h à Biot.', tag: 'Interne', tone: 'bg-white/[0.05] text-bone/70 ring-white/10', h: '08:58' },
 ]
@@ -365,7 +366,7 @@ export function Inbox() {
           </div>
         </In>
         <div className="order-1 lg:order-2">
-          <Head kicker="Messagerie unifiée" title="Un seul fil" accent="par client." sub="WhatsApp, e-mails, SMS, demandes des portails et discussions d’équipe arrivent au même endroit, classés automatiquement : vendeur, acquéreur chaud, transaction, nouveau contact." />
+          <Head kicker="Messagerie unifiée" title="Un seul fil" accent="par client." sub="WhatsApp, e-mails et discussions d’équipe arrivent au même endroit, classés automatiquement : vendeur, acquéreur chaud, transaction, nouveau contact." />
           <div className="mt-7 flex flex-wrap gap-2 text-[12.5px] text-bone/70">
             {['Classement automatique', 'Réponses suggérées', 'Mentions @équipe', 'Historique dans le dossier'].map((x) => <span key={x} className="rounded-full bg-white/[0.04] px-3 py-1.5 ring-1 ring-white/[0.08]">{x}</span>)}
           </div>
@@ -378,7 +379,7 @@ export function Inbox() {
 /* ——— Conformité ——— */
 
 const COMPLIANCE: [Icon, string, string][] = [
-  [Lock, 'RGPD', 'Hébergement européen, registre des consentements, opposition propagée à toutes les relances.'],
+  [Lock, 'RGPD', 'Hébergement européen prévu à l’ouverture, données jamais revendues, registre des consentements, opposition propagée à toutes les relances.'],
   [ImageSquare, 'AI Act', 'Images retouchées par IA étiquetées, original toujours conservé (août 2026).'],
   [Prohibit, 'Démarchage', 'Aucun appel de prospection sans consentement préalable (11/08/2026), preuve horodatée.'],
   [SealCheck, 'Validation humaine', 'Rien ne part chez un client, un acquéreur ou un voisin sans votre clic.'],
@@ -409,8 +410,8 @@ export function Compliance() {
 
 const SCENARIOS = [
   { photo: 'p-sofia', who: 'Sofia', role: 'Conseillère indépendante · Juan-les-Pins', q: 'Mes estimations, je les faisais le soir. Maintenant je dicte dans la voiture, je relis à midi et le vendeur reçoit tout avant même que je sois rentrée.', gain: 'Préparation & livrables', icon: FileText },
-  { photo: 'p-julien', who: 'Julien', role: 'Agence de 3 conseillers · Biot', q: 'Les visites confirmées la veille sur WhatsApp, c’est fini les déplacements pour rien. Et je ne me demande plus qui a rappelé qui.', gain: 'Rappels & messagerie', icon: BellRinging },
-  { photo: 'p-lea', who: 'Léa', role: 'Directrice d’agence · Valbonne', q: 'Le courrier voisinage et le kit social partent pour chaque mandat, pas seulement quand on a le temps. Notre image a changé dans le quartier.', gain: 'Marketing du mandat', icon: Buildings },
+  { photo: 'p-julien', who: 'Rui', role: 'Consultor imobiliário · Lisboa', q: 'Apartamento T2 em Arroios : je dicte le débrief en sortant, le compte rendu est prêt en portugais et la relance du vendeur est programmée pour vendredi.', gain: 'Débrief & relances', icon: BellRinging },
+  { photo: 'p-lea', who: 'Léa', role: 'Mandataire indépendante · Lyon', q: 'Je vends surtout des T3 autour de 280 k€, sans assistante. L’estimation et le courrier voisinage sont prêts avant que je reparte, et je vois chaque semaine le temps récupéré.', gain: 'Documents & temps gagné', icon: Buildings },
 ]
 
 export function Scenarios() {
@@ -439,11 +440,11 @@ export function Scenarios() {
 /* ——— FAQ ——— */
 
 const FAQ = [
-  ['Que se passe-t-il après les 14 jours ?', 'Rien d’automatique : aucune carte bancaire n’est demandée. Vous choisissez de continuer à 49 € HT par siège et par mois, ou vous exportez vos documents ; vos données sont alors supprimées sous 30 jours.'],
-  ['Faut-il changer de CRM ?', 'Non. Jaspe Essentiel se branche sur Apimo, Hektor ou Modelo, ou fonctionne seul avec votre agenda. Vous gardez vos habitudes, Jaspe s’occupe de la rédaction et des relances.'],
+  ['Combien ça coûte après la bêta ?', `Pendant la bêta, tout est ouvert et gratuit, sans carte bancaire. Ensuite : ${PLANS.map((p) => `${p.name} ${p.price} ${p.unit} (${p.dossiers.toLowerCase()}${p.yearly ? `, ou ${p.yearly}` : ''}${p.id === 'agence' ? `, ${p.seats.toLowerCase()}` : ''})`).join(' ; ')}. Prix HT, sans engagement.`],
+  ['Faut-il changer de CRM ?', 'Non. Votre CRM fait tourner l’agence ; Jaspe travaille à côté. Vous importez vos biens et contacts depuis eGO ou Hektor (fichier CSV), et Jaspe s’occupe du compte rendu, des documents et des relances.'],
   ['Est-ce que des messages partent sans moi ?', 'Seuls les rappels de rendez-vous, sur des modèles que vous avez validés et à des clients qui ont donné leur accord. Tout le reste — livrables, relances, courriers — attend votre validation.'],
   ['De quoi ai-je besoin pour WhatsApp ?', 'D’un numéro WhatsApp Business. Nous le connectons avec vous pendant l’appel de démarrage de 30 minutes ; en attendant, les rappels restent préparés et visibles dans Jaspe.'],
-  ['Et si mon agence grandit ?', 'Vous passez à l’offre Agence (5 sièges, CRM natif, matching acquéreurs) à tout moment, sans ressaisie, au prorata du mois en cours.'],
+  ['Et si mon agence grandit ?', `Vous passez à l’offre Agence (${PLANS.find((p) => p.id === 'agence')!.price} € / mois, ${PLANS.find((p) => p.id === 'agence')!.seats.toLowerCase()}) à tout moment, sans ressaisie.`],
 ]
 
 export function Faq() {
