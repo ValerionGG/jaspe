@@ -67,12 +67,31 @@ export function createAccounts(path) {
     CREATE TABLE IF NOT EXISTS sessions (tokenHash TEXT PRIMARY KEY, userId TEXT NOT NULL, expiresAt TEXT NOT NULL, createdAt TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS invites (id TEXT PRIMARY KEY, tokenHash TEXT NOT NULL UNIQUE, orgId TEXT NOT NULL, role TEXT NOT NULL, createdBy TEXT NOT NULL, expiresAt TEXT NOT NULL, usedAt TEXT, createdAt TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, type TEXT NOT NULL, at TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS resets (tokenHash TEXT PRIMARY KEY, userId TEXT NOT NULL, expiresAt TEXT NOT NULL, usedAt TEXT, createdAt TEXT NOT NULL);`)
+    CREATE TABLE IF NOT EXISTS resets (tokenHash TEXT PRIMARY KEY, userId TEXT NOT NULL, expiresAt TEXT NOT NULL, usedAt TEXT, createdAt TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS waroutes (phone TEXT PRIMARY KEY, orgId TEXT NOT NULL, createdAt TEXT NOT NULL);`)
   const orgRow = (r) => (r ? { ...r, options: JSON.parse(r.options || '[]'), cancelAtPeriodEnd: !!r.cancelAtPeriodEnd } : null)
   const q = (sql) => db.prepare(sql)
   const ORG_FIELDS = ['name', 'country', 'plan', 'status', 'period', 'options', 'seats', 'customerId', 'subscriptionId', 'periodEnd', 'cancelAtPeriodEnd']
   const api = {
     db,
+    /**
+     * Débrief WhatsApp en mode comptes : un numéro de conseiller appartient à une seule agence.
+     * Remplace les numéros de l’agence ; refuse (409) un numéro déjà rattaché à une autre agence,
+     * sinon une agence pourrait recevoir les débriefs d’une autre.
+     */
+    claimWaPhones(orgId, phones) {
+      const list = [...new Set(phones.map((p) => String(p ?? '').replace(/\D/g, '').replace(/^00/, '')).filter((p) => p.length >= 8))]
+      const taken = list.filter((p) => { const r = q('SELECT orgId FROM waroutes WHERE phone = ?').get(p); return r && r.orgId !== orgId })
+      if (taken.length) { const e = new Error(`Numéro déjà rattaché à une autre agence : …${taken[0].slice(-4)}`); e.status = 409; throw e }
+      db.exec('BEGIN')
+      try {
+        q('DELETE FROM waroutes WHERE orgId = ?').run(orgId)
+        for (const p of list) q('INSERT INTO waroutes (phone, orgId, createdAt) VALUES (?, ?, ?)').run(p, orgId, iso())
+        db.exec('COMMIT')
+      } catch (e) { db.exec('ROLLBACK'); throw e }
+      return list.length
+    },
+    waOrgFor(phone) { const d = String(phone ?? '').replace(/\D/g, '').replace(/^00/, ''); return d ? q('SELECT orgId FROM waroutes WHERE phone = ?').get(d)?.orgId ?? null : null },
     createOrg({ name, country }) {
       const id = `org_${randomUUID().replace(/-/g, '').slice(0, 12)}`
       q('INSERT INTO orgs (id, name, country, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)').run(id, name, country, iso(), iso())
@@ -397,7 +416,7 @@ ${link}`, html: `<p>Bonjour,</p><p>${escHtml(s.user.name)} vous invite à rejoin
     }
     const ctx = openOrg(s.org.id)
     await guard(req, parts, s.org, ctx)
-    return ctx
+    return { ...ctx, user: s.user }
   }
 
   return { handle, accounts, tick: async () => { for (const id of accounts.activeOrgIds()) await openOrg(id).engine.tick() } }

@@ -180,3 +180,18 @@ test('panel clients : portugais, offre, signaux LCB-FT, dates locales, faux posi
   e = db.list('timelog').find((x) => x.ref === 'doc-d1-L7')
   assert.equal(e.pending, false); assert.equal(e.net, 42)
 })
+
+test('AUT-010 : prépare une seule fois, n’écrase pas un brouillon à valider, ne boucle pas sur un livrable bloqué', async () => {
+  const { db, engine } = createApp({ dbPath: ':memory:', delay: () => Promise.resolve() })
+  db.put('properties', { id: 'px', title: 'Moradia T5', city: 'Cascais', surface: 310, price: 2.4e6, dpe: 'C' })
+  db.put('dossiers', { id: 'dx', seller: 'Família Teste', propertyId: 'px', agentId: 'a1', stage: 'prep', deliverables: {} })
+  await engine.tick(['AUT-010'], true)
+  await new Promise((r) => setTimeout(r, 30))
+  const v1 = db.list('documents').filter((d) => d.dossierId === 'dx').map((d) => `${d.code}:${d.version}`).sort()
+  await engine.tick(['AUT-010'], true)
+  await engine.tick(['AUT-010'], true)
+  await new Promise((r) => setTimeout(r, 30))
+  const v3 = db.list('documents').filter((d) => d.dossierId === 'dx').map((d) => `${d.code}:${d.version}`).sort()
+  assert.ok(v1.length > 0, 'préparé au premier passage')
+  assert.deepEqual(v3, v1, 'aucune nouvelle version aux passages suivants')
+})

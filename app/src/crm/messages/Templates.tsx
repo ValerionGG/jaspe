@@ -6,12 +6,20 @@ import { Card, Stat, Stagger, SoftBtn, Empty } from '../ui'
 import { Modal, Field, Input, Select, AsyncForm, toast, errText } from '../forms'
 import { useTemplates } from '../../data/collections'
 import type { Channel, Template } from '../../data/messaging'
-import { CH, ChannelBadge, fill, VARS, eyebrow, me } from './shared'
+import { CH, ChannelBadge, fill, VARS, eyebrow, useSelf } from './shared'
 
 type T = Template & { id: string }
-const SAMPLE: Record<string, string> = { prenom: 'Hélène', date: 'mercredi 14 octobre', heure: '15 h 00', lieu: '14 chemin des Nielles, Antibes', bien: 'villa contemporaine vue mer', conseiller: me.name, pieces: 'le PV d’AG 2025 et le carnet d’entretien' }
+/** Valeurs d’exemple pour l’aperçu d’un modèle (le conseiller est la personne connectée). */
+const BASE_SAMPLE: Record<string, string> = { prenom: 'Hélène', date: 'mercredi 14 octobre', heure: '15 h 00', lieu: '14 chemin des Nielles, Antibes', bien: 'villa contemporaine vue mer', pieces: 'le PV d’AG 2025 et le carnet d’entretien' }
 
+function useSample(): Record<string, string> {
+  const me = useSelf()
+  if (!me.real) return { ...BASE_SAMPLE, conseiller: me.name }
+  const d = new Date(Date.now() + 864e5)
+  return { ...BASE_SAMPLE, conseiller: me.name, date: d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }
+}
 function Preview({ body }: { body: string }) {
+  const SAMPLE = useSample()
   return <p className="whitespace-pre-line text-[13px] leading-relaxed text-bone/85">{body.split(/(\{\{\w+\}\})/g).map((p, i) => { const k = /^\{\{(\w+)\}\}$/.exec(p)?.[1]; return k ? <span key={i} className={clsx('rounded px-0.5', SAMPLE[k] ? 'bg-champagne/15 text-champagne-300' : 'bg-coral/15 text-coral')}>{SAMPLE[k] ?? p}</span> : p })}</p>
 }
 
@@ -83,6 +91,7 @@ const IBtn = ({ label, onClick, children }: { label: string; onClick: () => void
 
 function Editor({ tpl, onClose, cats }: { tpl: T | 'new' | null; onClose: () => void; cats: string[] }) {
   const [, ops] = useTemplates()
+  const SAMPLE = useSample()
   const t = tpl && tpl !== 'new' ? tpl : undefined
   const [body, setBody] = useState(t?.body ?? 'Bonjour {{prenom}}, ')
   const [channel, setChannel] = useState<Channel>(t?.channel ?? 'whatsapp')

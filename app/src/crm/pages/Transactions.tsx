@@ -5,7 +5,9 @@ import clsx from 'clsx'
 import { Handshake, Seal, Bank, Vault, Coins, DownloadSimple, Plus, CheckCircle, Circle, Warning, HourglassMedium, PaperPlaneTilt, FileText, Scales, ArrowRight, Sparkle, Check, PencilSimple, CaretRight, Receipt } from '@phosphor-icons/react'
 import { PageHeader, Card, Stagger, SoftBtn, Empty, IconBtn } from '../ui'
 import { EXPO } from '../../ui/kit'
-import { prop, eur, fmt, agent, type Dossier } from '../../data/mock'
+import { eur, fmt, type Dossier } from '../../data/mock'
+import { useIdentity } from '../../data/identity'
+import { useAgentOf, usePropOrBlank } from '../../data/people'
 import { TX_STAGES, type Tx, type TxStage, type CondState } from '../../data/ops'
 import { useTransactions, useDossiers, useTasks, useOutbox } from '../../data/collections'
 import { action, type Doc } from '../../data/store'
@@ -16,23 +18,35 @@ type Cond = Tx['conditions'][number]
 // ponytail: horloge de démo ancrée au lundi 12 oct. 2026 10:36, avance en temps réel.
 const DEMO_NOW = Date.UTC(2026, 9, 12, 10, 36)
 const T0 = Date.now()
-function useNow() {
-  const [n, setN] = useState(DEMO_NOW)
-  useEffect(() => { const t = setInterval(() => setN(DEMO_NOW + Date.now() - T0), 1000); return () => clearInterval(t) }, [])
+// Compte réel : horloge réelle (heure locale exprimée comme en démo, en « UTC » naïf).
+const realNow = () => { const d = new Date(); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()) }
+function useNow(real: boolean) {
+  const [n, setN] = useState(() => (real ? realNow() : DEMO_NOW))
+  useEffect(() => { const t = setInterval(() => setN(real ? realNow() : DEMO_NOW + Date.now() - T0), 1000); return () => clearInterval(t) }, [real])
   return n
 }
-const signTs = (t: Tx) => Date.UTC(t.sign.m < 9 ? 2027 : 2026, t.sign.m, t.sign.d, t.sign.h)
+/** Année de signature : enregistrée à la création ; sinon déduite (démo : oct. 2026 → août 2027 ; compte réel : prochaine occurrence, à 60 jours près). */
+const signTs = (t: Tx, real = false) => {
+  if (t.sign.y) return Date.UTC(t.sign.y, t.sign.m, t.sign.d, t.sign.h)
+  if (!real) return Date.UTC(t.sign.m < 9 ? 2027 : 2026, t.sign.m, t.sign.d, t.sign.h)
+  const y = new Date().getFullYear(), ts = Date.UTC(y, t.sign.m, t.sign.d, t.sign.h)
+  return ts < realNow() - 60 * 864e5 ? Date.UTC(y + 1, t.sign.m, t.sign.d, t.sign.h) : ts
+}
 const split = (ms: number) => { const s = Math.max(0, Math.floor(ms / 1000)); return { d: Math.floor(s / 86400), h: Math.floor((s % 86400) / 3600), m: Math.floor((s % 3600) / 60), s: s % 60 } }
 const pad = (n: number) => String(n).padStart(2, '0')
 const stamp = () => new Date().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-const MONTHS = [9, 10, 11, 0, 1].map((m) => ({ m, l: ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'][m] }))
+const ML = ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.']
+const monthsFrom = (start: number) => Array.from({ length: 5 }, (_, i) => (start + i) % 12).map((m) => ({ m, l: ML[m] }))
 const STATES: CondState[] = ['à lancer', 'en cours', 'en retard', 'levée']
 
 const COND: Record<CondState, string> = { levée: 'bg-sage/15 text-sage ring-sage/25', 'en cours': 'bg-sea/15 text-sea ring-sea/25', 'en retard': 'bg-coral/15 text-coral ring-coral/25', 'à lancer': 'bg-white/[0.04] text-bone/55 ring-white/10' }
 const STAGE_I: Record<TxStage, typeof Handshake> = { offre: Handshake, compromis: FileText, conditions: Scales, acte: Seal }
 
 export default function Transactions() {
-  const now = useNow()
+  const real = useIdentity().real
+  const now = useNow(real)
+  const prop = usePropOrBlank()
+  const MONTHS = monthsFrom(real ? new Date().getMonth() : 9)
   const [txs, ops] = useTransactions()
   const [dossiers] = useDossiers()
   const [, taskOps] = useTasks()
@@ -45,7 +59,7 @@ export default function Transactions() {
   const engaged = txs.filter((t) => t.stage !== 'offre')
   const fees = txs.reduce((s, t) => s + t.fees, 0)
   const deposits = txs.reduce((s, t) => s + t.deposit, 0)
-  const nextActe = [...txs].filter((t) => signTs(t) > now && t.stage !== 'offre').sort((a, b) => signTs(a) - signTs(b))[0]
+  const nextActe = [...txs].filter((t) => signTs(t, real) > now && t.stage !== 'offre').sort((a, b) => signTs(a, real) - signTs(b, real))[0]
   const byAgency = Object.entries(txs.flatMap((t) => t.split.map((s) => [s.agency, (t.fees * s.pct) / 100] as const)).reduce<Record<string, number>>((acc, [a, v]) => ({ ...acc, [a]: (acc[a] ?? 0) + v }), {})).sort((a, b) => b[1] - a[1])
   const feesByMonth = MONTHS.map(({ m, l }) => ({ l, v: Math.round(txs.filter((t) => t.stage !== 'offre' && t.sign.m === m).reduce((s, t) => s + t.fees, 0) / 1000) }))
   const maxMonth = Math.max(1, ...feesByMonth.map((m) => m.v))
@@ -75,7 +89,7 @@ export default function Transactions() {
             { I: Handshake, l: 'Volume sous compromis', v: eur(engaged.reduce((s, t) => s + t.price, 0)), h: `${engaged.length} transactions engagées` },
             { I: Coins, l: 'Honoraires attendus', v: eur(fees), h: 'TTC · avant répartition' },
             { I: Vault, l: 'Séquestres chez notaires', v: eur(deposits), h: 'Dépôts de garantie versés' },
-            { I: HourglassMedium, l: 'Prochaine signature', v: nextActe ? (() => { const c = split(signTs(nextActe) - now); return `${c.d} j ${pad(c.h)} h` })() : '—', h: nextActe ? `${prop(nextActe.propertyId).title} · ${nextActe.sign.label}` : 'Aucune signature planifiée' },
+            { I: HourglassMedium, l: 'Prochaine signature', v: nextActe ? (() => { const c = split(signTs(nextActe, real) - now); return `${c.d} j ${pad(c.h)} h` })() : '—', h: nextActe ? `${prop(nextActe.propertyId).title} · ${nextActe.sign.label}` : 'Aucune signature planifiée' },
           ].map(({ I, l, v, h }) => (
             <Card key={l}>
               <div className="flex items-center justify-between text-[12px] text-mist"><span>{l}</span><I size={16} weight="light" className="text-champagne/80" /></div>
@@ -121,7 +135,7 @@ export default function Transactions() {
                   </button>
                   <div className="space-y-1.5">
                     {items.map((t) => {
-                      const p = prop(t.propertyId), c = split(signTs(t) - now), on = tx?.id === t.id
+                      const p = prop(t.propertyId), c = split(signTs(t, real) - now), on = tx?.id === t.id
                       return (
                         <motion.button layout key={t.id} onClick={() => setSel(t.id)} className={clsx('relative flex w-full items-center gap-3 rounded-2xl p-2 text-left ring-1 transition-all duration-300', on ? 'bg-ink-700 ring-champagne/40' : 'bg-ink-800/80 ring-white/[0.05] hover:ring-white/15', stage && !active && 'opacity-40')}>
                           <img src={p.photo} alt="" className="h-11 w-11 shrink-0 rounded-xl object-cover" />
@@ -187,6 +201,9 @@ export default function Transactions() {
 
 function NewTx({ dossiers, onCreate, onCancel }: { dossiers: Dossier[]; onCreate: (t: Partial<T>) => Promise<void>; onCancel: () => void }) {
   const [id, setId] = useState(dossiers[0].id)
+  const who = useIdentity()
+  const prop = usePropOrBlank(), agent = useAgentOf()
+  const todayIso = new Date().toISOString().slice(0, 10)
   const d = dossiers.find((x) => x.id === id)!, p = prop(d.propertyId)
   return (
     <AsyncForm submitLabel="Créer la transaction" success="Transaction créée · conditions et pièces à suivre" onCancel={onCancel} onSubmit={async (v) => {
@@ -208,19 +225,19 @@ function NewTx({ dossiers, onCreate, onCancel }: { dossiers: Dossier[]; onCreate
         ],
         pieces: [{ l: 'Offre écrite signée', s: 'reçue', from: 'Acquéreur' }, { l: 'Titre de propriété', s: 'manquante', from: 'Vendeur' }, { l: 'DDT complet', s: 'manquante', from: 'Diagnostiqueur' }, { l: 'Pièces d’identité acquéreur', s: 'manquante', from: 'Acquéreur' }],
         fees, feePayer: v.feePayer as Tx['feePayer'], split: [{ agency: agent(d.agentId).agency, pct: 100, role: 'Mandat & vente' }], deposit,
-        sign: { m: dt.getMonth(), d: dt.getDate(), h: dt.getHours(), label, place: v.place.trim() || 'À définir' },
+        sign: { m: dt.getMonth(), d: dt.getDate(), h: dt.getHours(), y: dt.getFullYear(), label, place: v.place.trim() || 'À définir' },
       })
     }}>
       <Field label="Dossier en offre"><Select name="dossier" value={id} onChange={(e) => setId(e.target.value)}>{dossiers.map((x) => <option key={x.id} value={x.id}>{x.seller} · {prop(x.propertyId).title}</option>)}</Select></Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Acquéreur"><Input name="buyer" required placeholder="Mme Okafor" /></Field>
+        <Field label="Acquéreur"><Input name="buyer" required placeholder={who.real ? 'Nom de l’acquéreur' : 'Mme Okafor'} /></Field>
         <Field label="Prix accepté (€)"><Input key={`p${id}`} name="price" type="number" min={0} step={1000} required defaultValue={p.price} /></Field>
         <Field label="Honoraires TTC (€)"><Input key={`f${id}`} name="fees" type="number" min={0} step={500} required defaultValue={Math.round(p.price * 0.05)} /></Field>
         <Field label="Charge des honoraires"><Select name="feePayer" defaultValue="vendeur"><option value="vendeur">Vendeur</option><option value="acquéreur">Acquéreur</option></Select></Field>
-        <Field label="Signature du compromis"><Input name="date" type="date" required min="2026-10-11" max="2027-08-31" /></Field>
+        <Field label="Signature du compromis"><Input name="date" type="date" required min={who.real ? todayIso : '2026-10-11'} max={who.real ? undefined : '2027-08-31'} /></Field>
         <Field label="Heure"><Input name="time" type="time" step={900} defaultValue="10:00" /></Field>
-        <Field label="Notaires"><Input name="notaries" placeholder="Me Faure · Me Lenoir" /></Field>
-        <Field label="Lieu de signature"><Input name="place" placeholder="Étude Faure, Antibes" /></Field>
+        <Field label="Notaires"><Input name="notaries" placeholder={who.real ? 'Me … · Me …' : 'Me Faure · Me Lenoir'} /></Field>
+        <Field label="Lieu de signature"><Input name="place" placeholder={who.real ? 'Étude notariale, ville' : 'Étude Faure, Antibes'} /></Field>
         <Field label="Dépôt de garantie (€)"><Input name="deposit" type="number" min={0} step={500} defaultValue={0} /></Field>
         <Field label="Condition de prêt"><Select name="loan" defaultValue="yes"><option value="yes">Oui</option><option value="no">Achat comptant</option></Select></Field>
       </div>
@@ -240,7 +257,9 @@ function Detail({ tx, now, d, update, relance, ask, advance }: {
     try { await action('invoice.fromTransaction', { txId: tx.id }); toast('Facture de commission prête à relire'); navigate('/app/factures') }
     catch (e) { toast(errText(e), 'error') }
   }
-  const p = prop(tx.propertyId), c = split(signTs(tx) - now)
+  const real = useIdentity().real
+  const prop = usePropOrBlank()
+  const p = prop(tx.propertyId), c = split(signTs(tx, real) - now)
   const doneIdx = tx.milestones.filter((m) => m.s === 'done').length
   const missing = tx.pieces.filter((x) => x.s === 'manquante').map((x) => x.l)
   const received = tx.pieces.filter((x) => x.s === 'reçue').length

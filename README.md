@@ -74,7 +74,7 @@ Réponse aux retours des testeurs (étude complète : `research/05-etude-concurr
 ## Vague 3 : se brancher partout
 - **Serveur MCP** (`server/mcp.js`, `server/mcp-stdio.js`) : 9 outils (5 de lecture, 4 de préparation). Les outils d’écriture ne font que **proposer** dans « Tâches & validations » ; `mcp.approve` exécute après accord du conseiller. HTTP sur `/mcp` avec jeton d’agence (`Authorization: Bearer jsp.…`, empreinte seule stockée) ou stdio (`node server/mcp-stdio.js`). Configuration à copier dans Réglages › Intégrations.
 - **Lecture du compromis / CPCV** (`server/contract.js`, étape Compromis & acte) : PDF lu avec unpdf ; Claude Opus 5.5 en sortie structurée si `ANTHROPIC_API_KEY`, sinon règles FR/PT. Chaque date, condition et pièce cite son extrait ; rien n’est appliqué sans case cochée ; relances J-7 créées aux échéances.
-- **Débrief par WhatsApp** (`server/whatsapp.js`, webhook `/api/whatsapp/webhook`) : texte ou vocal d’un numéro de conseiller enregistré → transcription (service tiers compatible « audio transcriptions » : `JASPE_STT_URL`, `JASPE_STT_KEY`, `JASPE_STT_MODEL`) → plan proposé à valider. Variables `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`. Signature `X-Hub-Signature-256` vérifiée. Démo locale uniquement pour l’instant (routage numéro → agence à faire en mode comptes).
+- **Débrief par WhatsApp** (`server/whatsapp.js`, webhook `/api/whatsapp/webhook`) : texte ou vocal d’un numéro de conseiller enregistré → transcription (service tiers compatible « audio transcriptions » : `JASPE_STT_URL`, `JASPE_STT_KEY`, `JASPE_STT_MODEL`) → plan proposé à valider. Variables `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`. Signature `X-Hub-Signature-256` vérifiée. En mode comptes, un seul webhook pour toutes les agences : chaque numéro de conseiller est rattaché à une seule agence (table `waroutes`, conflit refusé en 409) et le message part dans la base de cette agence ; numéro inconnu ignoré.
 - **IMPIC** : échéance à la fin du trimestre suivant (« a confirmar »), rappels J-15 et J-3, export CSV de l’anexo.
 
 ## Vague 4 : le monde réel
@@ -95,4 +95,4 @@ Tests serveur : `npm test` (84 tests, aucun appel réseau réel : Stripe, Invoic
 
 ## Audit du 26 novembre 2026
 
-Test réel en mode comptes, note 53/100 avant et 75/100 après corrections : voir [docs/audit-2026-11/AUDIT.md](docs/audit-2026-11/AUDIT.md) (captures incluses).
+Test réel en mode comptes, note 53/100 au départ, 84/100 après deux vagues de corrections : voir [docs/audit-2026-11/AUDIT.md](docs/audit-2026-11/AUDIT.md) (captures incluses).

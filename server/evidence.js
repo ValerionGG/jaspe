@@ -1,3 +1,4 @@
+import { actor } from './actor.js'
 // Pack Preuves : grille de risque LCB-FT / BCFT par partie, lien client « pièces et origine des fonds »,
 // export de contrôle horodaté (HTML imprimable + JSON avec empreintes SHA-256), récapitulatif trimestriel IMPIC.
 // Code pur (aucune API Node) : l'empreinte et l'écriture des fichiers sont injectées (`sha256`, `saveFile`).
@@ -231,7 +232,8 @@ export const canonical = (v) => (Array.isArray(v) ? `[${v.map(canonical).join(',
 
 /* ——— Fabrique ——— */
 export function createEvidence(db, deps = {}) {
-  const { HttpError = class extends Error { constructor(status, m) { super(m); this.status = status } }, sha256, saveFile, evaluate, setCompliance, emit = () => {}, user = 'Claire Delmas' } = deps
+  const { HttpError = class extends Error { constructor(status, m) { super(m); this.status = status } }, sha256, saveFile, evaluate, setCompliance, emit = () => {}, user: fixedUser } = deps
+  const userName = () => fixedUser ?? actor()
   if (typeof sha256 !== 'function') throw new Error('createEvidence : fonction sha256(buffer) requise')
   const nowD = () => (deps.now ? new Date(deps.now()) : new Date())
   const iso = () => nowD().toISOString()
@@ -253,7 +255,7 @@ export function createEvidence(db, deps = {}) {
   const partyName = (c, party) => (party === 'vendeur' ? c.tx?.seller ?? c.dossier.seller : c.tx?.buyer ?? c.dossier.buyer ?? 'Acquéreur à identifier')
 
   /** Journal horodaté, en ajout seul : qui, quand, quoi. Partagé avec la checklist (compliance.set). */
-  const log = (dossierId, kind, what, extra = {}) => put('cmplog', { dossierId, at: iso(), by: extra.by ?? user, kind, what, ...extra })
+  const log = (dossierId, kind, what, extra = {}) => put('cmplog', { dossierId, at: iso(), by: extra.by ?? userName(), kind, what, ...extra })
 
   /* ——— Grille de risque ——— */
   const texts = (c) => [
@@ -302,7 +304,7 @@ export function createEvidence(db, deps = {}) {
     const changed = !prev || prev.level !== out.level || prev.score !== out.score || prev.suggestions !== out.suggestions
     if (changed) out.updatedAt = iso()
     put('risks', out)
-    if (!prev || prev.level !== out.level) log(dossierId, 'risk', `Grille ${PARTIES[party].toLowerCase()} : niveau ${LEVELS[out.level].toLowerCase()} (score ${out.score})${prev ? ` — était ${LEVELS[prev.level].toLowerCase()}` : ''}`, { party, by: prev ? user : 'Jaspe (calcul)', to: out.level, from: prev?.level })
+    if (!prev || prev.level !== out.level) log(dossierId, 'risk', `Grille ${PARTIES[party].toLowerCase()} : niveau ${LEVELS[out.level].toLowerCase()} (score ${out.score})${prev ? ` — était ${LEVELS[prev.level].toLowerCase()}` : ''}`, { party, by: prev ? userName() : 'Jaspe (calcul)', to: out.level, from: prev?.level })
     return out
   }
 
@@ -366,7 +368,7 @@ export function createEvidence(db, deps = {}) {
       return grid(dossierId, party)
     },
     /** Décision et justification consignées par le conseiller, liées au niveau au moment de la décision. */
-    'risk.decide': ({ dossierId, party, decision, justification, by = user }) => {
+    'risk.decide': ({ dossierId, party, decision, justification, by = userName() }) => {
       partyOf(party)
       if (!DECISIONS[decision]) throw new HttpError(400, 'Décision inconnue')
       if (String(justification ?? '').trim().length < 10) throw new HttpError(400, 'Justifiez la décision (10 caractères au moins)')
@@ -395,7 +397,7 @@ export function createEvidence(db, deps = {}) {
       const ttl = Math.min(LINK_DAYS, Math.max(1, Number(days) || LINK_DAYS))
       const link = put('depotlinks', {
         dossierId, party, lang: lang === 'pt' || lang === 'fr' ? lang : c.country === 'PT' ? 'pt' : 'fr', tokenHash: await hash(enc(token)), tokenHint: token.slice(-4),
-        createdAt: created.toISOString(), expiresAt: new Date(created.getTime() + ttl * 864e5).toISOString(), createdBy: user,
+        createdAt: created.toISOString(), expiresAt: new Date(created.getTime() + ttl * 864e5).toISOString(), createdBy: userName(),
         partyName: g.name, pieces: g.pieces, level: g.level, uses: 0, maxUses: MAX_UPLOADS, declaredAt: null, revokedAt: null,
       })
       log(dossierId, 'link', `Lien « pièces et origine des fonds » créé pour ${PARTIES[party].toLowerCase()} (${g.pieces.length} pièce(s), expire le ${link.expiresAt.slice(0, 10)})`, { party, linkId: link.id })
@@ -405,13 +407,13 @@ export function createEvidence(db, deps = {}) {
       const l = db.get('depotlinks', id)
       if (!l) throw new HttpError(404, 'Lien introuvable')
       if (l.revokedAt) return publicLink(l)
-      const d = patch('depotlinks', id, { revokedAt: iso(), revokedBy: user })
+      const d = patch('depotlinks', id, { revokedAt: iso(), revokedBy: userName() })
       log(l.dossierId, 'link', `Lien ${PARTIES[l.party].toLowerCase()} révoqué (…${l.tokenHint})`, { party: l.party, linkId: id })
       return publicLink(d)
     },
 
     /** Export de contrôle : contenu canonique + empreinte SHA-256 de l'export lui-même. */
-    'evidence.export': async ({ dossierId, by = user }) => {
+    'evidence.export': async ({ dossierId, by = userName() }) => {
       const c = ctx(dossierId)
       const exportedAt = iso()
       refreshChecklist(dossierId)

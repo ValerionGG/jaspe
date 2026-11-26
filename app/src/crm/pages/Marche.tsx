@@ -9,6 +9,7 @@ import { eur, fmt } from '../../data/mock'
 import { compsFor, priceSeries, meters, DPE_STATS, DPE_C, type Comp, type Listing } from '../../data/geo'
 import { useProperties, useDossiers, type DocumentDoc } from '../../data/collections'
 import { action, useDoc, type Doc } from '../../data/store'
+import { useIdentity } from '../../data/identity'
 import { Modal, toast, errText } from '../forms'
 import { GeoMap, circle } from '../GeoMap'
 import { DocPaper } from './DossierDetail'
@@ -151,6 +152,7 @@ function Estimation({ s, props, onPick }: { s: Listing; props: Listing[]; onPick
   const [docId, setDocId] = useState<string | null>(null)
   const [tab, setTab] = useState<'tous' | 'dvf' | 'annonce'>('tous')
   const dossierId = dossiers.find((d) => d.propertyId === s.id)?.id
+  const real = useIdentity().real
 
   // Ajustements persistés sur le bien (champ `valuation`), après une courte pause de saisie
   const dirty = useRef(false)
@@ -304,7 +306,7 @@ function Estimation({ s, props, onPick }: { s: Listing; props: Listing[]; onPick
 
       <div className="mt-6 grid gap-6 lg:grid-cols-12">
         <Stagger i={3} className="min-w-0 lg:col-span-7">
-          <Card title="Comparables" kicker={`${inR.length} dans un rayon de ${meters(radius)}`} action={<Tabs id="mk-comp" value={tab} onChange={setTab} items={[{ id: 'tous', label: 'Tous' }, { id: 'dvf', label: 'DVF' }, { id: 'annonce', label: 'Annonces' }]} />} pad={false}>
+          <Card title="Comparables" kicker={`${inR.length} dans un rayon de ${meters(radius)}${real ? ' · comparables simulés : appuyez-vous sur « Ventes réelles »' : ''}`} action={<Tabs id="mk-comp" value={tab} onChange={setTab} items={[{ id: 'tous', label: 'Tous' }, { id: 'dvf', label: 'DVF' }, { id: 'annonce', label: 'Annonces' }]} />} pad={false}>
             <div className="thin-scroll max-h-[520px] overflow-auto">
               <table className="w-full min-w-[700px] text-left text-[12.5px]">
                 <thead className="sticky top-0 z-10 bg-ink-800 text-[10px] uppercase tracking-eyebrow text-mist"><tr className="border-b border-white/[0.06]">{['', 'Adresse', 'Date', 'Surface', 'Prix', '€/m²', 'Dist.', 'Exclusion'].map((h) => <th key={h} className="px-3 py-3 font-normal">{h}</th>)}</tr></thead>
@@ -341,7 +343,7 @@ function Estimation({ s, props, onPick }: { s: Listing; props: Listing[]; onPick
           <Stagger i={5}>
             <Card title="Sources" kicker="Datées et traçables" action={<Database size={15} className="text-mist" />}>
               <div className="space-y-2">
-                {[['DVF · Demandes de valeurs foncières', 'Millésime 2026-S1 · publié le 15/04/2026', 'data.gouv.fr'], ['Annonces actives', 'Veille portails · 11/10/2026 07:00', '5 portails'], ['INSEE · Recensement & Filosofi', 'RP 2022 · Filosofi 2021', 'insee.fr'], ['Indices Notaires-INSEE', '2T 2026 · Alpes-Maritimes', 'notaires.fr']].map(([a, b, c]) => (
+                {[['DVF · Demandes de valeurs foncières', 'Millésime 2026-S1 · publié le 15/04/2026', 'data.gouv.fr'],  ...(real ? [] : [['Annonces actives', 'Veille portails · 11/10/2026 07:00', '5 portails']]), ['INSEE · Recensement & Filosofi', 'RP 2022 · Filosofi 2021', 'insee.fr'], ['Indices Notaires-INSEE', '2T 2026 · Alpes-Maritimes', 'notaires.fr']].map(([a, b, c]) => (
                   <div key={a} className="flex items-start gap-3 rounded-xl bg-white/[0.02] px-3 py-2.5 ring-1 ring-white/[0.05]"><CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0 text-sage" /><div className="min-w-0 flex-1"><div className="text-[12.5px]">{a}</div><div className="num text-[11px] text-mist">{b}</div></div><span className="text-[10.5px] text-mist">{c}</span></div>
                 ))}
               </div>
@@ -361,8 +363,8 @@ function Estimation({ s, props, onPick }: { s: Listing; props: Listing[]; onPick
         </div>
       </div>
 
-      {/* Analyse DPE */}
-      <Stagger i={6} className="mt-6">
+      {/* Analyse DPE (statistiques locales de démonstration : masquées en compte réel) */}
+      {!real && <Stagger i={6} className="mt-6">
         <Card title="Valeur verte · analyse DPE locale" kicker="Antibes · ventes DVF 2024 – 2026 · appartements et maisons" action={<Pill tone="gold"><Target size={11} />Bien estimé : classe {s.dpe}</Pill>}>
           <div className="grid gap-6 lg:grid-cols-12">
             <div className="space-y-2 lg:col-span-8">
@@ -384,14 +386,14 @@ function Estimation({ s, props, onPick }: { s: Listing; props: Listing[]; onPick
             </div>
           </div>
         </Card>
-      </Stagger>
+      </Stagger>}
 
-      <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {!real && <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Délai de vente médian" value="74 j" delta="−6 j" hint="Secteur, 12 derniers mois" />
         <Stat label="Marge de négociation" value="4,8 %" hint="Annonce → acte, DVF appariés" />
         <Stat label="Stock d’annonces" value="186" delta="+11 %" hint="Biens > 1 M€ · Antibes" />
         <Stat label="Tension acheteurs" value="2,4" hint="Acquéreurs qualifiés par bien" />
-      </div>
+      </div>}
       <Modal open={!!docId} onClose={() => setDocId(null)} width={640} kicker="Document généré · validation humaine requise" title={<>Analyse <span className="italic text-champagne-300">&amp; estimation</span> L7</>}>
         {docId && <DocView id={docId} />}
       </Modal>

@@ -8,7 +8,7 @@ import { Modal, Field, Input, Select, Textarea, AsyncForm, toast, errText } from
 import { action } from '../../data/store'
 import { useReminders, useTemplates, useContacts, useConversations, useEvents } from '../../data/collections'
 import type { Reminder } from '../../data/messaging'
-import { fill, longDate, until, localInput, eventDate, me, type Conv } from './shared'
+import { fill, longDate, until, localInput, eventDate, useSelf, type Conv } from './shared'
 
 type St = Reminder['status']
 const TONE: Record<St, string> = { programmé: 'bg-sea/10 text-sea ring-sea/25', consigné: 'bg-sage/10 text-sage ring-sage/25', annulé: 'bg-white/[0.04] text-bone/45 ring-white/10' }
@@ -59,7 +59,7 @@ export default function Reminders({ openConv }: { openConv: (id: string) => void
                     <p className="mt-3 rounded-xl bg-white/[0.03] p-3 text-[12.5px] leading-relaxed text-bone/80 ring-1 ring-white/[0.05]">{r.text}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-mist">
                       {tpl && <span>Modèle : <span className="text-bone/70">{tpl.name}</span></span>}
-                      {ev && <span>RDV : <span className="text-bone/70">{ev.title} · {ev.day}/10 {ev.start}</span></span>}
+                      {ev && <span>RDV : <span className="text-bone/70">{ev.title} · {eventDate(ev).toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' })} {ev.start}</span></span>}
                       <span className="flex items-center gap-1">{r.createdBy.startsWith('Routine') && <Lightning size={11} className="text-champagne-300" />}{r.createdBy}</span>
                       {r.dossierId && <Link to={`/app/dossiers/${r.dossierId}`} className="hover:text-bone">Dossier →</Link>}
                       {r.conversationId && <button onClick={() => openConv(r.conversationId!)} className="flex items-center gap-1 text-champagne-300 hover:underline"><ChatsCircle size={11} />Conversation</button>}
@@ -83,6 +83,7 @@ function ManualModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [templates] = useTemplates()
   const [contacts] = useContacts()
   const [convs, convOps] = useConversations()
+  const me = useSelf()
   const wa = templates.filter((t) => t.channel === 'whatsapp' && t.approved)
   const [contactId, setContactId] = useState('')
   const [tplId, setTplId] = useState('tpl-rdv')
@@ -122,7 +123,7 @@ function EventModal({ open, onClose, events }: { open: boolean; onClose: () => v
         toast(`${r.length} rappel(s) programmé(s)`); onClose()
       }}>
         <Field label="Rendez-vous à venir">
-          <Select name="event" required defaultValue="">{[<option key="" value="">Choisir…</option>, ...events.map((e) => <option key={e.id} value={e.id}>{e.day}/10 {e.start} — {e.title} · {e.who}</option>)]}</Select>
+          <Select name="event" required defaultValue="">{[<option key="" value="">Choisir…</option>, ...events.map((e) => <option key={e.id} value={e.id}>{eventDate(e).toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' })} {e.start} — {e.title} · {e.who}</option>)]}</Select>
         </Field>
         <p className="text-[11.5px] text-mist">Si des rappels existent déjà pour ce rendez-vous, de nouveaux sont ajoutés (programmation manuelle). Un rendez-vous trop proche est refusé.</p>
       </AsyncForm>

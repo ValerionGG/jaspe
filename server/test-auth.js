@@ -213,5 +213,9 @@ test('bêta sans paiement : sans clé Stripe, offre « Bêta gratuite » sans qu
     const profile = (await c.call('GET', '/settings')).json.find((s) => s.id === 'profile')
     assert.equal(profile.name, 'Anne Martin'); assert.equal(profile.email, 'beta@x.fr')
     assert.doesNotMatch(JSON.stringify(profile), /Delmas/)
+    // Auteur des actions = utilisateur connecté (jamais le personnage de démo).
+    assert.equal((await c.call('POST', '/actions/feedback.send', { text: 'Test auteur', page: '/app' })).status < 300, true)
+    const fb = (await c.call('GET', '/feedback')).json.find((f) => f.text === 'Test auteur')
+    assert.equal(fb.by, 'Anne Martin')
   } finally { await app.close() }
 })

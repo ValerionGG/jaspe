@@ -1,3 +1,4 @@
+import { actor } from './actor.js'
 // Messagerie unifiée : WhatsApp, e-mail, SMS, canaux internes. Rappels WhatsApp programmés.
 // Règles WhatsApp Business : consentement (opt-in) requis ; hors de la fenêtre de 24 h suivant le dernier
 // message du client, seul un modèle approuvé peut être envoyé. Sans connecteur, l’envoi externe est consigné.
@@ -52,7 +53,7 @@ export function createMessaging(db, { put, patch, activity, notify, run }) {
     return m
   }
 
-  function send({ conversationId, text, template, attachments, scheduleAt, author = 'Claire Delmas' }) {
+  function send({ conversationId, text, template, attachments, scheduleAt, author = actor() }) {
     const conv = convOf(conversationId)
     if (!text?.trim() && !template) throw Object.assign(new Error('Message vide'), { status: 400 })
     if (conv.channel === 'whatsapp') {
@@ -89,12 +90,12 @@ export function createMessaging(db, { put, patch, activity, notify, run }) {
     const tpl = db.get('templates', e.kind === 'visite' ? 'tpl-visite' : 'tpl-rdv')
     const d = e.dossier ? db.get('dossiers', e.dossier) : null
     const p = d ? db.get('properties', d.propertyId) : null
-    const vars = { prenom: String(e.who ?? '').split('·')[0].trim(), date: when.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }), heure: e.start, lieu: e.place, bien: p ? `« ${p.title} »` : 'le bien', conseiller: 'Claire Delmas' }
+    const vars = { prenom: String(e.who ?? '').split('·')[0].trim(), date: when.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }), heure: e.start, lieu: e.place, bien: p ? `« ${p.title} »` : 'le bien', conseiller: actor() }
     const j1 = new Date(when); j1.setDate(j1.getDate() - 1); j1.setHours(18, 0, 0, 0)
     const h2 = new Date(when.getTime() - 2 * H)
     return [['J-1', j1], ['H-2', h2]].filter(([, d]) => d.getTime() > Date.now() - 6 * H).map(([rule, d]) => put('reminders', {
       kind: 'whatsapp', rule, eventId: e.id, dossierId: e.dossier, target: vars.prenom || e.who, text: fill(tpl?.body ?? 'Rappel : rendez-vous le {{date}} à {{heure}} — {{lieu}}.', vars),
-      template: tpl?.id, dueAt: d.toISOString(), status: 'programmé', createdBy: manual ? 'Claire Delmas' : 'Routine AUT-110',
+      template: tpl?.id, dueAt: d.toISOString(), status: 'programmé', createdBy: manual ? actor() : 'Routine AUT-110',
     }, { front: true }))
   }
 

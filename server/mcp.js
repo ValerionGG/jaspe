@@ -7,6 +7,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import * as z from 'zod'
 import { NAMES, EXTERNAL } from './templates.js'
 import { HttpError } from './engine.js'
+import { actor } from './actor.js'
 
 const L_CODES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9']
 /** Seules ces actions peuvent être exécutées par une proposition validée (une entrée de file forgée ne lance rien d'autre). */
@@ -230,7 +231,7 @@ export function mcpActions(engine, db, { orgId, emit } = {}) {
     if (emit) { db.remove('queue', id); emit('queue', id, 'delete') } else engine.actions['queue.resolve']({ id, decision })
   }
   return {
-    'mcp.approve': async ({ id, by = 'Claire Delmas' }) => {
+    'mcp.approve': async ({ id, by = actor() }) => {
       const q = get(id)
       const { action, payload } = q.detail ?? {}
       if (!ALLOWED.has(action) || !engine.actions[action]) throw new HttpError(400, `Action non autorisée pour une proposition MCP : ${action}`)
@@ -240,7 +241,7 @@ export function mcpActions(engine, db, { orgId, emit } = {}) {
       if (emit) activity(by, `a validé une proposition MCP : ${q.title}`, 'win', q.dossier ? `/app/dossiers/${q.dossier}` : '/app/taches')
       return { ok: true, id, action, result }
     },
-    'mcp.reject': ({ id, reason, by = 'Claire Delmas' }) => {
+    'mcp.reject': ({ id, reason, by = actor() }) => {
       const q = get(id)
       drop(id, `Proposition MCP refusée${reason ? ` (${reason})` : ''}`)
       log(q, 'refusé', { decidedBy: by, reason })
@@ -251,7 +252,7 @@ export function mcpActions(engine, db, { orgId, emit } = {}) {
     'apitoken.create': ({ name } = {}) => {
       const token = `jsp.${orgId ?? 'demo'}.${randomBytes(24).toString('base64url')}`
       const doc = db.put('apitokens', { id: `tok_${randomUUID().slice(0, 8)}`, name: String(name ?? '').trim().slice(0, 80) || 'Jeton MCP', hash: sha256(token), hint: `${token.slice(0, 4)}…${token.slice(-4)}`, createdAt: new Date().toISOString(), lastUsedAt: null, revokedAt: null }, { front: true })
-      activity('Claire Delmas', `a créé le jeton d’API « ${doc.name} » (MCP)`, 'warn', '/app/reglages?s=integrations')
+      activity(actor(), `a créé le jeton d’API « ${doc.name} » (MCP)`, 'warn', '/app/reglages?s=integrations')
       return { id: doc.id, name: doc.name, hint: doc.hint, createdAt: doc.createdAt, token }
     },
     'apitoken.list': () => ({ tokens: db.list('apitokens').map(({ hash: _h, ...t }) => t) }),
@@ -259,7 +260,7 @@ export function mcpActions(engine, db, { orgId, emit } = {}) {
       const t = db.get('apitokens', id)
       if (!t) throw new HttpError(404, 'Jeton introuvable')
       db.patch('apitokens', id, { revokedAt: t.revokedAt ?? new Date().toISOString() })
-      activity('Claire Delmas', `a révoqué le jeton d’API « ${t.name} »`, 'warn', '/app/reglages?s=integrations')
+      activity(actor(), `a révoqué le jeton d’API « ${t.name} »`, 'warn', '/app/reglages?s=integrations')
       return { ok: true, id }
     },
   }

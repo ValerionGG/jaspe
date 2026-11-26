@@ -4,11 +4,13 @@ import clsx from 'clsx'
 import { WhatsappLogo, EnvelopeSimple, ChatText, Globe, Hash, Lock } from '@phosphor-icons/react'
 import type { Channel, Conversation, Message } from '../../data/messaging'
 import { useContacts, useDossiers, useEvents, useSettings } from '../../data/collections'
-import { prop, me } from '../../data/mock'
+import { prop } from '../../data/mock'
+import { useIdentity } from '../../data/identity'
 import { TAGS as TAGS_FALLBACK } from '../../data/messaging'
 import type { CalEvent, Contact } from '../../data/ops'
 
-export { me }
+/** Conseiller connecté (compte réel) ou personnage de démo. */
+export function useSelf() { const who = useIdentity(); return { id: who.userId, name: who.name, real: who.real } }
 export const H = 3600e3
 export type Conv = Conversation & { id: string; consentRequestedAt?: string }
 export type Msg = Message & { id: string; mine?: string[] }
@@ -70,6 +72,7 @@ export function useConvContext(conv?: Conv) {
   const [contacts] = useContacts()
   const [dossiers] = useDossiers()
   const [events] = useEvents()
+  const me = useSelf()
   if (!conv) return { contact: undefined, dossier: undefined, property: undefined, next: [] as (CalEvent & { id: string })[], vars: {} as Record<string, string> }
   const words = conv.title.toLowerCase().split(/[\s—–·&,.]+/).filter((w) => w.length > 2 && !['mme', 'famille', 'lead', 'notaire', 'office'].includes(w))
   const contact: (Contact & { id: string }) | undefined = conv.kind === 'channel' ? undefined

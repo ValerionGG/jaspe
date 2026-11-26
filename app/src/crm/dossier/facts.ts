@@ -1,6 +1,7 @@
 import { PROPERTIES, me as DEMO_ME, type Property, type Buyer } from '../../data/mock'
 import { ZONES, WISHES, dist } from '../../data/geo'
 import { useMe } from '../../data/store'
+import type { TFn } from '../../i18n'
 
 /** Bien tel que stocké : un bien importé ou saisi peut n’avoir ni adresse, ni année, ni photo, ni estimation. */
 export type LooseProperty = Partial<Property> & Pick<Property, 'id' | 'title'> & {
@@ -14,10 +15,17 @@ const IMPORT_LABEL: Record<string, string> = { ego: 'eGO', hektor: 'Hektor' }
 export const isDemoProperty = (p: LooseProperty, mode?: string) => mode !== 'auth' && !p.importedFrom && PROPERTIES.some((x) => x.id === p.id)
 
 /** Seule provenance vraie d’un champ de la fiche : l’import d’origine, sinon la saisie du conseiller. */
-export const originLabel = (p: LooseProperty) => (p.importedFrom ? `Import ${IMPORT_LABEL[p.importedFrom.source ?? ''] ?? 'CSV'}` : 'Saisi par le conseiller')
+export const originLabel = (p: LooseProperty, t?: TFn) => {
+  const src = IMPORT_LABEL[p.importedFrom?.source ?? ''] ?? 'CSV'
+  if (t) return p.importedFrom ? t('src.import', { src }) : t('src.manual')
+  return p.importedFrom ? `Import ${src}` : 'Saisi par le conseiller'
+}
 
 /** Badge de source d’un fait : libellé historique pour la démo, provenance réelle sinon. */
-export const factSource = (p: LooseProperty, demo: boolean, demoLabel: string) => (demo ? demoLabel : originLabel(p))
+export const factSource = (p: LooseProperty, demo: boolean, demoLabel: string, t?: TFn) => (demo ? demoLabel : originLabel(p, t))
+
+/** Pays du bien : champ de la fiche s’il existe, sinon pays de l’agence. */
+export const countryOf = (p: LooseProperty, agency: 'FR' | 'PT'): 'FR' | 'PT' => { const c = String((p as { country?: unknown }).country ?? '').toUpperCase(); return c === 'PT' ? 'PT' : c === 'FR' ? 'FR' : agency }
 
 /** Joint les parties non vides (adresse, ville…). */
 export const joinParts = (...xs: (string | undefined | null)[]) => xs.map((x) => x?.trim()).filter(Boolean).join(', ')

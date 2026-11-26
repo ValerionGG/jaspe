@@ -5,7 +5,8 @@ import { CheckCircle, Warning, XCircle, PencilSimple, ArrowsClockwise, CalendarB
 import { PageHeader, Card, Tabs, SoftBtn, Stagger, DELIV_TONE, Empty } from '../ui'
 import { EXPO } from '../../ui/kit'
 import { DELIVERABLES, prop, agent, type DelivState, type Dossier } from '../../data/mock'
-import { useDossiers, useDocuments, useOutbox, type Outbox } from '../../data/collections'
+import { useDossiers, useDocuments, useOutbox, useAgents, type Outbox } from '../../data/collections'
+import { useIdentity } from '../../data/identity'
 import { action } from '../../data/store'
 import { STUDIO_CODES, FAN_CODES, EXTERNAL, checksOf, currentMeta, diffOf, type StudioCode, type StudioDocument, type Snapshot } from '../../data/studio'
 import { StudioDoc } from '../studio-docs'
@@ -16,7 +17,6 @@ const DOT: Record<DelivState, string> = { done: 'bg-sage', review: 'bg-champagne
 const CHECK_ICON = { ok: <CheckCircle size={15} weight="fill" className="shrink-0 text-sage" />, warn: <Warning size={15} weight="fill" className="shrink-0 text-champagne" />, fail: <XCircle size={15} weight="fill" className="shrink-0 text-coral" /> }
 const nameOf = (c: string) => DELIVERABLES.find((x) => x.code === c)?.name ?? c
 const PHOTO_CODES = new Set(['L3', 'L4', 'L6', 'L8'])
-const ME = 'Claire Delmas'
 const dt = (iso?: string) => (iso ? new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—')
 const defaultWhen = () => { const t = new Date(Date.now() + 864e5); t.setHours(10, 0, 0, 0); return new Date(t.getTime() - t.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) }
 
@@ -32,6 +32,7 @@ export default function Studio() {
   const [dossiers] = useDossiers()
   const [docsRaw, docOps] = useDocuments()
   const [outRaw, outOps] = useOutbox()
+  const who = useIdentity()
   const docs = docsRaw as Doc2[], outbox = outRaw as OutRow[]
   const [view, setView] = useState<'valider' | 'fan' | 'envois'>('valider')
   const [filter, setFilter] = useState<Filter>('todo')
@@ -171,7 +172,7 @@ export default function Studio() {
                   const body = v.body.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean)
                   if (!body.length) throw new Error('Le texte ne peut pas être vide')
                   await action('deliverable.edit', { dossierId: sel.d, code: sel.c, subject: doc.subject !== undefined ? v.subject : undefined, body })
-                  await docOps.update(doc.id, { history: [...(doc.history ?? []), currentMeta(doc)], editedBy: ME, editedAt: new Date().toISOString() } as Partial<Doc2>)
+                  await docOps.update(doc.id, { history: [...(doc.history ?? []), currentMeta(doc)], editedBy: who.name, editedAt: new Date().toISOString() } as Partial<Doc2>)
                   setEditing(false)
                 }}
                 onValidate={() => run('ok', async () => {
@@ -225,7 +226,13 @@ type WbProps = {
 
 /** Aperçu, actions et contrôles du livrable sélectionné. */
 function Workbench({ sel, dossier, doc, out, busy, editing, setEditing, plan, setPlan, when, setWhen, diffV, setDiffV, onReject, onGenerate, onEdit, onValidate, onSchedule }: WbProps) {
-  const p = prop(dossier.propertyId), a = agent(dossier.agentId)
+  const who = useIdentity()
+  const [agents] = useAgents()
+  const p = prop(dossier.propertyId)
+  // Compte réel : signataire = conseiller du dossier s’il existe, sinon la personne connectée (jamais le personnage de démo).
+  const a = who.real
+    ? (agents.find((x) => x.id === dossier.agentId) ?? { id: who.userId, name: who.name, role: who.role, agency: who.orgName, photo: '', mandats: 0, ca: 0, score: 0 })
+    : agent(dossier.agentId)
   const state = stateOf(dossier, sel.c)
   const checks = doc ? checksOf(doc) : []
   const hasFail = checks.some((c) => c.state === 'fail')

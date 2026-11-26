@@ -14,7 +14,9 @@ import { createMailer, sendOutbox, sendDueOutbox, createMailActions } from './ma
 import { mcpActions, handleMcpHttp } from './mcp.js'
 import { createContractReader } from './contract.js'
 import { createMarket } from './market.js'
-import { createWhatsApp } from './whatsapp.js'
+import { createWhatsApp, createWaRouter } from './whatsapp.js'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { setActorSource } from './actor.js'
 import Anthropic from '@anthropic-ai/sdk'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -72,7 +74,7 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
       actions: { ...createMailActions(db, mailer), ...(mailer.configured ? { 'outbox.send': ({ id }) => sendOutbox(db, mailer, id, { patch: mp, activity: act }) } : {}) },
       rules: mailer.configured ? { 'AUT-MAIL': () => { sendDueOutbox(db, mailer, { patch: mp, activity: act }).catch(() => {}); return ['skip', 'Envois programmés traités'] } } : {},
     })
-    return { db, clients, emit, engine, evidence, wa, copilot: createCopilot(db), filesDir: dir }
+    return { db, clients, emit, engine, evidence, wa, copilot: createCopilot(db), filesDir: dir, orgId }
   }
   const main = auth ? null : makeCtx(dbPath, filesDir)
   const { db, engine, copilot } = main ?? {}
@@ -111,8 +113,17 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
   const accounts = auth ? createAccounts(dataDir === ':memory:' ? ':memory:' : join(dataDir, 'accounts.sqlite')) : null
   const billing = auth ? createBilling({ accounts, env, ...(stripeFetch ? { fetch: stripeFetch } : {}) }) : null
   const gate = auth ? createGate({ accounts, billing, openOrg, send, readBody, mailer, publicUrl: env.JASPE_PUBLIC_URL, beta: env.JASPE_BETA === '1' ? true : env.JASPE_BETA === '0' ? false : undefined }) : null
+  // Mode comptes : nom de l’utilisateur de la requête ; routines et webhooks hors requête → « Jaspe ».
+  const actorStore = new AsyncLocalStorage()
+  if (auth) setActorSource(() => actorStore.getStore()?.name ?? 'Jaspe')
+  const waRouter = auth ? createWaRouter({ env, hmac: (k, b) => createHmac('sha256', k).update(b).digest('hex'), orgFor: (p) => accounts.waOrgFor(p), ctxFor: openOrg, log: (m) => console.warn(m) }) : null
 
-  async function api(req, res, parts, { db, engine, copilot, clients, emit, filesDir } = main) {
+  // Un numéro de conseiller WhatsApp n’appartient qu’à une agence (vérifié avant d’enregistrer le réglage).
+  const claimWa = (orgId, head, id, body) => {
+    if (!accounts || !orgId || head !== 'settings' || id !== 'whatsapp-agents' || !body || typeof body.agents !== 'object' || !body.agents) return
+    try { accounts.claimWaPhones(orgId, Object.keys(body.agents)) } catch (e) { throw new HttpError(e.status ?? 400, e.message) }
+  }
+  async function api(req, res, parts, { db, engine, copilot, clients, emit, filesDir, orgId } = main) {
     const [head, a, b] = parts
     const m = req.method
     if (head === 'health') return send(res, 200, { ok: true, copilot: copilot.mode, engine: engine.ENGINE_IDS, clients: clients.size })
@@ -158,13 +169,13 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
     }
     if (head && !a) {
       if (m === 'GET') return send(res, 200, db.list(col(head)), { 'x-nxt-seeded': db.isSeeded(head) ? '1' : '0' })
-      if (m === 'POST') { const doc = await readBody(req); if (typeof doc !== 'object' || Array.isArray(doc)) throw new HttpError(400, 'Objet attendu'); const d = db.put(col(head), doc, { front: true }); emit(head, d.id); return send(res, 201, d) }
+      if (m === 'POST') { const doc = await readBody(req); if (typeof doc !== 'object' || Array.isArray(doc)) throw new HttpError(400, 'Objet attendu'); claimWa(orgId, head, doc.id, doc); const d = db.put(col(head), doc, { front: true }); emit(head, d.id); return send(res, 201, d) }
     }
     if (head && a) {
       col(head)
       if (m === 'GET') { const d = db.get(head, a); return d ? send(res, 200, d) : send(res, 404, { error: 'Introuvable' }) }
-      if (m === 'PATCH') { const d = db.patch(head, a, await readBody(req)); if (!d) throw new HttpError(404, 'Introuvable'); emit(head, a); return send(res, 200, d) }
-      if (m === 'PUT') { const d = db.put(head, { ...(await readBody(req)), id: a }); emit(head, a); return send(res, 200, d) }
+      if (m === 'PATCH') { const body = await readBody(req); claimWa(orgId, head, a, body); const d = db.patch(head, a, body); if (!d) throw new HttpError(404, 'Introuvable'); emit(head, a); return send(res, 200, d) }
+      if (m === 'PUT') { const body = await readBody(req); claimWa(orgId, head, a, body); const d = db.put(head, { ...body, id: a }); emit(head, a); return send(res, 200, d) }
       if (m === 'DELETE') { const ok = db.remove(head, a); emit(head, a, 'delete'); return send(res, ok ? 200 : 404, { ok }) }
     }
     throw new HttpError(405, 'Méthode non prise en charge')
@@ -186,11 +197,10 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost')
     try {
-      // Webhook WhatsApp : corps BRUT pour vérifier la signature. Démo uniquement (le routage numéro → agence n’existe pas encore en mode comptes).
+      // Webhook WhatsApp : corps BRUT pour vérifier la signature. En mode comptes, chaque message va à l’agence du numéro expéditeur.
       if (url.pathname === '/api/whatsapp/webhook') {
-        if (!main) throw new HttpError(501, 'Débrief WhatsApp non disponible en mode comptes pour l’instant')
         const raw = req.method === 'POST' ? await new Promise((resolve, reject) => { const c = []; let n = 0; req.on('data', (d) => { n += d.length; if (n > 1024 * 1024) { reject(new HttpError(413, 'Corps trop volumineux')); req.destroy() } else c.push(d) }); req.on('end', () => resolve(Buffer.concat(c))); req.on('error', reject) }) : Buffer.alloc(0)
-        const r = await main.wa.handleWebhook(req, raw, url.searchParams)
+        const r = await (main ? main.wa : waRouter).handleWebhook(req, raw, url.searchParams)
         res.writeHead(r.status, { 'content-type': r.contentType ?? 'text/plain; charset=utf-8' }); res.end(r.body ?? '')
         r.done?.catch?.(console.error)
         return
@@ -201,7 +211,8 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
         if (parts[0] === 'public' && parts[1] === 'depot') return await publicDepot(req, res, parts)
         if (!gate) return demoRoute(req, res, parts, send) || await api(req, res, parts)
         const ctx = await gate.handle(req, res, parts)
-        return ctx ? await api(req, res, parts, ctx) : undefined
+        // L’auteur des actions (journal, validations) est l’utilisateur connecté, pas le personnage de démo.
+        return ctx ? await actorStore.run({ name: ctx.user?.name }, () => api(req, res, parts, ctx)) : undefined
       }
       return await staticFile(req, res, url.pathname)
     } catch (e) {

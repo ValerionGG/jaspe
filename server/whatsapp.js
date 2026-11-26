@@ -22,6 +22,7 @@
 //   OpenAI : https://platform.openai.com/docs/api-reference/audio/createTranscription (https://api.openai.com/v1/audio/transcriptions)
 //   Mistral Voxtral : https://docs.mistral.ai/api/endpoint/audio/transcriptions (https://api.mistral.ai/v1/audio/transcriptions, voxtral-mini-latest)
 import { planFromBrief, BASELINES, REVIEW_MIN } from './assist.js'
+import { actor } from './actor.js'
 
 const H = 3600e3
 const GRAPH = 'https://graph.facebook.com'
@@ -232,7 +233,7 @@ export function createWhatsApp({ db, put, patch, remove = (col, id) => db.remove
       patch('waplans', id, { status: 'validé', decidedAt: iso(), dossierId: target, items: chosen, done: r?.done ?? [] })
       settle(p, true)
       bump({ approved: 1 })
-      activity('Claire Delmas', `a validé le débrief WhatsApp de ${p.agentName} (${(r?.done ?? []).length} action(s))`, 'win', target ? `/app/dossiers/${target}` : '/app/taches')
+      activity(actor(), `a validé le débrief WhatsApp de ${p.agentName} (${(r?.done ?? []).length} action(s))`, 'win', target ? `/app/dossiers/${target}` : '/app/taches')
       return { ok: true, done: r?.done ?? [] }
     },
     'waplan.reject': ({ id }) => {
@@ -240,7 +241,7 @@ export function createWhatsApp({ db, put, patch, remove = (col, id) => db.remove
       patch('waplans', id, { status: 'refusé', decidedAt: iso() })
       settle(p, false)
       bump({ rejected: 1 })
-      activity('Claire Delmas', `a écarté le débrief WhatsApp de ${p.agentName}`, 'neutral', '/app/taches')
+      activity(actor(), `a écarté le débrief WhatsApp de ${p.agentName}`, 'neutral', '/app/taches')
       return { ok: true }
     },
     /** État de l’intégration pour Réglages (aucun secret renvoyé) et part des débriefs arrivés par WhatsApp. */
@@ -260,4 +261,46 @@ export function createWhatsApp({ db, put, patch, remove = (col, id) => db.remove
   }
 
   return { handleWebhook, actions, processMessage }
+}
+
+/**
+ * Mode comptes : un seul webhook Meta pour toutes les agences. La signature est vérifiée une fois,
+ * puis chaque message part vers l’agence à laquelle le numéro de l’expéditeur est rattaché.
+ * Numéro inconnu : ignoré (jamais déposé dans une agence au hasard).
+ */
+export function createWaRouter({ env = {}, hmac, orgFor, ctxFor, log = () => {} }) {
+  async function handleWebhook(req, rawBody, query = {}) {
+    const q = (k) => (typeof query.get === 'function' ? query.get(k) : query[k])
+    if (req.method === 'GET') {
+      if (q('hub.mode') === 'subscribe' && env.WHATSAPP_VERIFY_TOKEN && safeEqual(q('hub.verify_token'), env.WHATSAPP_VERIFY_TOKEN)) return { status: 200, body: String(q('hub.challenge') ?? ''), contentType: 'text/plain' }
+      return { status: 403, body: 'Jeton de vérification invalide', contentType: 'text/plain' }
+    }
+    if (req.method !== 'POST') return { status: 405, body: 'Méthode non prise en charge', contentType: 'text/plain' }
+    if (!env.WHATSAPP_APP_SECRET || !hmac) return { status: 503, body: 'WhatsApp non configuré (WHATSAPP_APP_SECRET)', contentType: 'text/plain' }
+    const h = req.headers ?? {}
+    const sig = String(h['x-hub-signature-256'] ?? h['X-Hub-Signature-256'] ?? '')
+    const expected = `sha256=${await hmac(env.WHATSAPP_APP_SECRET, rawBody ?? '')}`
+    if (!safeEqual(sig.toLowerCase(), expected.toLowerCase())) return { status: 401, body: 'Signature invalide', contentType: 'text/plain' }
+    let payload
+    try { payload = JSON.parse(typeof rawBody === 'string' ? rawBody : new TextDecoder().decode(rawBody)) } catch { return { status: 400, body: 'JSON invalide', contentType: 'text/plain' } }
+    const jobs = []
+    if (payload?.object === 'whatsapp_business_account') {
+      for (const e of payload.entry ?? []) for (const c of e.changes ?? []) {
+        if (c.field !== 'messages') continue
+        for (const m of c.value?.messages ?? []) jobs.push({ m, value: c.value })
+      }
+    }
+    const done = (async () => {
+      const out = []
+      for (const { m, value } of jobs) {
+        const from = m.from ?? value.contacts?.[0]?.wa_id
+        const orgId = orgFor(from)
+        if (!orgId) { log(`WhatsApp : message ignoré, numéro non rattaché (${mask(from)})`); out.push({ ignored: true }); continue }
+        try { out.push({ orgId, ...(await ctxFor(orgId).wa.processMessage(m, value)) }) } catch (e) { out.push({ orgId, error: String(e.message ?? e) }) }
+      }
+      return out
+    })()
+    return { status: 200, body: 'EVENT_RECEIVED', contentType: 'text/plain', done }
+  }
+  return { handleWebhook }
 }

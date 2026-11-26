@@ -8,12 +8,14 @@ import {
 } from '@phosphor-icons/react'
 import { PageHeader, Card, Tabs, SoftBtn, Stagger, Empty } from '../ui'
 import { Avatar, Ring, Spark, EXPO } from '../../ui/kit'
-import { AGENCIES, STAGES, DELIVERABLES, eur, prop, agent, me, type Stage } from '../../data/mock'
-import { useDossiers, useTransactions, useRuns, useDocuments, useNotes, useTasks, type Note } from '../../data/collections'
+import { AGENCIES, STAGES, DELIVERABLES, eur, type Stage } from '../../data/mock'
+import { useDossiers, useTransactions, useRuns, useDocuments, useNotes, useTasks, useEvents, type Note } from '../../data/collections'
+import { useIdentity } from '../../data/identity'
+import { useAgentOf, usePropOrBlank } from '../../data/people'
 import type { Ops } from '../../data/store'
 import { toast, errText } from '../forms'
 import {
-  KPIS, CA_SERIES, MANDATS_SERIES, MONTHS, FUNNEL, DAYS, HOURS, HEAT, TEAM, AI_COSTS, AI_SPLIT_LABELS, QUALITY, download, csv,
+  KPIS, CA_SERIES, MANDATS_SERIES, MONTHS, FUNNEL, DAYS, HOURS, HEAT as HEAT_DEMO, TEAM, AI_COSTS, AI_SPLIT_LABELS, QUALITY, download, csv,
   type Scope, type Member, type Kpi,
 } from '../../data/pilot'
 
@@ -27,7 +29,7 @@ type Step = { label: string; n: number; note: string }
 type Decision = Note & { meeting?: string; done?: boolean }
 
 /** Indicateurs vivants de l’agence, recalculés depuis les collections. */
-function useLive() {
+function useLive(real: boolean) {
   const [dossiers] = useDossiers()
   const [txs] = useTransactions()
   const [runs] = useRuns()
@@ -45,15 +47,18 @@ function useLive() {
     const validated = gen.filter((d) => d.status === 'done')
     const clean = validated.filter((d) => !d.edited).length
     const days = Array.from({ length: 12 }, (_, i) => { const day = new Date(Date.now() - (11 - i) * 864e5).toISOString().slice(0, 10); return runs.filter((r) => r.at?.startsWith(day)).length })
-    const h = KPIS.agence
+    // En compte réel, aucune tendance de démo : on ne garde que ce qui est calculé depuis les données du compte.
+    const h = real ? KPIS.agence.map((k) => ({ ...k, spark: [] as number[] })) : KPIS.agence
     const pctOf = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0)
     const kpis: LiveKpi[] = [
-      { ...h[0], live: true, label: 'Honoraires · transactions', value: eur(fees), delta: `${txs.length} en cours`, good: true, hint: `${eur(volume)} de volume · ${txs.filter((t) => t.stage === 'acte').length} à l’acte`, source: `Transactions en direct · tendance ${HIST}` },
-      { ...h[1], live: true, value: String(active.length), delta: `${exclu} excl.`, good: true, hint: `${dossiers.length} dossiers ouverts · ${mandated.length} mandats signés`, source: `Dossiers en direct · tendance ${HIST}` },
-      { ...h[2], live: true, value: `${pctOf(exclu, mandated.length)} %`, delta: `${exclu}/${mandated.length}`, good: pctOf(exclu, mandated.length) >= 45, hint: 'Réseau : 45 % (historique)', source: `Mandats des dossiers en direct · tendance ${HIST}` },
-      { ...h[3], live: false, source: `Dossiers clos, 12 mois · ${HIST}` },
-      { ...h[4], live: true, value: `${pctOf(mand, estim)} %`, delta: `${mand}/${estim}`, good: pctOf(mand, estim) >= 35, hint: `${mand} mandats / ${estim} RDV réalisés`, source: `Étapes des dossiers en direct · tendance ${HIST}` },
-      { ...h[5], live: true, label: 'Copilote · réussite 7 j', value: `${pctOf(ok7, r7.length)} %`, delta: `${r7.length} exéc.`, good: !r7.length || ok7 / r7.length >= 0.9, hint: `${gen.length} livrables générés · ${validated.length} validés`, spark: days.some(Boolean) ? days : h[5].spark, source: 'Exécutions des routines, 12 derniers jours' },
+      { ...h[0], live: true, label: 'Honoraires · transactions', value: eur(fees), delta: `${txs.length} en cours`, good: true, hint: `${eur(volume)} de volume · ${txs.filter((t) => t.stage === 'acte').length} à l’acte`, source: real ? 'Transactions en direct' : `Transactions en direct · tendance ${HIST}` },
+      { ...h[1], live: true, value: String(active.length), delta: `${exclu} excl.`, good: true, hint: `${dossiers.length} dossiers ouverts · ${mandated.length} mandats signés`, source: real ? 'Dossiers en direct' : `Dossiers en direct · tendance ${HIST}` },
+      { ...h[2], live: true, value: `${pctOf(exclu, mandated.length)} %`, delta: `${exclu}/${mandated.length}`, good: pctOf(exclu, mandated.length) >= 45, hint: real ? `${exclu} exclusifs sur ${mandated.length} mandats` : 'Réseau : 45 % (historique)', source: real ? 'Mandats des dossiers en direct' : `Mandats des dossiers en direct · tendance ${HIST}` },
+      real
+        ? { ...h[3], live: true, value: '—', delta: `${reach('acte')} actes`, good: true, hint: 'Calculé dès les premiers dossiers menés jusqu’à l’acte', source: 'Dossiers clos du compte' }
+        : { ...h[3], live: false, source: `Dossiers clos, 12 mois · ${HIST}` },
+      { ...h[4], live: true, value: `${pctOf(mand, estim)} %`, delta: `${mand}/${estim}`, good: pctOf(mand, estim) >= 35, hint: `${mand} mandats / ${estim} RDV réalisés`, source: real ? 'Étapes des dossiers en direct' : `Étapes des dossiers en direct · tendance ${HIST}` },
+      { ...h[5], live: true, label: 'Copilote · réussite 7 j', value: `${pctOf(ok7, r7.length)} %`, delta: `${r7.length} exéc.`, good: !r7.length || ok7 / r7.length >= 0.9, hint: `${gen.length} livrables générés · ${validated.length} validés`, spark: days.some(Boolean) ? days : real ? [] : h[5].spark, source: 'Exécutions des routines, 12 derniers jours' },
     ]
     const funnel: Step[] = [
       { label: 'Dossiers ouverts', n: dossiers.length, note: 'Préparation incluse' },
@@ -77,7 +82,7 @@ function useLive() {
     const docStats = { gen: gen.length, validated: validated.length, clean: pctOf(clean, validated.length) }
     const runStats = { n: runs.length, cost: runs.reduce((s, r) => s + (r.cost || 0), 0) }
     return { kpis, funnel, blocked, docStats, runStats }
-  }, [dossiers, txs, runs, docs])
+  }, [dossiers, txs, runs, docs, real])
 }
 const pct = (n: number) => `${Math.round(n * 100)} %`
 const lc = (s: string) => s[0].toLowerCase() + s.slice(1)
@@ -198,9 +203,11 @@ function Funnel({ steps }: { steps: Step[] }) {
 }
 
 /* ——— Carte de chaleur ——— */
-function Heatmap({ scale }: { scale: number }) {
+function Heatmap({ scale, counts }: { scale: number; counts?: number[][] }) {
   const [hover, setHover] = useState<[number, number] | null>(null)
-  const peak = useMemo(() => { let b = [0, 0, 0]; HEAT.forEach((r, d) => r.forEach((v, h) => { if (v > b[0]) b = [v, d, h] })); return b }, [])
+  // `counts` (compte réel) : événements de l’agenda par jour et heure ; sinon la carte de démo.
+  const HEAT = useMemo(() => { if (!counts) return HEAT_DEMO; const m = Math.max(1, ...counts.flat()); return counts.map((r) => r.map((v) => v / m)) }, [counts])
+  const peak = useMemo(() => { let b = [0, 0, 0]; HEAT.forEach((r, d) => r.forEach((v, h) => { if (v > b[0]) b = [v, d, h] })); return b }, [HEAT])
   return (
     <div>
       <div className="overflow-x-auto thin-scroll">
@@ -227,7 +234,7 @@ function Heatmap({ scale }: { scale: number }) {
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[11.5px] text-mist">
         <span className="min-h-[18px] text-bone/70">
-          {hover ? <><span className="text-bone">{DAYS[hover[0]]} {HOURS[hover[1]]} h</span> · <span className="num">{Math.round(HEAT[hover[0]][hover[1]] * 14 * scale)}</span> interactions en moyenne</>
+          {hover ? <><span className="text-bone">{DAYS[hover[0]]} {HOURS[hover[1]]} h</span> · <span className="num">{counts ? counts[hover[0]][hover[1]] : Math.round(HEAT[hover[0]][hover[1]] * 14 * scale)}</span> {counts ? 'événements sur 8 semaines' : 'interactions en moyenne'}</>
             : <>Pic : <span className="text-bone">{DAYS[peak[1]]} {HOURS[peak[2]]} h</span> · protégez ce créneau pour les RDV vendeurs</>}
         </span>
         <span className="flex items-center gap-1.5">Calme{[0.1, 0.3, 0.5, 0.7, 0.92].map((o) => <span key={o} className="h-2.5 w-4 rounded-[3px]" style={{ background: `rgb(var(--acc-500) / ${o})` }} />)}Intense</span>
@@ -281,6 +288,15 @@ function AgencyTable({ scope }: { scope: Scope }) {
 }
 
 function TeamDynamics({ scope }: { scope: Scope }) {
+  if (useIdentity().real) return (
+    <Card kicker="Équipe · sans podium" title="Dynamique de progression" className="h-full">
+      <Empty title="Pas encore d’équipe">La progression de chacun, comparée à lui-même sur 90 jours, apparaît quand vos collègues ont rejoint l’agence et travaillé leurs dossiers. <Link to="/app/reglages" className="text-champagne-300 hover:underline">Inviter un collègue →</Link></Empty>
+    </Card>
+  )
+  return <TeamDynamicsDemo scope={scope} />
+}
+
+function TeamDynamicsDemo({ scope }: { scope: Scope }) {
   const [tab, setTab] = useState<'prog' | 'help'>('prog')
   const [tasks, tops] = useTasks()
   const pool = TEAM.filter((m) => scope === 'reseau' || m.agency === HOME)
@@ -339,6 +355,7 @@ type BlockedRow = ReturnType<typeof useLive>['blocked'][number]
 
 function BlockedList({ rows }: { rows: BlockedRow[] }) {
   const nav = useNavigate()
+  const prop = usePropOrBlank(), agent = useAgentOf()
   return (
     <Card kicker={`${rows.length} à débloquer · en direct`} title="Dossiers bloqués" className="h-full" action={<Link to="/app/dossiers" className="text-[12px] text-mist hover:text-bone">Tous les dossiers →</Link>}>
       {!rows.length ? <Empty title="Rien ne bloque">Aucun livrable bloqué ni échéance dépassée dans les dossiers.</Empty> : (
@@ -352,7 +369,7 @@ function BlockedList({ rows }: { rows: BlockedRow[] }) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2"><span className="truncate text-[13px] font-medium">{p.title}</span><span className="num hidden shrink-0 text-[10.5px] text-mist sm:inline">{d.ref}</span></div>
                     {reasons.map((r) => <div key={r} className="mt-0.5 flex items-start gap-1.5 text-[11.5px] text-bone/55">{r.startsWith('Échéance') ? <Clock size={12} className="mt-0.5 shrink-0 text-coral" /> : <FileText size={12} className="mt-0.5 shrink-0 text-coral" />}{r}</div>)}
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-mist"><Avatar src={o.photo} size={18} /><span className="whitespace-nowrap">{o.name}</span><span className="whitespace-nowrap">· {d.seller}</span>{late && <span className="whitespace-nowrap rounded-full bg-coral/10 px-1.5 text-coral">en retard</span>}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-mist">{o.photo ? <Avatar src={o.photo} size={18} /> : <Initials name={o.name} size={18} />}<span className="whitespace-nowrap">{o.name}</span><span className="whitespace-nowrap">· {d.seller}</span>{late && <span className="whitespace-nowrap rounded-full bg-coral/10 px-1.5 text-coral">en retard</span>}</div>
                   </div>
                 </div>
                 <button onClick={() => nav(`/app/dossiers/${d.id}`)}
@@ -368,16 +385,27 @@ function BlockedList({ rows }: { rows: BlockedRow[] }) {
   )
 }
 
+/** Prochain lundi (aujourd’hui si on est lundi), à partir de la date réelle. */
+function nextMonday() {
+  const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + ((8 - d.getDay()) % 7)); return d
+}
+
 function MondayMeeting({ scope, kpis, blocked }: { scope: Scope; kpis: Kpi[]; blocked: BlockedRow[] }) {
   const k = kpis
-  const meeting = `2026-10-13:${scope}`
+  const who = useIdentity(), real = who.real
+  const home = real ? who.orgName : HOME
+  const mon = nextMonday()
+  const monIso = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`
+  const monLabel = mon.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const meeting = real ? `${monIso}:${scope}` : `2026-10-13:${scope}`
+  const team = real ? [] : TEAM
   const [notes, nops] = useNotes() as unknown as [Decision[], Ops<Decision>]
   const decisions = notes.filter((n) => n.meeting === meeting).sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''))
-  const helpers = TEAM.filter((m) => m.help && (scope === 'reseau' || m.agency === HOME))
-  const over = AI_COSTS.filter((a) => a.spent > a.budget)
+  const helpers = team.filter((m) => m.help && (scope === 'reseau' || m.agency === HOME))
+  const over = real ? [] : AI_COSTS.filter((a) => a.spent > a.budget)
   const agenda = [
-    { min: 5, title: 'Victoires de la semaine', detail: TEAM.filter((m) => m.win && (scope === 'reseau' || m.agency === HOME)).map((m) => `${m.name.split(' ')[0]} : ${lc(m.win!)}`).join(' · ') },
-    { min: 10, title: `Chiffres clés · ${lc(k[0].label)} ${k[0].value}`, detail: `Mandats actifs ${k[1].value}, exclusivité ${k[2].value}, transformation ${k[4].value}, délai ${k[3].value}` },
+    { min: 5, title: 'Victoires de la semaine', detail: real ? 'Tour de table : un succès par personne' : team.filter((m) => m.win && (scope === 'reseau' || m.agency === HOME)).map((m) => `${m.name.split(' ')[0]} : ${lc(m.win!)}`).join(' · ') },
+    { min: 10, title: `Chiffres clés · ${lc(k[0].label)} ${k[0].value}`, detail: `Mandats actifs ${k[1].value}, exclusivité ${k[2].value}, transformation ${k[4].value}${k[3].value === '—' ? '' : `, délai ${k[3].value}`}` },
     { min: 15, title: `Dossiers bloqués (${blocked.length})`, detail: blocked.length ? blocked.map((b) => `${b.d.ref} : ${b.reasons[0]}`).join(' · ') : 'Aucun dossier bloqué' },
     { min: 10, title: 'Entraide & coaching', detail: helpers.length ? helpers.map((m) => `${m.name.split(' ')[0]} : ${m.help}`).join(' · ') : 'Aucune demande cette semaine' },
     ...(scope === 'reseau' && over.length ? [{ min: 5, title: 'Budget IA', detail: over.map((a) => `${a.agency} à ${Math.round((a.spent / a.budget) * 100)} % du budget`).join(' · ') }] : []),
@@ -386,12 +414,12 @@ function MondayMeeting({ scope, kpis, blocked }: { scope: Scope; kpis: Kpi[]; bl
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const total = agenda.reduce((s, a) => s + a.min, 0)
-  const md = () => [`# Réunion commerciale · lundi 19 octobre 2026, 09:00`, `Périmètre : ${scope === 'agence' ? HOME : 'Réseau Riviera'} · ${total} min`, '', '## Ordre du jour', ...agenda.map((a, i) => `${i + 1}. ${a.title} (${a.min} min)\n   ${a.detail}`), '', '## Décisions', ...(decisions.length ? decisions.map((d) => `- [${d.done ? 'x' : ' '}] ${d.text} — ${d.by}`) : ['_Aucune décision consignée._']), '', `_Chiffres : CRM Jaspe, extraits le ${new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}. Séries de tendance : ${HIST}._`].join('\n')
+  const md = () => [real ? `# Réunion commerciale · ${monLabel} ${mon.getFullYear()}, 09:00` : `# Réunion commerciale · lundi 19 octobre 2026, 09:00`, `Périmètre : ${scope === 'agence' ? home : 'Réseau Riviera'} · ${total} min`, '', '## Ordre du jour', ...agenda.map((a, i) => `${i + 1}. ${a.title} (${a.min} min)\n   ${a.detail}`), '', '## Décisions', ...(decisions.length ? decisions.map((d) => `- [${d.done ? 'x' : ' '}] ${d.text} — ${d.by}`) : ['_Aucune décision consignée._']), '', `_Chiffres : CRM Jaspe, extraits le ${new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}.${real ? '' : ` Séries de tendance : ${HIST}.`}_`].join('\n')
   const add = async () => {
     const text = draft.trim()
     if (!text) return toast('Saisissez une décision', 'error')
     setBusy(true)
-    try { await nops.create({ text, at: new Date().toISOString(), by: me.name, meeting, done: false }); setDraft(''); toast('Décision consignée') }
+    try { await nops.create({ text, at: new Date().toISOString(), by: who.name, meeting, done: false }); setDraft(''); toast('Décision consignée') }
     catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
   }
   const run = (p: Promise<unknown>, ok?: string) => p.then(() => ok && toast(ok)).catch((e) => toast(errText(e), 'error'))
@@ -401,13 +429,13 @@ function MondayMeeting({ scope, kpis, blocked }: { scope: Scope; kpis: Kpi[]; bl
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-champagne/10 blur-3xl" />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-[10.5px] uppercase tracking-eyebrow text-mist"><CalendarCheck size={13} />Lundi 13 octobre · 09:00</div>
+            <div className="flex items-center gap-2 text-[10.5px] uppercase tracking-eyebrow text-mist"><CalendarCheck size={13} />{real ? monLabel.replace(/^./, (c) => c.toUpperCase()) : 'Lundi 13 octobre'} · 09:00</div>
             <h2 className="display mt-2 text-[2rem]">Réunion <span className="italic text-champagne-300">commerciale</span></h2>
             <div className="mt-1 flex items-center gap-1.5 text-[12px] text-champagne-300"><Sparkle size={12} weight="fill" />Ordre du jour généré à partir des données de la semaine · {total} min</div>
           </div>
           <div className="flex gap-2">
             <SoftBtn icon={<Copy size={14} />} onClick={() => navigator.clipboard?.writeText(md()).then(() => toast('Compte rendu copié'), () => toast('Copie refusée par le navigateur', 'error'))}>Copier</SoftBtn>
-            <SoftBtn tone="gold" icon={<DownloadSimple size={14} />} onClick={() => { download(`reunion-lundi-13-octobre-${scope}.md`, md(), 'text/markdown'); toast('Compte rendu exporté (.md)') }}>Exporter .md</SoftBtn>
+            <SoftBtn tone="gold" icon={<DownloadSimple size={14} />} onClick={() => { download(real ? `reunion-${monIso}-${scope}.md` : `reunion-lundi-13-octobre-${scope}.md`, md(), 'text/markdown'); toast('Compte rendu exporté (.md)') }}>Exporter .md</SoftBtn>
           </div>
         </div>
       </div>
@@ -448,6 +476,13 @@ function MondayMeeting({ scope, kpis, blocked }: { scope: Scope; kpis: Kpi[]; bl
 }
 
 function AiCosts({ runs }: { runs: { n: number; cost: number } }) {
+  if (useIdentity().real) return (
+    <Card kicker="En direct · exécutions du copilote" title="Coûts IA" className="h-full" action={<span className="num text-[12px] text-bone/70">{runs.cost.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>}>
+      {runs.n ? (
+        <div className="flex items-center gap-2 text-[12.5px] text-bone/60"><span className="h-1.5 w-1.5 rounded-full bg-sage" /><span className="num text-bone/80">{runs.n}</span> exécutions de routines · <span className="num text-bone/80">{runs.cost.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span> consommés</div>
+      ) : <Empty title="Aucune consommation">Les coûts apparaissent dès que le copilote prépare des documents ou exécute des routines pour l’agence.</Empty>}
+    </Card>
+  )
   const total = AI_COSTS.reduce((s, a) => s + a.spent, 0), budget = AI_COSTS.reduce((s, a) => s + a.budget, 0)
   const max = Math.max(...AI_COSTS.map((a) => Math.max(a.spent, a.budget)))
   return (
@@ -479,10 +514,19 @@ function AiCosts({ runs }: { runs: { n: number; cost: number } }) {
 }
 
 function Quality({ live }: { live: { gen: number; validated: number; clean: number } }) {
-  const total = QUALITY.reduce((s, q) => s + q.n, 0)
-  const avg = Math.round(QUALITY.reduce((s, q) => s + q.rate * q.n, 0) / total)
+  const real = useIdentity().real
+  const [docs] = useDocuments()
+  // Compte réel : taux sans retouche par livrable, calculé sur les documents validés du compte.
+  const rows = useMemo(() => {
+    if (!real) return QUALITY
+    const by = new Map<string, { n: number; clean: number }>()
+    docs.filter((d) => d.dossierId && d.status === 'done').forEach((d) => { const r = by.get(d.code) ?? { n: 0, clean: 0 }; r.n++; if (!d.edited) r.clean++; by.set(d.code, r) })
+    return [...by].sort(([a], [b]) => a.localeCompare(b, 'fr', { numeric: true })).map(([code, r]) => ({ code, name: DELIVERABLES.find((x) => x.code === code)?.name ?? code, n: r.n, rate: Math.round((r.clean / r.n) * 100) }))
+  }, [real, docs])
+  const total = rows.reduce((s, q) => s + q.n, 0)
+  const avg = total ? Math.round(rows.reduce((s, q) => s + q.rate * q.n, 0) / total) : 0
   return (
-    <Card kicker={`${total.toLocaleString('fr-FR')} livrables · 90 j · ${HIST}`} title="Qualité des livrables" className="h-full">
+    <Card kicker={real ? `${total.toLocaleString('fr-FR')} livrables validés · en direct` : `${total.toLocaleString('fr-FR')} livrables · 90 j · ${HIST}`} title="Qualité des livrables" className="h-full">
       <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl bg-white/[0.02] p-3 ring-1 ring-white/[0.05]">
         {([['Générés', live.gen], ['Validés', live.validated], ['Sans retouche', live.validated ? `${live.clean} %` : '—']] as const).map(([l, v]) => <div key={l}><div className="flex items-center gap-1.5 text-[10px] uppercase tracking-eyebrow text-mist">{l === 'Générés' && <span className="h-1.5 w-1.5 rounded-full bg-sage" />}{l}</div><div className="num mt-1 text-[17px]">{v}</div></div>)}
       </div>
@@ -491,7 +535,8 @@ function Quality({ live }: { live: { gen: number; validated: number; clean: numb
         <div className="text-[12.5px] text-bone/60">validés <span className="text-bone">sans aucune retouche</span> par le conseiller. Chaque retouche alimente le modèle de l’agence.</div>
       </div>
       <div className="space-y-2">
-        {QUALITY.map((q, i) => {
+        {real && !rows.length && <div className="rounded-xl border border-dashed border-white/10 px-3 py-4 text-center text-[12px] text-mist">Le taux par livrable apparaît dès les premiers documents validés.</div>}
+        {rows.map((q, i) => {
           const c = q.rate >= 85 ? 'rgb(var(--sage))' : q.rate >= 75 ? 'rgb(var(--acc-500))' : 'rgb(var(--coral))'
           return (
             <div key={q.code} className="grid grid-cols-[2.2rem_1fr_2.6rem] items-center gap-2 text-[12px]" title={`${q.name} · ${q.n} livrables`}>
@@ -502,14 +547,37 @@ function Quality({ live }: { live: { gen: number; validated: number; clean: numb
           )
         })}
       </div>
-      <div className="mt-4 text-[11.5px] text-bone/50"><span className="text-coral">L7</span> : les retouches portent surtout sur l’ajustement « vue mer » des comparables.</div>
+      {!real && <div className="mt-4 text-[11.5px] text-bone/50"><span className="text-coral">L7</span> : les retouches portent surtout sur l’ajustement « vue mer » des comparables.</div>}
     </Card>
   )
 }
 
+/** Compte réel : événements de l’agenda des 8 dernières semaines, par jour de semaine (lundi = 0) et heure (8 h → 20 h). */
+function useFieldHeat(on: boolean) {
+  const [events] = useEvents()
+  return useMemo(() => {
+    if (!on) return undefined
+    const t = new Date()
+    const today = Math.round((Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) - Date.UTC(2026, 9, 0)) / 864e5)
+    const grid = DAYS.map(() => HOURS.map(() => 0))
+    events.forEach((e) => {
+      if (e.kind === 'interne' || e.day > today || e.day <= today - 56) return
+      const h = parseInt(e.start, 10) - HOURS[0]
+      if (Number.isNaN(h) || h < 0 || h >= HOURS.length) return
+      grid[(new Date(2026, 9, e.day).getDay() + 6) % 7][h]++
+    })
+    return grid
+  }, [on, events])
+}
+
 export default function Pilotage() {
-  const [scope, setScope] = useState<Scope>('agence')
-  const live = useLive()
+  const who = useIdentity(), real = who.real
+  const [scopeSel, setScope] = useState<Scope>('agence')
+  // Un compte réel n’a qu’une agence : pas de vue réseau consolidée.
+  const scope: Scope = real ? 'agence' : scopeSel
+  const live = useLive(real)
+  const heat = useFieldHeat(real)
+  const hasHeat = !!heat?.some((r) => r.some(Boolean))
   const kpis: LiveKpi[] = scope === 'agence' ? live.kpis : KPIS.reseau.map((k) => ({ ...k, live: false, source: `${k.source} · ${HIST}` }))
   const funnel = scope === 'agence' ? live.funnel : FUNNEL.reseau
   const ca = CA_SERIES[scope], md = MANDATS_SERIES[scope]
@@ -522,10 +590,10 @@ export default function Pilotage() {
     <div>
       <PageHeader
         kicker="Pilotage"
-        title={<>Agence & <span className="italic text-champagne-300">réseau</span></>}
-        sub={<>{scope === 'agence' ? `${HOME} · indicateurs recalculés en direct depuis les dossiers, transactions et exécutions du copilote` : 'Réseau Riviera · 6 agences, 39 conseillers · consolidation du lundi 12 octobre à 07:00'} · sources au survol.</>}
+        title={real ? <>Votre <span className="italic text-champagne-300">agence</span></> : <>Agence & <span className="italic text-champagne-300">réseau</span></>}
+        sub={<>{scope === 'agence' ? `${real ? who.orgName : HOME} · indicateurs recalculés en direct depuis les dossiers, transactions et exécutions du copilote` : 'Réseau Riviera · 6 agences, 39 conseillers · consolidation du lundi 12 octobre à 07:00'} · sources au survol.</>}
         actions={<>
-          <Tabs id="pl-scope" value={scope} onChange={setScope} items={[{ id: 'agence', label: <span className="flex items-center gap-1.5"><Buildings size={14} weight="light" />Agence</span> }, { id: 'reseau', label: <span className="flex items-center gap-1.5"><Globe size={14} weight="light" />Réseau</span> }]} />
+          {!real && <Tabs id="pl-scope" value={scope} onChange={setScope} items={[{ id: 'agence', label: <span className="flex items-center gap-1.5"><Buildings size={14} weight="light" />Agence</span> }, { id: 'reseau', label: <span className="flex items-center gap-1.5"><Globe size={14} weight="light" />Réseau</span> }]} />}
           <SoftBtn icon={<DownloadSimple size={14} />} onClick={exportCsv}>Exporter .csv</SoftBtn>
         </>}
       />
@@ -538,7 +606,7 @@ export default function Pilotage() {
               <Card key={k.id} className="group">
                 <div className="flex items-center justify-between gap-2 text-[11.5px] text-mist"><span className="truncate">{k.label}</span><span className={clsx('num shrink-0 whitespace-nowrap', k.good ? 'text-sage' : 'text-coral')}>{k.delta}</span></div>
                 <div className="display mt-2 text-[2.3rem] leading-none">{k.value}</div>
-                <div className="mt-3 [&>svg]:h-auto [&>svg]:w-full"><Spark data={k.spark} w={150} h={26} color={k.id === 'adoption' ? 'rgb(var(--sage))' : 'rgb(var(--acc-500))'} /></div>
+                <div className="mt-3 h-[26px] [&>svg]:h-auto [&>svg]:w-full">{k.spark.length > 1 && <Spark data={k.spark} w={150} h={26} color={k.id === 'adoption' ? 'rgb(var(--sage))' : 'rgb(var(--acc-500))'} />}</div>
                 <div className="mt-2 truncate text-[11px] text-bone/45">{k.hint}</div>
                 <div className="mt-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-eyebrow text-mist"><span className={clsx('h-1.5 w-1.5 rounded-full', k.live ? 'bg-sage' : 'bg-white/25')} />{k.live ? 'En direct' : 'Historique importé'}</div>
                 <div className="mt-1 max-h-0 overflow-hidden text-[10.5px] text-mist opacity-0 transition-all duration-500 ease-silk group-hover:max-h-12 group-hover:opacity-100">Source : {k.source}</div>
@@ -548,9 +616,9 @@ export default function Pilotage() {
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             <Stagger i={1} className="lg:col-span-7">
-              <Card kicker={`Chiffre d’affaires signé · k€ · ${HIST}`} title="12 derniers mois" className="h-full"
-                action={<div className="flex items-center gap-4 text-[11px] text-mist"><span className="flex items-center gap-1.5"><span className="h-[2px] w-4 rounded bg-champagne" />2025–26</span><span className="flex items-center gap-1.5"><span className="h-px w-4 border-t border-dashed border-sea" />N-1</span></div>}>
-                <AreaChart n={ca.n} n1={ca.n1} />
+              <Card kicker={real ? 'Chiffre d’affaires signé · k€' : `Chiffre d’affaires signé · k€ · ${HIST}`} title="12 derniers mois" className="h-full"
+                action={real ? undefined : <div className="flex items-center gap-4 text-[11px] text-mist"><span className="flex items-center gap-1.5"><span className="h-[2px] w-4 rounded bg-champagne" />2025–26</span><span className="flex items-center gap-1.5"><span className="h-px w-4 border-t border-dashed border-sea" />N-1</span></div>}>
+                {real ? <Empty title="Pas encore d’historique">La courbe du chiffre d’affaires signé, comparée à l’année précédente, se construit au fil des actes enregistrés dans Transactions.</Empty> : <AreaChart n={ca.n} n1={ca.n1} />}
               </Card>
             </Stagger>
             <Stagger i={2} className="lg:col-span-5">
@@ -562,18 +630,22 @@ export default function Pilotage() {
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             <Stagger i={3} className="lg:col-span-7">
-              <Card kicker={`RDV, visites, appels · 8 semaines · ${HIST}`} title="Quand l’équipe est sur le terrain" className="h-full"><Heatmap scale={scope === 'reseau' ? 5.2 : 1} /></Card>
+              <Card kicker={real ? 'RDV, visites, appels · 8 semaines · agenda' : `RDV, visites, appels · 8 semaines · ${HIST}`} title="Quand l’équipe est sur le terrain" className="h-full">
+                {real && !hasHeat ? <Empty title="Agenda encore vide">La carte se remplit avec les rendez-vous, visites et appels saisis dans l’Agenda.</Empty> : <Heatmap scale={scope === 'reseau' ? 5.2 : 1} counts={heat} />}
+              </Card>
             </Stagger>
             <Stagger i={4} className="lg:col-span-5">
-              <Card kicker={`Mandats rentrés · ${HIST}`} title="Exclusifs et simples" className="h-full"
-                action={<div className="flex items-center gap-3 text-[11px] text-mist"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-champagne" />Exclusifs</span><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-white/20" />Simples</span></div>}>
-                <StackedBars ex={md.ex} simple={md.simple} />
+              <Card kicker={real ? 'Mandats rentrés' : `Mandats rentrés · ${HIST}`} title="Exclusifs et simples" className="h-full"
+                action={real ? undefined : <div className="flex items-center gap-3 text-[11px] text-mist"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-champagne" />Exclusifs</span><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-white/20" />Simples</span></div>}>
+                {real ? <Empty title="Pas encore d’historique">L’évolution mensuelle des mandats exclusifs et simples apparaît au fil des mandats signés dans les dossiers.</Empty> : <StackedBars ex={md.ex} simple={md.simple} />}
               </Card>
             </Stagger>
           </div>
 
           <Stagger i={5}>
-            <Card pad={false} kicker={`Réseau Riviera · ${HIST}`} title="Agences" action={<span className="text-[11.5px] text-mist">Cliquez une colonne pour trier</span>}><AgencyTable scope={scope} /></Card>
+            {real
+              ? <Card kicker="Réseau" title="Agences"><Empty title="Une seule agence">Le comparatif entre agences (mandats, exclusivité, délais, adoption) apparaît quand votre compte regroupe plusieurs agences d’un même réseau.</Empty></Card>
+              : <Card pad={false} kicker={`Réseau Riviera · ${HIST}`} title="Agences" action={<span className="text-[11.5px] text-mist">Cliquez une colonne pour trier</span>}><AgencyTable scope={scope} /></Card>}
           </Stagger>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">

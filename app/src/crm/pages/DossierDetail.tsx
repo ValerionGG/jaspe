@@ -11,10 +11,14 @@ import { AsyncForm, Field, Input, Textarea, toast, errText } from '../forms'
 import { JourneyStepper, currentStep, type StepId } from '../dossier/Stepper'
 import { StepView } from '../dossier'
 import { useJourney } from '../dossier/useJourney'
-import { factSource, isDemoProperty, joinParts, estimateRange, matchBuyers, useCurrentUserName, useMeMode, type LooseProperty } from '../dossier/facts'
+import { factSource, isDemoProperty, joinParts, estimateRange, matchBuyers, countryOf, useCurrentUserName, useMeMode, type LooseProperty } from '../dossier/facts'
+import { piecesFor, DEMO_PIECES } from '../dossier/pieces'
+import type { JourneyX } from '../dossier/prep-model'
+import { useT, type TKey } from '../../i18n'
+import { useIdentity } from '../../data/identity'
 import { figuresOf } from '../dossier/deliv-kit'
 
-const ROLE_LABEL: Record<string, string> = { vendeur: 'Vendeur', acquereur: 'Acquéreur', notaire: 'Notaire', diagnostiqueur: 'Diagnostiqueur', syndic: 'Syndic', courtier: 'Courtier', photographe: 'Photographe' }
+const ROLES = ['vendeur', 'acquereur', 'notaire', 'diagnostiqueur', 'syndic', 'courtier', 'photographe']
 type Fact = [string, string, string]
 
 const DPE_C = { A: '#3F8F5A', B: '#6BAF5B', C: '#B8C94A', D: '#F2D43A', E: '#F0A43A', F: '#E86F3A', G: '#D4402F' }
@@ -92,6 +96,8 @@ function Preview({ code, onClose, state, dossierId }: { code: string; onClose: (
 
 export default function DossierDetail() {
   const { id } = useParams()
+  const { t } = useT()
+  const ident = useIdentity()
   const [dossiers] = useDossiers()
   const d = dossiers.find((x) => x.id === id) ?? DOSSIERS.find((x) => x.id === id) ?? dossiers[0]
   const [files] = useFiles()
@@ -113,16 +119,16 @@ export default function DossierDetail() {
   const mode = useMeMode()
   const userName = useCurrentUserName()
   const demo = isDemoProperty(lp, mode)
-  const src = (legacy: string) => factSource(lp, demo, legacy)
+  const src = (legacy: string) => factSource(lp, demo, legacy, t)
   const gallery = (p.gallery ?? []).filter(Boolean)
   const l7 = useDoc<DocumentDoc & Doc>('documents', `${d.id}-L7`)
   const range = estimateRange(lp, l7?.range)
   const compFig = figuresOf(l7 ?? undefined).find((f) => /^Compar/i.test(f.label))
   const compCount = compFig ? Number(compFig.value) || 0 : demo ? 5 : 0
   const people = [
-    { n: d.seller, r: 'Vendeurs · décideurs', ph: d.sellerPhoto ?? (demo ? '/img/p-paul.webp' : undefined) },
-    ...(a ? [{ n: a.name, r: `${a.role} · responsable`, ph: a.photo }] : []),
-    ...contacts.filter((c) => c.dossiers?.includes(d.id)).map((c) => ({ n: c.name, r: c.roles.map((x) => ROLE_LABEL[x] ?? x).join(' · ') || 'Contact', ph: c.photo })),
+    { n: d.seller, r: t('dd.sellers'), ph: d.sellerPhoto ?? (demo ? '/img/p-paul.webp' : undefined) },
+    ...(a ? [{ n: a.name, r: t('dd.owner', { role: a.role }), ph: a.photo }] : []),
+    ...contacts.filter((c) => c.dossiers?.includes(d.id)).map((c) => ({ n: c.name, r: c.roles.map((x) => (ROLES.includes(x) ? t(`dd.role.${x}` as TKey) : x)).join(' · ') || t('dd.contact'), ph: c.photo })),
   ].filter((x, i, xs) => x.n && xs.findIndex((y) => y.n === x.n) === i)
   const matches = matchBuyers(buyers, lp).slice(0, 3)
   const facts: Fact[] = [
@@ -139,6 +145,17 @@ export default function DossierDetail() {
   const [open, setOpen] = useState<string | null>(null)
   const [photo, setPhoto] = useState(0)
   const ready = Object.values(d.deliverables).filter((s) => s === 'done').length
+  // Pièces : liste historique figée en démo, liste générée (pays, type, régime) et état enregistré sur le parcours sinon.
+  const jx = journey as JourneyX | undefined
+  const country = countryOf(lp, ident.country)
+  const pieces = demo ? [] : piecesFor(country, lp, jx?.discovery?.regime?.v ?? '')
+  const got = jx?.prep?.pieces ?? {}
+  const received = pieces.filter((x) => got[x.key]).length
+  const togglePiece = async (key: string) => {
+    if (!jx) return
+    try { await save({ prep: { ...(jx.prep ?? {}), pieces: { ...got, [key]: !got[key] } } } as Partial<JourneyX>) } catch (x) { toast(errText(x), 'error') }
+  }
+  const pieceCount = demo ? DEMO_PIECES.length : pieces.length
 
   return (
     <div>
@@ -158,7 +175,7 @@ export default function DossierDetail() {
             </div>
             <div className="flex items-end gap-4">
               <div className="flex gap-1.5">{gallery.map((g, i) => <button key={g} onClick={() => setPhoto(i)} className={`h-12 w-16 overflow-hidden rounded-lg ring-2 transition ${i === photo ? 'ring-champagne' : 'ring-transparent opacity-60 hover:opacity-100'}`}><img src={g} alt="" className="h-full w-full object-cover" /></button>)}</div>
-              <div className="text-right"><div className="text-[11px] text-mist">Prix de présentation</div><div className="display text-4xl">{eur(p.price)}</div></div>
+              <div className="text-right"><div className="text-[11px] text-mist">{t('dd.presPrice')}</div><div className="display text-4xl">{eur(p.price)}</div></div>
             </div>
           </div>
         </div>
@@ -171,7 +188,7 @@ export default function DossierDetail() {
 
       <div className="mt-6 grid gap-6 xl:grid-cols-12">
         <div className="space-y-6 xl:col-span-8">
-          <Stagger i={2}><Tabs id="dossier" value={tab} onChange={setTab} items={[{ id: 'parcours', label: 'Parcours vendeur', count: ready }, { id: 'bien', label: 'Bien' }, { id: 'documents', label: 'Pièces', count: 11 + myFiles.length }, { id: 'journal', label: 'Journal', count: myLog.length }]} /></Stagger>
+          <Stagger i={2}><Tabs id="dossier" value={tab} onChange={setTab} items={[{ id: 'parcours', label: t('dd.tab.journey'), count: ready }, { id: 'bien', label: t('dd.tab.property') }, { id: 'documents', label: t('dd.tab.docs'), count: pieceCount + myFiles.length }, { id: 'journal', label: t('dd.tab.log'), count: myLog.length }]} /></Stagger>
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.4, ease: EXPO }} className="space-y-6">
               {tab === 'parcours' && journey && <StepView step={step} dossier={d} journey={journey} save={save} openDeliverable={setOpen} goTo={setStep} />}
@@ -190,22 +207,40 @@ export default function DossierDetail() {
                 </div>
               )}
               {tab === 'documents' && (
-                <Card title="Pièces du dossier" kicker="L9 · checklist conditionnelle" action={<label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white/[0.04] px-4 py-2 text-[13px] font-medium ring-1 ring-white/[0.08] transition hover:bg-white/[0.08]"><UploadSimple size={14} />{uploading ? 'Dépôt…' : 'Déposer'}<input type="file" multiple className="sr-only" onChange={(e) => { onUpload(e.currentTarget.files); e.currentTarget.value = '' }} /></label>}>
+                <Card title={t('pc.title')} kicker={demo ? t('pc.kicker') : `${t('pc.kicker')} · ${t('pc.progress', { a: received, b: pieces.length })}`} action={<label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white/[0.04] px-4 py-2 text-[13px] font-medium ring-1 ring-white/[0.08] transition hover:bg-white/[0.08]"><UploadSimple size={14} />{uploading ? t('pc.uploading') : t('pc.upload')}<input type="file" multiple className="sr-only" onChange={(e) => { onUpload(e.currentTarget.files); e.currentTarget.value = '' }} /></label>}>
                   {myFiles.length > 0 && (
                     <div className="mb-4 space-y-2">
-                      <div className="text-[10.5px] uppercase tracking-eyebrow text-mist">Déposées dans Jaspe</div>
+                      <div className="text-[10.5px] uppercase tracking-eyebrow text-mist">{t('pc.inJaspe')}</div>
                       {myFiles.map((f) => <a key={f.id} href={`/api/files/${f.id}/raw`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl bg-champagne/[0.06] px-3.5 py-3 ring-1 ring-champagne/20 transition hover:bg-champagne/10"><FileText size={18} weight="light" className="text-champagne-300" /><span className="flex-1 truncate text-[13px]">{f.name}</span><span className="num text-[11px] text-mist">{Math.max(1, Math.round(f.size / 1024))} Ko</span></a>)}
                     </div>
                   )}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {[['Titre de propriété', 'ok', 'p.1-14'], ['DPE', 'ok', 'p.2'], ['Diagnostic amiante', 'ok', 'p.1'], ['Électricité / gaz', 'ok', 'p.3'], ['Termites', 'ok', 'p.1'], ['ERP · risques', 'ok', 'Géorisques'], ['Taxe foncière 2025', 'ok', 'p.1'], ['PV d’AG 2025', 'missing', '—'], ['Règlement ASL', 'check', 'à vérifier'], ['Plans', 'ok', '3 pages'], ['Permis piscine', 'check', 'à vérifier']].map(([n, s, r]) => (
-                      <div key={n} className="flex items-center gap-3 rounded-xl bg-white/[0.02] px-3.5 py-3 ring-1 ring-white/[0.05]">
-                        <FileText size={18} weight="light" className="text-bone/50" /><span className="flex-1 text-[13px]">{n}</span>
-                        <span className="text-[11px] text-mist">{r}</span>
-                        {s === 'ok' ? <CheckCircle size={16} weight="fill" className="text-sage" /> : s === 'missing' ? <span className="rounded-full bg-coral/15 px-2 py-0.5 text-[10.5px] text-coral">Manquant</span> : <span className="rounded-full bg-champagne/15 px-2 py-0.5 text-[10.5px] text-champagne-300">À vérifier</span>}
+                  {demo ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {DEMO_PIECES.map(([n, s, r]) => (
+                        <div key={n} className="flex items-center gap-3 rounded-xl bg-white/[0.02] px-3.5 py-3 ring-1 ring-white/[0.05]">
+                          <FileText size={18} weight="light" className="text-bone/50" /><span className="flex-1 text-[13px]">{n}</span>
+                          <span className="text-[11px] text-mist">{r}</span>
+                          {s === 'ok' ? <CheckCircle size={16} weight="fill" className="text-sage" /> : s === 'missing' ? <span className="rounded-full bg-coral/15 px-2 py-0.5 text-[10.5px] text-coral">{t('pc.missing')}</span> : <span className="rounded-full bg-champagne/15 px-2 py-0.5 text-[10.5px] text-champagne-300">{t('pc.check')}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {pieces.map((x) => {
+                          const on = !!got[x.key]
+                          return (
+                            <button key={x.key} type="button" onClick={() => togglePiece(x.key)} aria-pressed={on} title={on ? t('pc.markMissing') : t('pc.markReceived')} className={`flex items-center gap-3 rounded-xl px-3.5 py-3 text-left ring-1 transition ${on ? 'bg-sage/[0.06] ring-sage/20' : 'bg-white/[0.02] ring-white/[0.05] hover:bg-white/[0.04]'}`}>
+                              <FileText size={18} weight="light" className="shrink-0 text-bone/50" />
+                              <span className="min-w-0 flex-1"><span className="block text-[13px]">{x.label}</span>{(x.ref || x.when) && <span className="block truncate text-[10.5px] text-mist">{[x.ref, x.when].filter(Boolean).join(' · ')}</span>}</span>
+                              {on ? <span className="flex shrink-0 items-center gap-1 text-[10.5px] text-sage"><CheckCircle size={16} weight="fill" />{t('pc.received')}</span> : <span className="shrink-0 rounded-full bg-coral/15 px-2 py-0.5 text-[10.5px] text-coral">{t('pc.missing')}</span>}
+                            </button>
+                          )
+                        })}
                       </div>
-                    ))}
-                  </div>
+                      <p className="mt-3 text-[11px] text-mist">* {t('pc.footnote')}</p>
+                    </>
+                  )}
                 </Card>
               )}
               {tab === 'journal' && (
@@ -230,34 +265,34 @@ export default function DossierDetail() {
         <div className="space-y-6 xl:col-span-4">
           <Stagger i={3}>
             <Card>
-              <div className="flex items-center gap-4"><Ring value={d.progress} size={64} stroke={4}><span className="num text-sm">{d.progress}%</span></Ring><div><div className="text-[11px] uppercase tracking-eyebrow text-mist">Prochaine action</div><div className="mt-1 text-[15px]">{d.next}</div><div className="text-[12px] text-champagne-300">{d.due}</div></div></div>
-              <div className="mt-5 grid grid-cols-3 gap-2">{[[Phone, 'Appeler'], [EnvelopeSimple, 'Écrire'], [Eye, 'Portail']].map(([I, l]) => { const Ic = I as typeof Phone; return <button key={l as string} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white/[0.03] py-3 text-[11.5px] text-bone/75 ring-1 ring-white/[0.06] transition hover:bg-white/[0.06]"><Ic size={17} weight="light" />{l as string}</button> })}</div>
+              <div className="flex items-center gap-4"><Ring value={d.progress} size={64} stroke={4}><span className="num text-sm">{d.progress}%</span></Ring><div><div className="text-[11px] uppercase tracking-eyebrow text-mist">{t('dd.next')}</div><div className="mt-1 text-[15px]">{d.next}</div><div className="text-[12px] text-champagne-300">{d.due}</div></div></div>
+              <div className="mt-5 grid grid-cols-3 gap-2">{[[Phone, t('dd.call')], [EnvelopeSimple, t('dd.write')], [Eye, t('dd.portal')]].map(([I, l]) => { const Ic = I as typeof Phone; return <button key={l as string} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white/[0.03] py-3 text-[11.5px] text-bone/75 ring-1 ring-white/[0.06] transition hover:bg-white/[0.06]"><Ic size={17} weight="light" />{l as string}</button> })}</div>
             </Card>
           </Stagger>
           <Stagger i={4}>
-            <Card title="Estimation" kicker="L7 · à valider">
+            <Card title={t('dd.est.title')} kicker={t('dd.est.kicker')}>
               {range ? (
                 <>
                   <div className="display text-4xl">{eur(range[0])} – {eur(range[1])}</div>
                   <div className="relative mt-4 h-1.5 rounded-full bg-white/10"><div className="absolute inset-y-0 rounded-full bg-gradient-to-r from-champagne-700 to-champagne" style={{ left: '20%', right: '15%' }} /><div className="absolute -top-1.5 h-4 w-0.5 rounded bg-bone" style={{ left: '58%' }} /></div>
                 </>
               ) : (
-                <div><div className="display text-3xl text-bone/70">Estimation à préparer</div><p className="mt-2 text-[12.5px] text-mist">Aucune fourchette calculée : elle sera établie avec l’analyse L7 et des comparables datés.</p></div>
+                <div><div className="display text-3xl text-bone/70">{t('dd.est.empty')}</div><p className="mt-2 text-[12.5px] text-mist">{t('dd.est.emptyHint')}</p></div>
               )}
-              <div className="mt-2 flex justify-between gap-3 text-[11px] text-mist"><span>{p.price ? `Prix présenté ${eur(p.price)}` : 'Prix non renseigné'}</span><span>{compCount ? `${compCount} comparable${compCount > 1 ? 's' : ''}` : 'Aucun comparable pour l’instant'}</span></div>
+              <div className="mt-2 flex justify-between gap-3 text-[11px] text-mist"><span>{p.price ? t('dd.est.price', { p: eur(p.price) }) : t('dd.est.noPrice')}</span><span>{compCount ? t('dd.est.comps', { n: compCount }) : t('dd.est.noComps')}</span></div>
             </Card>
           </Stagger>
           <Stagger i={5}>
-            <Card title="Personnes">
+            <Card title={t('dd.people')}>
               {people.map(({ n, r, ph }) => <div key={n} className="flex items-center gap-3 border-b border-white/[0.04] py-2.5 last:border-0"><Avatar src={ph} name={n} size={34} /><div className="min-w-0 flex-1"><div className="truncate text-[13px]">{n}</div><div className="text-[11px] text-mist">{r}</div></div><LinkIcon size={14} className="text-mist" /></div>)}
             </Card>
           </Stagger>
           <Stagger i={6}>
-            <Card title="Acquéreurs compatibles" kicker="L3 · matching expliqué">
-              {buyers.length === 0 && <p className="py-2 text-[13px] text-mist">Aucun acquéreur enregistré pour l’instant</p>}
-              {buyers.length > 0 && matches.length === 0 && <p className="py-2 text-[13px] text-mist">Aucun acquéreur compatible avec ce bien pour l’instant</p>}
+            <Card title={t('dd.buyers')} kicker={t('dd.buyers.kicker')}>
+              {buyers.length === 0 && <p className="py-2 text-[13px] text-mist">{t('dd.buyers.none')}</p>}
+              {buyers.length > 0 && matches.length === 0 && <p className="py-2 text-[13px] text-mist">{t('dd.buyers.noMatch')}</p>}
               {matches.map(({ b, score: v }) => <div key={b.id} className="flex items-center gap-3 py-2"><span className="flex-1 truncate text-[13px]">{b.name}</span><div className="h-1 w-24 rounded-full bg-white/10"><div className="h-1 rounded-full bg-champagne" style={{ width: `${v}%` }} /></div><span className="num w-8 text-right text-[12px]">{v}</span></div>)}
-              <Link to="/app/acquereurs" className="mt-3 block text-[12px] text-champagne-300">Voir le matching →</Link>
+              <Link to="/app/acquereurs" className="mt-3 block text-[12px] text-champagne-300">{t('dd.buyers.see')}</Link>
             </Card>
           </Stagger>
         </div>

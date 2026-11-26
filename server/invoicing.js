@@ -1,3 +1,4 @@
+import { actor } from './actor.js'
 // Émission déléguée des factures de commission : Jaspe prépare, un logiciel certifié émet.
 // - Portugal : API InvoiceXpress (logiciel certifié AT) → numéro légal, ATCUD, PDF.
 // - France : fichier Factur-X (XML CII, profil EN 16931) à déposer sur une plateforme agréée (PA).
@@ -293,13 +294,13 @@ export function createInvoicing(db, { put, patch, activity, HttpError, fetch = g
         const mand = inv.template === 'mandataire'
         const client = { name: String(inv.client ?? '').trim() || 'Consumidor final', fiscal_id: mand ? s.network?.nif : undefined, address: mand ? s.network?.address : undefined, postal_code: mand ? s.network?.postcode : undefined, city: mand ? s.network?.city : undefined, country: 'Portugal', language: 'pt' }
         const legal = await issueWithInvoiceXpress(inv, { call, client, prev: inv.legal ?? {}, onStep: (partial) => patch('invoices', id, { legal: partial }) })
-        activity('Claire Delmas', `a émis la facture ${legal.legalNumber ?? inv.number} via InvoiceXpress${legal.atcud ? ` (ATCUD ${legal.atcud})` : ''}`, 'win', '/app/factures')
+        activity(actor(), `a émis la facture ${legal.legalNumber ?? inv.number} via InvoiceXpress${legal.atcud ? ` (ATCUD ${legal.atcud})` : ''}`, 'win', '/app/factures')
         return patch('invoices', id, { legal })
       }
       const r = facturx(inv)
       if (r.missing.length) throw new HttpError(409, `Factur-X incomplet : ${r.missing.join(', ')}. Complétez les coordonnées de facturation.`)
       const legal = { provider: 'facturx', format: FACTURX_PROFILE.label, legalNumber: inv.number, filename: r.filename, issuedAt: new Date().toISOString(), transmission: 'à déposer sur votre plateforme agréée (PA)' }
-      activity('Claire Delmas', `a figé le Factur-X de la facture ${inv.number}`, 'win', '/app/factures')
+      activity(actor(), `a figé le Factur-X de la facture ${inv.number}`, 'win', '/app/factures')
       return patch('invoices', id, { legal, facturx: { xml: r.xml, filename: r.filename } })
     },
   }

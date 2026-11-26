@@ -4,7 +4,9 @@ import clsx from 'clsx'
 import { Plus, EnvelopeSimple, Scales, Phone, Lock, Scan, CheckCircle, Printer, Truck, MapPin, Sparkle, Camera, PaperPlaneTilt, Warning, Footprints, ArrowRight, ListChecks, PencilSimple, Trash, DownloadSimple } from '@phosphor-icons/react'
 import { PageHeader, Card, Stat, Tabs, SoftBtn, IconBtn, Stagger, Empty } from '../ui'
 import { Pill, Avatar, EXPO } from '../../ui/kit'
-import { agent, fmt, img, me } from '../../data/mock'
+import { fmt, img, me as DEMO_ME } from '../../data/mock'
+import { useIdentity } from '../../data/identity'
+import { useAgentOf } from '../../data/people'
 import { SECTORS, SIGNALS, SIGNAL_META, type SignalKind, type Campaign, type Consent, type Signal } from '../../data/geo'
 import { useCampaigns, useConsents, useTasks, useNotes, useAgents } from '../../data/collections'
 import { uploadFile, type Doc } from '../../data/store'
@@ -13,8 +15,10 @@ import { GeoMap, polygon } from '../GeoMap'
 
 const SHORT: Record<string, string> = { s1: 'Vieil Antibes', s2: 'La Salis', s3: 'Cap Ouest', s4: 'Juan centre', s5: 'Les Combes' }
 const DOT = { coral: 'bg-coral', gold: 'bg-champagne', sea: 'bg-sea', sage: 'bg-sage' } as const
-const LAW_DATE = new Date('2026-08-11'), TODAY = new Date('2026-10-11')
-const sinceLaw = Math.round((TODAY.getTime() - LAW_DATE.getTime()) / 86400000)
+const LAW_DATE = new Date('2026-08-11'), DEMO_TODAY = new Date('2026-10-11')
+const sinceLaw = (today: Date) => Math.max(0, Math.round((today.getTime() - LAW_DATE.getTime()) / 86400000))
+/** Nom d’un secteur : secteurs de démonstration, sinon le libellé saisi (compte réel). */
+const secName = (id: string) => SECTORS.find((s) => s.id === id)?.name ?? id
 const CONSENT_TONE: Record<Consent['status'], 'green' | 'red' | 'gold' | 'neutral'> = { Exprès: 'green', Refus: 'red', Expiré: 'gold', 'À recueillir': 'neutral' }
 const STATUSES: Consent['status'][] = ['Exprès', 'À recueillir', 'Refus', 'Expiré']
 const CHANNELS: Consent['channel'][] = ['Téléphone', 'SMS', 'E-mail', 'Courrier']
@@ -41,6 +45,7 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { w
 
 function CampaignForm({ initial, sector, onClose }: { initial?: Campaign & Doc; sector?: string; onClose: () => void }) {
   const [, ops] = useCampaigns()
+  const real = useIdentity().real
   const i = initial
   return (
     <AsyncForm submitLabel={i ? 'Enregistrer' : 'Créer la campagne'} success={i ? 'Campagne mise à jour' : 'Campagne créée — BAT à valider'} onCancel={onClose} onSubmit={async (v) => {
@@ -52,10 +57,12 @@ function CampaignForm({ initial, sector, onClose }: { initial?: Campaign & Doc; 
       if (i) await ops.update(i.id, patch); else await ops.create({ ...patch, returns: 0 })
       onClose()
     }}>
-      <Field label="Nom de la campagne"><Input name="name" required defaultValue={i?.name} placeholder="Vendu chemin de la Garoupe" /></Field>
+      <Field label="Nom de la campagne"><Input name="name" required defaultValue={i?.name} placeholder={real ? 'Vendu dans votre rue' : 'Vendu chemin de la Garoupe'} /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Secteur"><Select name="sector" defaultValue={i?.sector ?? sector ?? 's1'}>{SECTORS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>
-        <Field label="Volume (courriers)"><Input name="volume" type="number" min={1} required defaultValue={i?.volume ?? SECTORS.find((s) => s.id === (sector ?? 's1'))?.homes} inputMode="numeric" /></Field>
+        {real
+          ? <Field label="Secteur"><Input name="sector" required defaultValue={i?.sector} placeholder="Quartier, rues ou code postal" /></Field>
+          : <Field label="Secteur"><Select name="sector" defaultValue={i?.sector ?? sector ?? 's1'}>{SECTORS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>}
+        <Field label="Volume (courriers)"><Input name="volume" type="number" min={1} required defaultValue={i?.volume ?? (real ? undefined : SECTORS.find((s) => s.id === (sector ?? 's1'))?.homes)} inputMode="numeric" /></Field>
         <Field label="Accroche" className="sm:col-span-2"><Input name="hook" required defaultValue={i?.hook} placeholder="Prix au m² 2026 de votre rue" /></Field>
         <Field label="Date de dépôt"><Input name="date" defaultValue={i?.date} placeholder="20 oct." /></Field>
         <Field label="Impression"><Select name="print" defaultValue={i?.print ?? 'BAT à valider'}>{PRINT.map((p) => <option key={p}>{p}</option>)}</Select></Field>
@@ -69,6 +76,7 @@ function CampaignForm({ initial, sector, onClose }: { initial?: Campaign & Doc; 
 
 function ConsentForm({ initial, onClose }: { initial?: C; onClose: () => void }) {
   const [, ops] = useConsents()
+  const who = useIdentity()
   const i = initial
   return (
     <AsyncForm submitLabel={i ? 'Enregistrer' : 'Ajouter au registre'} success={i ? 'Registre mis à jour' : 'Contact ajouté au registre'} onCancel={onClose} onSubmit={async (v) => {
@@ -84,13 +92,13 @@ function ConsentForm({ initial, onClose }: { initial?: C; onClose: () => void })
       onClose()
     }}>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Contact" className="sm:col-span-2"><Input name="name" required defaultValue={i?.name} placeholder="Mme Hélène Vidal" /></Field>
+        <Field label="Contact" className="sm:col-span-2"><Input name="name" required defaultValue={i?.name} placeholder={who.real ? 'Nom du contact' : 'Mme Hélène Vidal'} /></Field>
         <Field label="Canal"><Select name="channel" defaultValue={i?.channel ?? 'Téléphone'}>{CHANNELS.map((p) => <option key={p}>{p}</option>)}</Select></Field>
         <Field label="Statut"><Select name="status" defaultValue={i?.status ?? 'À recueillir'}>{STATUSES.map((p) => <option key={p}>{p}</option>)}</Select></Field>
         <Field label="Preuve" className="sm:col-span-2" hint="Obligatoire pour un consentement exprès"><Input name="proof" defaultValue={i && i.proof !== '—' ? i.proof : ''} placeholder="Formulaire estimation · horodaté + IP" /></Field>
         <Field label="Recueilli le" hint="JJ/MM/AAAA · vide = aujourd’hui"><Input name="date" defaultValue={i && i.date !== '—' ? i.date : ''} /></Field>
         <Field label="Expire le" hint="Vide = 3 ans"><Input name="expires" defaultValue={i && i.expires !== '—' ? i.expires : ''} /></Field>
-        <Field label="Téléphone"><Input name="phone" type="tel" defaultValue={i?.phone} placeholder="+33 6 …" /></Field>
+        <Field label="Téléphone"><Input name="phone" type="tel" defaultValue={i?.phone} placeholder={who.real && who.country === 'PT' ? '+351 9 …' : '+33 6 …'} /></Field>
         <Field label="Origine"><Input name="origin" defaultValue={i?.origin} placeholder="Site agence, boîtage…" /></Field>
       </div>
     </AsyncForm>
@@ -100,12 +108,15 @@ function ConsentForm({ initial, onClose }: { initial?: C; onClose: () => void })
 function TourForm({ photo, sector, onClose }: { photo?: string; sector: string; onClose: () => void }) {
   const [, ops] = useNotes()
   const [agents] = useAgents()
+  const who = useIdentity()
+  const me = who.real ? { id: who.userId, name: who.name } : DEMO_ME
+  const pickable = who.real ? [...agents.filter((a) => a.id !== who.userId), { id: who.userId, name: who.name, mandats: 1 }] : agents
   return (
     <AsyncForm submitLabel="Enregistrer la tournée" success="Tournée enregistrée" onCancel={onClose} onSubmit={async (v) => {
       const boxes = Number(v.boxes) || 0, read = Number(v.read) || 0
       if (!v.streets?.trim() || boxes <= 0) throw new Error('Rues et nombre de boîtes obligatoires')
       if (read > boxes) throw new Error('Les boîtes lues ne peuvent dépasser les boîtes visitées')
-      const s = SECTORS.find((x) => x.id === v.sector)!
+      const s = { name: secName(v.sector) }
       const date = v.date ? new Date(v.date).toISOString() : new Date().toISOString()
       await ops.create({ kind: 'tour', text: `Tournée de boîtage — ${s.name} : ${v.streets.trim()} (${boxes} boîtes)`, at: new Date().toISOString(), by: me.name, date, agentId: v.agentId, sector: v.sector, streets: v.streets.trim(), boxes, read, photo } as never)
       onClose()
@@ -113,9 +124,11 @@ function TourForm({ photo, sector, onClose }: { photo?: string; sector: string; 
       {photo && <img src={photo} alt="Photo de la tournée" className="h-32 w-full rounded-2xl object-cover" />}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Date"><Input name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} /></Field>
-        <Field label="Conseiller"><Select name="agentId" defaultValue={me.id}>{agents.filter((a) => a.mandats > 0).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
-        <Field label="Secteur" className="sm:col-span-2"><Select name="sector" defaultValue={sector}>{SECTORS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>
-        <Field label="Rues parcourues" className="sm:col-span-2"><Input name="streets" required placeholder="Rue Vauban, rue Fersen" /></Field>
+        <Field label="Conseiller"><Select name="agentId" defaultValue={me.id}>{pickable.filter((a) => a.mandats > 0 || who.real).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
+        {who.real
+          ? <Field label="Secteur" className="sm:col-span-2"><Input name="sector" required placeholder="Quartier, rues ou code postal" /></Field>
+          : <Field label="Secteur" className="sm:col-span-2"><Select name="sector" defaultValue={sector}>{SECTORS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>}
+        <Field label="Rues parcourues" className="sm:col-span-2"><Input name="streets" required placeholder={who.real ? 'Rue …, rue …' : 'Rue Vauban, rue Fersen'} /></Field>
         <Field label="Boîtes visitées"><Input name="boxes" type="number" min={1} required inputMode="numeric" /></Field>
         <Field label="Noms relevés"><Input name="read" type="number" min={0} inputMode="numeric" /></Field>
       </div>
@@ -129,6 +142,10 @@ export default function Prospection() {
   const [consentsRaw, consentOps] = useConsents()
   const [tasksRaw, taskOps] = useTasks()
   const [notes, noteOps] = useNotes()
+  const who = useIdentity(), real = who.real
+  const agent = useAgentOf()
+  const SIGNALS_: Signal[] = real ? [] : SIGNALS
+  const HIST: typeof HISTORY = real ? [] : HISTORY
   const [layers, setLayers] = useState<Record<SignalKind, boolean>>({ dpe: true, succession: true, stock: true, vente: true })
   const [sector, setSector] = useState('s1')
   const [hover, setHover] = useState<string | null>(null)
@@ -145,8 +162,8 @@ export default function Prospection() {
   const tours = useMemo(() => (notes as unknown as Tour[]).filter((n) => n.kind === 'tour').sort((a, b) => b.date.localeCompare(a.date)), [notes])
   const sec = SECTORS.find((s) => s.id === sector)!
   const lastTour = tours.find((t) => t.sector === sector)
-  const signals = SIGNALS.filter((s) => layers[s.kind])
-  const secSignals = SIGNALS.filter((s) => s.sector === sector).sort((a, b) => b.score - a.score)
+  const signals = SIGNALS_.filter((s) => layers[s.kind])
+  const secSignals = SIGNALS_.filter((s) => s.sector === sector).sort((a, b) => b.score - a.score)
   const shapes = useMemo(() => SECTORS.map((s) => polygon(s.coords, { id: s.id, color: s.color, opacity: s.id === sector ? 0.2 : 0.06, width: s.id === sector ? 2 : 1, dashed: s.id !== sector })), [sector])
   const markers = signals.map((s) => ({ id: s.id, lng: s.lng, lat: s.lat, tone: SIGNAL_META[s.kind].tone, title: `${SIGNAL_META[s.kind].l} · ${s.addr}` }))
   const centroid = (c: [number, number][]) => [c.reduce((a, p) => a + p[0], 0) / c.length, c.reduce((a, p) => a + p[1], 0) / c.length] as [number, number]
@@ -179,7 +196,7 @@ export default function Prospection() {
   const call = (c: C) => {
     if (!canCall(c)) return toast('Appel bloqué : aucun consentement exprès et valide', 'error')
     if (!c.phone) { toast('Aucun numéro renseigné pour ce contact', 'info'); setConsentForm({ id: c.id }); return }
-    run(() => noteOps.create({ text: `Appel de prospection — ${c.name} · consentement ${c.channel.toLowerCase()} du ${c.date} (${c.proof})`, at: new Date().toISOString(), by: me.name }), 'Appel consigné au journal')
+    run(() => noteOps.create({ text: `Appel de prospection — ${c.name} · consentement ${c.channel.toLowerCase()} du ${c.date} (${c.proof})`, at: new Date().toISOString(), by: who.name }), 'Appel consigné au journal')
     window.location.href = `tel:${c.phone.replace(/\s/g, '')}`
   }
   const exportCsv = () => {
@@ -201,7 +218,7 @@ export default function Prospection() {
   return (
     <div>
       <PageHeader
-        kicker={`Territoire · ${SECTORS.length} secteurs · ${fmt(SECTORS.reduce((s, x) => s + x.homes, 0))} logements`}
+        kicker={real ? `Territoire · ${camps.length} campagne${camps.length > 1 ? 's' : ''} · ${tours.length} tournée${tours.length > 1 ? 's' : ''}` : `Territoire · ${SECTORS.length} secteurs · ${fmt(SECTORS.reduce((s, x) => s + x.homes, 0))} logements`}
         title={<>Prospection <span className="italic text-champagne-300">de terrain</span></>}
         sub="Signaux vendeurs croisés sur vos secteurs, courriers de voisinage L5, tournées de boîtage et registre des consentements."
         actions={<><SoftBtn icon={<Footprints size={14} />} onClick={() => setTourForm({})}>Nouvelle tournée</SoftBtn><SoftBtn tone="gold" icon={<Plus size={14} />} onClick={() => setCampForm({ sector })}>Campagne L5</SoftBtn></>}
@@ -212,35 +229,41 @@ export default function Prospection() {
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-coral/15 text-coral"><Scales size={18} weight="light" /></span>
           <div className="min-w-0 flex-1 text-[13px] leading-relaxed">
             <span className="font-medium text-bone">Démarchage téléphonique : consentement préalable obligatoire depuis le 11/08/2026.</span>{' '}
-            <span className="text-bone/60">Tout appel de prospection sans accord exprès et prouvable est interdit. Le courrier postal reste autorisé. En vigueur depuis <span className="num text-coral">{sinceLaw} jours</span>.</span>
+            <span className="text-bone/60">Tout appel de prospection sans accord exprès et prouvable est interdit. Le courrier postal reste autorisé. En vigueur depuis <span className="num text-coral">{sinceLaw(real ? new Date() : DEMO_TODAY)} jours</span>.</span>
           </div>
           <a href="#registre" className="flex shrink-0 items-center gap-1.5 text-[12.5px] text-coral hover:underline">Registre des consentements <ArrowRight size={13} /></a>
         </div>
       </Stagger>
 
       <Stagger i={1} className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Signaux vendeurs actifs" value={SIGNALS.length} hint={`${tasks.filter((t) => t.signalId).length} transformé(s) en tâche`} />
+        <Stat label="Signaux vendeurs actifs" value={SIGNALS_.length} hint={`${tasks.filter((t) => t.signalId).length} transformé(s) en tâche`} />
         <Stat label="Courriers distribués" value={fmt(distributed)} hint={`${camps.filter((c) => c.dist !== 'Distribuée').length} campagne(s) L5 en cours ou planifiées`} />
         <Stat label="Taux de retour" value={distributed ? `${((returns / distributed) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %` : '—'} hint={`${returns} retours · QR code + appels entrants`} />
         <Stat label="Consentements exprès" value={`${consentsAll.filter((c) => c.status === 'Exprès' && !isExpired(c)).length}/${consentsAll.length}`} hint={`${consentsAll.filter((c) => c.status === 'À recueillir').length} à recueillir`} />
       </Stagger>
 
-      <div className="grid gap-6 lg:grid-cols-12">
+      {real ? (
+        <Stagger i={2}>
+          <Card title="Secteurs & signaux vendeurs" kicker="Territoire">
+            <Empty title="Aucun secteur ni signal pour l’instant">La carte des secteurs et les signaux vendeurs (DPE, successions, ventes récentes) s’afficheront ici quand des sources seront branchées sur votre territoire. Vos campagnes L5, tournées et consentements s’enregistrent dès maintenant ci-dessous.</Empty>
+          </Card>
+        </Stagger>
+      ) : <div className="grid gap-6 lg:grid-cols-12">
         <Stagger i={2} className="min-w-0 lg:col-span-8">
           <Card pad={false} className="h-full">
-            <GeoMap markers={markers} shapes={shapes} activeId={hover} onHover={setHover} onSelect={(id) => { const s = SIGNALS.find((x) => x.id === id)!; if (s.sector) setSector(s.sector) }} onShapeClick={pickSector} focus={focus} center={[7.116, 43.572]} zoom={13.2} className="h-[460px] rounded-[calc(1.4rem-0.25rem)] lg:h-full lg:min-h-[560px]">
+            <GeoMap markers={markers} shapes={shapes} activeId={hover} onHover={setHover} onSelect={(id) => { const s = SIGNALS_.find((x) => x.id === id)!; if (s.sector) setSector(s.sector) }} onShapeClick={pickSector} focus={focus} center={[7.116, 43.572]} zoom={13.2} className="h-[460px] rounded-[calc(1.4rem-0.25rem)] lg:h-full lg:min-h-[560px]">
               <div className="absolute inset-x-3 top-3 mr-12 flex flex-wrap gap-1.5">
                 {(Object.keys(SIGNAL_META) as SignalKind[]).map((k) => {
                   const m = SIGNAL_META[k], on = layers[k]
                   return (
                     <button key={k} onClick={() => setLayers({ ...layers, [k]: !on })} title={m.hint} className={clsx('flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ring-1 backdrop-blur-md transition-all duration-300', on ? 'bg-ink/80 text-bone ring-white/15' : 'bg-ink/50 text-bone/40 ring-white/[0.06]')}>
-                      <span className={clsx('h-1.5 w-1.5 rounded-full transition-opacity', DOT[m.tone], !on && 'opacity-30')} />{m.l}<span className="num text-mist">{SIGNALS.filter((s) => s.kind === k).length}</span>
+                      <span className={clsx('h-1.5 w-1.5 rounded-full transition-opacity', DOT[m.tone], !on && 'opacity-30')} />{m.l}<span className="num text-mist">{SIGNALS_.filter((s) => s.kind === k).length}</span>
                     </button>
                   )
                 })}
               </div>
               <AnimatePresence>
-                {hover && (() => { const s = SIGNALS.find((x) => x.id === hover); if (!s) return null; const m = SIGNAL_META[s.kind]; return (
+                {hover && (() => { const s = SIGNALS_.find((x) => x.id === hover); if (!s) return null; const m = SIGNAL_META[s.kind]; return (
                   <motion.div key={s.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35, ease: EXPO }} className="pointer-events-none absolute bottom-4 left-4 max-w-[300px] rounded-2xl bg-ink-800/90 p-3 shadow-float ring-1 ring-white/10 backdrop-blur-xl">
                     <div className="flex items-center gap-1.5 text-[10.5px] uppercase tracking-eyebrow text-mist"><span className={clsx('h-1.5 w-1.5 rounded-full', DOT[m.tone])} />{m.l}</div>
                     <div className="mt-1 text-[13px]">{s.addr}</div><div className="text-[11.5px] text-bone/55">{s.detail}</div>
@@ -281,7 +304,7 @@ export default function Prospection() {
             <div className="mt-4"><SoftBtn tone="gold" icon={<EnvelopeSimple size={13} />} onClick={() => setCampForm({ sector })}>Courrier L5 sur ce secteur</SoftBtn></div>
           </Card>
         </Stagger>
-      </div>
+      </div>}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-12">
         <Stagger i={4} className="min-w-0 lg:col-span-7">
@@ -289,7 +312,7 @@ export default function Prospection() {
             {!camps.length && <Empty title="Aucune campagne">Lancez un premier courrier de voisinage sur un secteur.</Empty>}
             <div className="space-y-2.5">
               {camps.map((c) => {
-                const s = SECTORS.find((x) => x.id === c.sector) ?? SECTORS[0], next = nextLabel(c)
+                const s = SECTORS.find((x) => x.id === c.sector) ?? (real ? { name: c.sector || '—', color: 'rgb(var(--acc-500))' } : SECTORS[0]), next = nextLabel(c)
                 return (
                   <div key={c.id} className="rounded-2xl bg-white/[0.02] p-3.5 ring-1 ring-white/[0.05]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -337,13 +360,13 @@ export default function Prospection() {
             <div className="mt-4 divide-y divide-white/[0.05]">
               {tours.map((t) => (
                 <div key={t.id} className="flex items-center gap-3 py-2.5">
-                  <Avatar src={agent(t.agentId).photo} size={28} />
-                  <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-[12.5px]"><span className="num text-bone/70">{shortDate(t.date)}</span><span className="truncate">{SECTORS.find((s) => s.id === t.sector)?.name}</span>{t.photo && <Camera size={11} className="shrink-0 text-mist" />}</div><div className="truncate text-[11px] text-mist">{t.streets}</div></div>
+                  <Avatar src={agent(t.agentId).photo} name={agent(t.agentId).name} size={28} />
+                  <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-[12.5px]"><span className="num text-bone/70">{shortDate(t.date)}</span><span className="truncate">{secName(t.sector)}</span>{t.photo && <Camera size={11} className="shrink-0 text-mist" />}</div><div className="truncate text-[11px] text-mist">{t.streets}</div></div>
                   <div className="text-right"><div className="num text-[12.5px]">{t.boxes}</div><div className="num text-[10px] text-mist">{t.boxes ? Math.round((t.read / t.boxes) * 100) : 0} % relevés</div></div>
                   {confirm === t.id ? <button onClick={() => { setConfirm(null); run(() => noteOps.remove(t.id), 'Tournée supprimée') }} className="rounded-full bg-coral/15 px-2.5 py-1 text-[11px] text-coral ring-1 ring-coral/30">Confirmer</button> : <button onClick={() => setConfirm(t.id)} aria-label="Supprimer la tournée" className="text-mist transition hover:text-coral"><Trash size={13} /></button>}
                 </div>
               ))}
-              {HISTORY.map((t) => (
+              {HIST.map((t) => (
                 <div key={t.d} className="flex items-center gap-3 py-2.5 opacity-70">
                   <Avatar src={agent(t.a).photo} size={28} />
                   <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-[12.5px]"><span className="num text-bone/70">{t.d}</span><span className="truncate">{SECTORS.find((s) => s.id === t.s)!.name}</span></div><div className="truncate text-[11px] text-mist">{t.streets} · historique</div></div>
@@ -416,7 +439,16 @@ export default function Prospection() {
           </Card>
         </Stagger>
 
+        {real ? (
         <Stagger i={7} className="min-w-0 lg:col-span-12">
+          <Card title="KPI de prospection" kicker="Calculés sur vos campagnes et tournées" className="h-full">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {([['Campagnes L5', fmt(camps.length)], ['Courriers distribués', fmt(distributed)], ['Retours', fmt(returns)], ['Tournées enregistrées', fmt(tours.length)]] as const).map(([k, v]) => <div key={k} className="rounded-xl bg-white/[0.025] p-3 ring-1 ring-white/[0.05]"><div className="display text-2xl">{v}</div><div className="text-[10.5px] text-mist">{k}</div></div>)}
+            </div>
+            <p className="mt-3 text-[11.5px] text-bone/45">Les taux de transformation (contact → RDV → mandat) apparaîtront quand vos dossiers seront rattachés à leurs campagnes d’origine.</p>
+          </Card>
+        </Stagger>
+        ) : <Stagger i={7} className="min-w-0 lg:col-span-12">
           <Card title="KPI de prospection" kicker="6 derniers mois · historique importé" className="h-full">
             <div className="grid gap-6 md:grid-cols-3">
               <div>
@@ -438,12 +470,12 @@ export default function Prospection() {
               </div>
               <div className="space-y-2.5 md:border-l md:border-white/[0.06] md:pl-6">
                 {[['Contact → RDV estimation', '22,5 %'], ['RDV → mandat', '25,8 %'], ['Coût par mandat (courrier)', '312 €'], ['Délai signal → RDV', '9 j']].map(([k, v]) => <div key={k} className="flex items-center justify-between text-[12.5px]"><span className="text-bone/60">{k}</span><span className="num">{v}</span></div>)}
-                <div className="flex items-center justify-between text-[12.5px]"><span className="text-bone/60">Tournées enregistrées</span><span className="num">{tours.length + HISTORY.length}</span></div>
+                <div className="flex items-center justify-between text-[12.5px]"><span className="text-bone/60">Tournées enregistrées</span><span className="num">{tours.length + HIST.length}</span></div>
               </div>
               <div className="flex h-fit gap-2.5 rounded-2xl bg-champagne/[0.06] p-3.5 text-[12px] leading-relaxed text-bone/75 ring-1 ring-champagne/20"><Sparkle size={14} weight="fill" className="mt-0.5 shrink-0 text-champagne" /><span>Les signaux « succession » convertissent 2,3 fois mieux que la moyenne : 4 sont ouverts sur <span className="text-champagne-300">La Salis</span> et <span className="text-champagne-300">Les Combes</span>.<MapPin size={11} className="ml-1 inline text-mist" /></span></div>
             </div>
           </Card>
-        </Stagger>
+        </Stagger>}
       </div>
 
       <Modal open={!!campForm} onClose={() => setCampForm(null)} kicker="Courrier voisinage L5" title={editingCamp ? <>Modifier <span className="italic text-champagne-300">la campagne</span></> : <>Nouvelle <span className="italic text-champagne-300">campagne</span></>}>

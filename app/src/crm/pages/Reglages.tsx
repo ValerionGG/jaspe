@@ -60,7 +60,8 @@ function useSetting<T extends Record<string, unknown>>(id: string, defaults: T) 
 }
 function useAudit() {
   const [, ops] = useActivity()
-  return (what: string, tone = 'neutral') => { ops.create({ t: hhmm(), at: new Date().toISOString(), who: me.name, what, tone }).catch(() => {}) }
+  const who = useIdentity()
+  return (what: string, tone = 'neutral') => { ops.create({ t: hhmm(), at: new Date().toISOString(), who: who.name, what, tone }).catch(() => {}) }
 }
 
 /* ——— Primitives locales ——— */
@@ -206,16 +207,24 @@ function Profil() {
 
 /* ——— Agence & réseau ——— */
 const AGENCY = { agencyName: 'Maison Riviera · Antibes', signature: 'Claire Delmas — Conseillère senior', quietFrom: '20:00', quietTo: '08:00', overrides: { ai: true } as Record<string, boolean>, extraTeams: {} as Record<string, string[]>, retention: {} as Record<string, number>, aiAct: { label: true, c2pa: true } as Record<string, boolean>, billingLog: [] as { at: string; what: string }[] }
+/** Valeurs par défaut du document « agency » : en compte réel, nom de l’agence et signature de la personne connectée. */
+function useAgencyDefaults(): typeof AGENCY {
+  const who = useIdentity()
+  return who.real ? { ...AGENCY, agencyName: who.orgName, signature: `${who.name} — ${who.role}` } : AGENCY
+}
 
 function Reseau() {
-  const [ag, save] = useSetting('agency', AGENCY)
+  const who = useIdentity()
+  const [ag, save] = useSetting('agency', useAgencyDefaults())
   const audit = useAudit()
-  const [sel, setSel] = useState(NETWORK.agencies[0].name)
-  const [open, setOpen] = useState<string[]>([NETWORK.agencies[0].name])
+  // Compte réel : une seule agence (la sienne), sans réseau ni équipes de démonstration.
+  const agencies = who.real ? [{ name: who.orgName, city: '', teams: [] as string[], members: 0, overrides: 0 }] : NETWORK.agencies
+  const [sel, setSel] = useState(agencies[0].name)
+  const [open, setOpen] = useState<string[]>([agencies[0].name])
   const [adding, setAdding] = useState<string | null>(null)
   const over = { ...AGENCY.overrides, ...(ag.overrides ?? {}) }
   const extra = ag.extraTeams ?? {}
-  const a = NETWORK.agencies.find((x) => x.name === sel)!
+  const a = agencies.find((x) => x.name === sel) ?? agencies[0]
   const removeTeam = (agName: string, t: string) => save({ extraTeams: { ...extra, [agName]: (extra[agName] ?? []).filter((x) => x !== t) } }, `Équipe ${t} retirée`).then((ok) => ok && audit(`a retiré l’équipe ${t} · ${agName}`))
   return (
     <div className="space-y-6">
@@ -245,14 +254,18 @@ function Reseau() {
         </div>
       </Card>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.1fr]">
-        <Card title="Hiérarchie" kicker="Réseau → agences → équipes">
-          <div className="flex items-center gap-3 rounded-2xl bg-champagne/[0.07] p-3 ring-1 ring-champagne/20">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-champagne to-champagne-700 font-serif text-[16px] italic text-ink">R</span>
-            <div className="flex-1"><div className="text-[13.5px] font-medium">{NETWORK.name}</div><div className="text-[11px] text-mist">6 agences · 39 membres · Siège Sophia Antipolis</div></div>
-            <Globe size={16} weight="light" className="text-champagne-300" />
-          </div>
+        <Card title="Hiérarchie" kicker={who.real ? 'Agence → équipes' : 'Réseau → agences → équipes'}>
+          {who.real ? (
+            <p className="flex items-start gap-2 rounded-2xl bg-white/[0.02] p-3 text-[12px] text-bone/55 ring-1 ring-white/[0.05]"><Info size={14} className="mt-0.5 shrink-0" />Votre agence n’est rattachée à aucun réseau. Les autres agences apparaîtront ici lorsqu’elles existeront.</p>
+          ) : (
+            <div className="flex items-center gap-3 rounded-2xl bg-champagne/[0.07] p-3 ring-1 ring-champagne/20">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-champagne to-champagne-700 font-serif text-[16px] italic text-ink">R</span>
+              <div className="flex-1"><div className="text-[13.5px] font-medium">{NETWORK.name}</div><div className="text-[11px] text-mist">6 agences · 39 membres · Siège Sophia Antipolis</div></div>
+              <Globe size={16} weight="light" className="text-champagne-300" />
+            </div>
+          )}
           <div className="ml-[1.1rem] border-l border-white/[0.08] pl-4 pt-2">
-            {NETWORK.agencies.map((x) => {
+            {agencies.map((x) => {
               const isOpen = open.includes(x.name)
               const mine = extra[x.name] ?? []
               return (
@@ -264,7 +277,7 @@ function Reseau() {
                     <Buildings size={16} weight="light" className="text-bone/60" />
                     <span className="flex-1 text-[13px]">{x.name}</span>
                     {x.overrides > 0 && <Tag tone="sea">{x.overrides} dérog.</Tag>}
-                    <span className="num text-[11px] text-mist">{x.members}</span>
+                    {!who.real && <span className="num text-[11px] text-mist">{x.members}</span>}
                   </button>
                   <AnimatePresence initial={false}>
                     {isOpen && (
@@ -285,20 +298,22 @@ function Reseau() {
             })}
           </div>
         </Card>
-        <Card title={a.name} kicker="Réglages hérités" action={<span className="text-[11.5px] text-mist">{a.city}</span>}>
+        <Card title={a.name} kicker="Réglages hérités" action={a.city ? <span className="text-[11.5px] text-mist">{a.city}</span> : undefined}>
+          {who.real ? <Empty title="Aucun réglage hérité">Les réglages imposés par un réseau apparaissent ici lorsque l’agence est rattachée à un réseau.</Empty> : <>
           <p className="mb-3 flex items-start gap-2 rounded-xl bg-white/[0.02] p-3 text-[12px] text-bone/55 ring-1 ring-white/[0.05]"><Info size={14} className="mt-0.5 shrink-0" />Un réglage verrouillé par le réseau s’applique à toutes les agences. Les autres peuvent être adaptés localement.</p>
           {INHERITED.map((r) => (
             <Row key={r.id} title={r.label} tag={r.locked ? <Tag tone="mute">Verrouillé · {r.from}</Tag> : over[r.id] ? <Tag tone="sea">Dérogation locale</Tag> : <Tag tone="champagne">Hérité · {r.from}</Tag>}>
               {r.locked ? <Lock size={16} weight="light" className="text-mist" /> : <Toggle label={`Dérogation · ${r.label}`} on={!!over[r.id]} onChange={(v) => save({ overrides: { ...over, [r.id]: v } }, v ? 'Dérogation locale activée' : 'Réglage hérité rétabli').then((ok) => ok && audit(`${v ? 'a activé' : 'a retiré'} la dérogation « ${r.label} »`))} />}
             </Row>
           ))}
+          </>}
         </Card>
       </div>
       <Modal open={!!adding} onClose={() => setAdding(null)} title="Nouvelle équipe" kicker={adding ?? ''} width={460}>
         <AsyncForm submitLabel="Ajouter l’équipe" onCancel={() => setAdding(null)} success="Équipe ajoutée" onSubmit={async (v) => {
           const name = v.name?.trim()
           if (!name) throw new Error('Le nom de l’équipe est obligatoire')
-          const agName = adding!, cur = [...(NETWORK.agencies.find((x) => x.name === agName)?.teams ?? []), ...(extra[agName] ?? [])]
+          const agName = adding!, cur = [...(agencies.find((x) => x.name === agName)?.teams ?? []), ...(extra[agName] ?? [])]
           if (cur.some((t) => t.toLowerCase() === name.toLowerCase())) throw new Error('Cette équipe existe déjà')
           if (!(await save({ extraTeams: { ...extra, [agName]: [...(extra[agName] ?? []), name] } }))) throw new Error('Enregistrement impossible')
           audit(`a créé l’équipe ${name} · ${agName}`); setAdding(null)
@@ -316,6 +331,8 @@ const defaultAccess = (a: Member) => a.access ?? (a.id === 'a8' ? ROLES[0] : a.i
 const SECURITY = { mfa: true, mfaAll: true, ip: false, timeout: '8 heures', sso: { Google: true, Microsoft: false, SAML: false } as Record<string, boolean>, revoked: [] as string[], perms: PERM_MATRIX }
 
 function Equipe() {
+  const who = useIdentity()
+  const home = who.real ? who.orgName : HOME
   const [agents, ops] = useAgents() as unknown as [Member[], ReturnType<typeof useAgents>[1]]
   const [sec, saveSec] = useSetting('security', SECURITY)
   const [profile] = useSetting('profile', PROFILE)
@@ -337,9 +354,9 @@ function Equipe() {
             {members.map((a) => (
               <div key={a.id} className="flex flex-wrap items-center gap-3 py-2.5">
                 <Face a={a} />
-                <div className="min-w-0 flex-1 basis-[11rem]"><div className="flex items-center gap-2 truncate text-[13px]">{a.name}{a.id === me.id && <Tag tone="champagne">Vous</Tag>}</div><div className="truncate text-[11px] text-mist">{a.role} · {a.agency}</div></div>
+                <div className="min-w-0 flex-1 basis-[11rem]"><div className="flex items-center gap-2 truncate text-[13px]">{a.name}{a.id === who.userId && <Tag tone="champagne">Vous</Tag>}</div><div className="truncate text-[11px] text-mist">{a.role} · {a.agency}</div></div>
                 <Pill label={`Rôle de ${a.name}`} value={defaultAccess(a)} options={ROLES} onChange={(v) => run(ops.update(a.id, { access: v } as Partial<Member>).then(() => audit(`a attribué le rôle « ${v} » à ${a.name}`)), `${a.name.split(' ')[0]} : ${v}`)} />
-                {a.id !== me.id && (confirm === a.id
+                {a.id !== who.userId && (confirm === a.id
                   ? <span className="flex items-center gap-1"><button onClick={() => remove(a, 'a retiré')} className="rounded-full bg-coral/15 px-3 py-1.5 text-[11.5px] text-coral ring-1 ring-coral/25">Confirmer</button><IconBtn label="Annuler" onClick={() => setConfirm(null)}><X size={13} /></IconBtn></span>
                   : <IconBtn label={`Retirer ${a.name}`} onClick={() => setConfirm(a.id)}><Trash size={14} /></IconBtn>)}
               </div>
@@ -389,21 +406,21 @@ function Equipe() {
           </table>
         </div>
       </Card>
-      <Modal open={inviting} onClose={() => setInviting(false)} title="Inviter un conseiller" kicker="Équipe · Antibes Vieille-Ville" width={500}>
+      <Modal open={inviting} onClose={() => setInviting(false)} title="Inviter un conseiller" kicker={`Équipe · ${home}`} width={500}>
         <AsyncForm submitLabel="Créer et consigner l’invitation" onCancel={() => setInviting(false)} onSubmit={async (v) => {
           const name = v.name?.trim(), email = v.email?.trim().toLowerCase()
           if (!name) throw new Error('Le nom est obligatoire')
           if (!EMAIL.test(email ?? '')) throw new Error('Adresse e-mail invalide')
           if (taken.has(email)) throw new Error('Cette adresse appartient déjà à un membre ou à une invitation')
-          await ops.create({ name, email, access: v.access, role: v.access === ROLES[2] ? 'Conseiller' : v.access, agency: v.agency || HOME, photo: '', mandats: 0, ca: 0, score: 0, status: 'invité', invitedAt: new Date().toISOString() } as Partial<Member>)
+          await ops.create({ name, email, access: v.access, role: v.access === ROLES[2] ? 'Conseiller' : v.access, agency: v.agency || home, photo: '', mandats: 0, ca: 0, score: 0, status: 'invité', invitedAt: new Date().toISOString() } as Partial<Member>)
           audit(`a invité ${name} (${email}) · ${v.access}`)
           toast('Invitation consignée — envoi d’e-mail non configuré', 'info'); setInviting(false)
         }}>
           <Field label="Nom complet *"><Input name="name" placeholder="Prénom Nom" maxLength={60} autoFocus /></Field>
-          <Field label="Adresse e-mail *" hint="Contrôle de format et de doublon"><Input name="email" type="email" placeholder="prenom.nom@maison-riviera.fr" /></Field>
+          <Field label="Adresse e-mail *" hint="Contrôle de format et de doublon"><Input name="email" type="email" placeholder={who.real ? 'prenom.nom@agence.fr' : 'prenom.nom@maison-riviera.fr'} /></Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Rôle"><Select name="access" defaultValue={ROLES[2]}>{ROLES.map((r) => <option key={r}>{r}</option>)}</Select></Field>
-            <Field label="Agence"><Select name="agency" defaultValue={HOME}>{NETWORK.agencies.map((a) => <option key={a.name}>{a.name}</option>)}</Select></Field>
+            <Field label="Agence"><Select name="agency" defaultValue={home}>{(who.real ? [{ name: who.orgName }] : NETWORK.agencies).map((a) => <option key={a.name}>{a.name}</option>)}</Select></Field>
           </div>
         </AsyncForm>
       </Modal>
@@ -421,8 +438,11 @@ type BrandDraft = Pick<typeof BRAND, 'primary' | 'accent' | 'paper' | 'titleFont
 const pick = (b: typeof BRAND): BrandDraft => ({ primary: b.primary, accent: b.accent, paper: b.paper, titleFont: b.titleFont, bodyFont: b.bodyFont, signature: b.signature, logo: b.logo })
 
 function Marque() {
-  const [agency] = useSetting('agency', AGENCY)
-  const [b, save, exists] = useSetting('brand', { ...BRAND, primary: String((agency as Record<string, unknown>).primary ?? BRAND.primary), accent: String((agency as Record<string, unknown>).accent ?? BRAND.accent) })
+  const who = useIdentity()
+  const [agency] = useSetting('agency', useAgencyDefaults())
+  const brand = who.real ? { ...BRAND, signature: `${who.name} · ${who.role}\n${who.orgName}` } : BRAND
+  const mono = who.real ? (String(agency.agencyName || who.orgName).trim()[0] ?? 'J').toUpperCase() : 'R'
+  const [b, save, exists] = useSetting('brand', { ...brand, primary: String((agency as Record<string, unknown>).primary ?? BRAND.primary), accent: String((agency as Record<string, unknown>).accent ?? BRAND.accent) })
   const audit = useAudit()
   const saved = pick(b)
   const [c, setC] = useState<BrandDraft>(saved)
@@ -442,10 +462,10 @@ function Marque() {
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.05fr]">
       <div className="space-y-6">
-        <Card title="Identité visuelle" kicker="Héritée du réseau, adaptable">
+        <Card title="Identité visuelle" kicker={who.real ? 'Charte de l’agence' : 'Héritée du réseau, adaptable'}>
           <div className="flex items-center gap-4">
             {c.logo ? <img src={c.logo} alt="Logo de l’agence" className="h-16 w-16 rounded-2xl bg-white/[0.04] object-contain p-2 ring-1 ring-white/10" />
-              : <span className="flex h-16 w-16 items-center justify-center rounded-2xl font-serif text-3xl italic" style={{ background: c.accent, color: c.primary }}>R</span>}
+              : <span className="flex h-16 w-16 items-center justify-center rounded-2xl font-serif text-3xl italic" style={{ background: c.accent, color: c.primary }}>{mono}</span>}
             <label className="flex flex-1 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.12] px-4 py-4 text-center text-[12px] text-mist transition hover:border-champagne/40 hover:text-bone">
               <UploadSimple size={18} weight="light" /><span className="mt-1">Déposer un logo · SVG ou PNG transparent</span><input type="file" accept="image/svg+xml,image/png" className="hidden" onChange={(e) => onLogo(e.target.files?.[0])} />
             </label>
@@ -466,7 +486,7 @@ function Marque() {
           </div>
           <label className="mt-5 block"><span className="mb-1.5 block text-[10.5px] uppercase tracking-eyebrow text-mist">Signature</span>
             <textarea value={c.signature} onChange={(e) => setC({ ...c, signature: e.target.value })} rows={2} maxLength={240} className="w-full resize-none rounded-xl bg-white/[0.03] px-3.5 py-2.5 text-[13px] text-bone outline-none ring-1 ring-white/[0.07] focus:ring-champagne/40" /></label>
-          <SaveBar dirty={dirty} saving={saving} idle={exists ? 'Charte enregistrée' : 'Charte héritée du réseau'} onReset={() => setC(saved)} onSave={() => { if (![c.primary, c.accent, c.paper].every(hex)) return toast('Couleur invalide : format #RRGGBB attendu', 'error'); submit() }} />
+          <SaveBar dirty={dirty} saving={saving} idle={exists ? 'Charte enregistrée' : who.real ? 'Charte par défaut' : 'Charte héritée du réseau'} onReset={() => setC(saved)} onSave={() => { if (![c.primary, c.accent, c.paper].every(hex)) return toast('Couleur invalide : format #RRGGBB attendu', 'error'); submit() }} />
         </Card>
         <Card title="Modèles de documents" kicker="Verrouillés par le réseau ou personnalisables">
           {TEMPLATES.map((n) => {
@@ -480,20 +500,20 @@ function Marque() {
         </Card>
       </div>
       <div className="xl:sticky xl:top-24 xl:self-start">
-        <div className="mb-2 flex items-center justify-between"><span className="text-[10.5px] uppercase tracking-eyebrow text-mist">Aperçu en direct · L7</span><span className={clsx('flex items-center gap-1.5 text-[11px]', dirty ? 'text-champagne-300' : 'text-sage')}><span className={clsx('h-1.5 w-1.5 rounded-full', dirty ? 'bg-champagne' : 'animate-pulse bg-sage')} />{dirty ? 'Brouillon' : exists ? 'Charte enregistrée' : 'Charte du réseau'}</span></div>
+        <div className="mb-2 flex items-center justify-between"><span className="text-[10.5px] uppercase tracking-eyebrow text-mist">Aperçu en direct · L7</span><span className={clsx('flex items-center gap-1.5 text-[11px]', dirty ? 'text-champagne-300' : 'text-sage')}><span className={clsx('h-1.5 w-1.5 rounded-full', dirty ? 'bg-champagne' : 'animate-pulse bg-sage')} />{dirty ? 'Brouillon' : exists ? 'Charte enregistrée' : who.real ? 'Charte par défaut' : 'Charte du réseau'}</span></div>
         <motion.div layout className="overflow-hidden rounded-[1.4rem] shadow-float ring-1 ring-white/10" style={{ background: c.paper, color: c.primary, fontFamily: FONTS[c.bodyFont] }}>
           <div className="relative h-40"><img src={img('villa-pool')} alt="" className="h-full w-full object-cover" /><span className="theme-dark absolute bottom-2 right-2 rounded-full bg-ink/70 px-2 py-0.5 text-[9.5px] text-bone backdrop-blur">Image retouchée par IA · original conservé</span></div>
           <div className="p-7">
             <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: c.primary + '1f' }}>
-              <span className="flex min-w-0 items-center gap-2">{c.logo ? <img src={c.logo} alt="" className="h-7 w-7 object-contain" /> : <span className="flex h-7 w-7 items-center justify-center rounded-lg text-[13px] italic" style={{ background: c.accent, fontFamily: FONTS[c.titleFont] }}>R</span>}<span className="truncate text-[11px] uppercase tracking-[0.2em]" style={{ opacity: 0.6 }}>{agency.agencyName}</span></span>
+              <span className="flex min-w-0 items-center gap-2">{c.logo ? <img src={c.logo} alt="" className="h-7 w-7 object-contain" /> : <span className="flex h-7 w-7 items-center justify-center rounded-lg text-[13px] italic" style={{ background: c.accent, fontFamily: FONTS[c.titleFont] }}>{mono}</span>}<span className="truncate text-[11px] uppercase tracking-[0.2em]" style={{ opacity: 0.6 }}>{agency.agencyName}</span></span>
               <span className="shrink-0 pl-3 text-[10px] uppercase tracking-[0.2em]" style={{ opacity: 0.45 }}>Analyse de valeur</span>
             </div>
-            <h3 className="mt-5 text-[2.1rem] leading-[1.02]" style={{ fontFamily: FONTS[c.titleFont] }}>Villa contemporaine, <span style={{ color: c.accent, fontStyle: 'italic' }}>Cap d’Antibes</span></h3>
-            <div className="mt-4 flex items-baseline justify-between"><span className="text-[10px] uppercase tracking-[0.2em]" style={{ opacity: 0.5 }}>Fourchette retenue</span><span className="text-[1.7rem]" style={{ fontFamily: FONTS[c.titleFont] }}>4,60 – 5,15 M€</span></div>
+            <h3 className="mt-5 text-[2.1rem] leading-[1.02]" style={{ fontFamily: FONTS[c.titleFont] }}>{who.real ? <>Villa contemporaine, <span style={{ color: c.accent, fontStyle: 'italic' }}>exemple</span></> : <>Villa contemporaine, <span style={{ color: c.accent, fontStyle: 'italic' }}>Cap d’Antibes</span></>}</h3>
+            <div className="mt-4 flex items-baseline justify-between"><span className="text-[10px] uppercase tracking-[0.2em]" style={{ opacity: 0.5 }}>Fourchette retenue</span><span className="text-[1.7rem]" style={{ fontFamily: FONTS[c.titleFont] }}>{who.real ? '— €' : '4,60 – 5,15 M€'}</span></div>
             <div className="relative mt-2 h-1.5 rounded-full" style={{ background: c.primary + '14' }}><div className="absolute inset-y-0 left-[28%] right-[18%] rounded-full" style={{ background: c.accent }} /></div>
-            <p className="mt-4 text-[12.5px] leading-relaxed" style={{ opacity: 0.72 }}>Cinq ventes comparables DVF (sept. 2025 – mars 2026) dans un rayon de 900 m, ajustées pour la vue mer, l’état et le terrain.</p>
+            <p className="mt-4 text-[12.5px] leading-relaxed" style={{ opacity: 0.72 }}>{who.real ? 'Aperçu de mise en page : le texte, la fourchette et les comparables viendront de vos dossiers.' : 'Cinq ventes comparables DVF (sept. 2025 – mars 2026) dans un rayon de 900 m, ajustées pour la vue mer, l’état et le terrain.'}</p>
             <div className="mt-6 whitespace-pre-line border-t pt-4 text-[11.5px]" style={{ borderColor: c.primary + '1f', opacity: 0.75 }}>{c.signature}</div>
-            <div className="mt-3 text-[9.5px]" style={{ opacity: 0.4 }}>Sources : DVF/Etalab au 01/10/2026 · document validé par un professionnel avant envoi.</div>
+            <div className="mt-3 text-[9.5px]" style={{ opacity: 0.4 }}>{who.real ? 'Sources citées sur chaque document' : 'Sources : DVF/Etalab au 01/10/2026'} · document validé par un professionnel avant envoi.</div>
           </div>
         </motion.div>
       </div>
@@ -652,7 +672,7 @@ const sortActivity = (list: Activity[]) => [...list].sort((a, b) => (b.at ?? '')
 function Conformite() {
   const [consents] = useConsents()
   const [activity] = useActivity()
-  const [ag, save] = useSetting('agency', AGENCY)
+  const [ag, save] = useSetting('agency', useAgencyDefaults())
   const audit = useAudit()
   const [f, setF] = useState<(typeof CS_TABS)[number]>('tous')
   const [limit, setLimit] = useState(10)
@@ -738,7 +758,7 @@ const EVENTS = ['Livrable prêt à valider', 'Offre reçue', 'Nouveau lead vende
 const CHANNELS = [{ id: 'app', l: 'App', i: Desktop }, { id: 'push', l: 'Mobile', i: DeviceMobile }, { id: 'mail', l: 'Courriel', i: EnvelopeSimple }]
 const NOTIF = { matrix: Object.fromEntries(EVENTS.flatMap((e, ei) => CHANNELS.map((c, ci) => [`${e}|${c.id}`, ci === 0 || (ci === 1 && ei < 4) || (ci === 2 && ei === 5)]))) as Record<string, boolean>, quietFrom: '20:00', quietTo: '08:00', weekend: true, urgent: true, digest: false }
 function Notifications() {
-  const [agency] = useSetting('agency', AGENCY)
+  const [agency] = useSetting('agency', useAgencyDefaults())
   const [n, save] = useSetting('notifications', { ...NOTIF, quietFrom: agency.quietFrom, quietTo: agency.quietTo })
   const m = { ...NOTIF.matrix, ...(n.matrix ?? {}) }
   const h = (s: string) => { const [a, b] = s.split(':').map(Number); return a + (b || 0) / 60 }
@@ -953,11 +973,14 @@ function AccountTeam({ me: a }: { me: AuthMe }) {
 
 /* ——— Sécurité ——— */
 function Securite() {
+  const who = useIdentity()
   const [s, save] = useSetting('security', SECURITY)
   const audit = useAudit()
   const sso = { ...SECURITY.sso, ...(s.sso ?? {}) }
   const revoked = s.revoked ?? []
-  const sessions = SESSIONS.filter((x) => !revoked.includes(x.device))
+  // Compte réel : seul l’appareil courant est connu (pas de liste d’appareils de démonstration).
+  const allSessions = who.real ? [{ device: 'Ce navigateur', place: Intl.DateTimeFormat().resolvedOptions().timeZone, last: 'Session actuelle', current: true }] : SESSIONS
+  const sessions = allSessions.filter((x) => !revoked.includes(x.device))
   const set = (patch: Partial<typeof SECURITY>, ok: string, log: string) => save(patch, ok).then((v) => v && audit(log, 'warn'))
   const account = useMe()
   const logout = () => authCall('POST', 'auth/logout').then(() => { resetLocalData(); window.location.href = '/connexion' }, (e) => toast(errText(e), 'error'))
@@ -970,13 +993,13 @@ function Securite() {
       )}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card title="Authentification" kicker="Double facteur">
-          <Row title={<span className="flex items-center gap-2"><Fingerprint size={16} weight="light" className="text-champagne-300" />Double authentification</span>} desc="Clé d’accès (passkey) sur ce Mac et l’iPhone" tag={s.mfa ? <Tag tone="sage">Active</Tag> : <Tag tone="coral">Inactive</Tag>}><Toggle label="MFA" on={s.mfa} onChange={(v) => set({ mfa: v }, v ? 'Double authentification activée' : 'Double authentification désactivée', `${v ? 'a activé' : 'a désactivé'} sa double authentification`)} /></Row>
+          <Row title={<span className="flex items-center gap-2"><Fingerprint size={16} weight="light" className="text-champagne-300" />Double authentification</span>} desc={who.real ? 'Clé d’accès (passkey) ou code à usage unique' : 'Clé d’accès (passkey) sur ce Mac et l’iPhone'} tag={s.mfa ? <Tag tone="sage">Active</Tag> : <Tag tone="coral">Inactive</Tag>}><Toggle label="MFA" on={s.mfa} onChange={(v) => set({ mfa: v }, v ? 'Double authentification activée' : 'Double authentification désactivée', `${v ? 'a activé' : 'a désactivé'} sa double authentification`)} /></Row>
           <Row title="Imposer la double authentification à toute l’agence" desc="Les membres sans MFA seront invités à l’activer à la prochaine connexion"><Toggle label="MFA agence" on={s.mfaAll} onChange={(v) => set({ mfaAll: v }, 'Politique MFA enregistrée', `${v ? 'a imposé' : 'n’impose plus'} la MFA à l’agence`)} /></Row>
           <Row title="Restreindre aux adresses IP des agences" desc="Accès mobile toujours autorisé avec MFA"><Toggle label="IP" on={s.ip} onChange={(v) => set({ ip: v }, 'Restriction IP enregistrée', `${v ? 'a activé' : 'a désactivé'} la restriction IP`)} /></Row>
           <Row title="Déconnexion après inactivité"><Pill label="Délai" value={s.timeout} options={['1 heure', '4 heures', '8 heures', '24 heures']} onChange={(v) => set({ timeout: v }, `Déconnexion après ${v}`, `a fixé la déconnexion automatique à ${v}`)} /></Row>
         </Card>
         <Card title="Authentification unique (SSO)" kicker="Annuaire d’entreprise">
-          {([['Google', 'Google Workspace', 'maison-riviera.fr · 34 comptes'], ['Microsoft', 'Microsoft Entra ID', 'Pour Cannes et Mougins'], ['SAML', 'SAML 2.0 personnalisé', 'Okta, JumpCloud…']] as const).map(([k, l, d]) => (
+          {([['Google', 'Google Workspace', who.real ? 'Comptes Google de l’agence' : 'maison-riviera.fr · 34 comptes'], ['Microsoft', 'Microsoft Entra ID', who.real ? 'Comptes Microsoft de l’agence' : 'Pour Cannes et Mougins'], ['SAML', 'SAML 2.0 personnalisé', 'Okta, JumpCloud…']] as const).map(([k, l, d]) => (
             <Row key={k} title={<span className="flex items-center gap-2"><Key size={15} weight="light" className="text-bone/60" />{l}</span>} desc={d}
               tag={sso[k] ? <Tag tone="sage">Configuré · simulé</Tag> : undefined}>
               <SoftBtn tone={sso[k] ? 'ghost' : 'gold'} onClick={() => save({ sso: { ...sso, [k]: !sso[k] } }).then((ok) => { if (!ok) return; audit(`${sso[k] ? 'a désactivé' : 'a configuré'} le SSO ${l}`, 'warn'); toast(sso[k] ? `${l} désactivé` : `${l} : fournisseur d’identité non configuré — réglage consigné`, sso[k] ? 'ok' : 'info') })}>{sso[k] ? 'Désactiver' : 'Configurer'}</SoftBtn>
@@ -984,7 +1007,7 @@ function Securite() {
           ))}
         </Card>
       </div>
-      <Card title="Sessions actives" kicker={`${sessions.length} appareil${sessions.length > 1 ? 's' : ''}`} action={<div className="flex gap-2">{revoked.length > 0 && <SoftBtn onClick={() => save({ revoked: [] }, 'Liste des sessions réinitialisée (démo)')}>Réinitialiser</SoftBtn>}{sessions.length > 1 && <SoftBtn icon={<SignOut size={13} />} onClick={() => set({ revoked: SESSIONS.filter((x) => !x.current).map((x) => x.device) }, 'Autres sessions révoquées', 'a révoqué toutes ses autres sessions')}>Déconnecter les autres</SoftBtn>}</div>}>
+      <Card title="Sessions actives" kicker={`${sessions.length} appareil${sessions.length > 1 ? 's' : ''}`} action={<div className="flex gap-2">{revoked.length > 0 && <SoftBtn onClick={() => save({ revoked: [] }, 'Liste des sessions réinitialisée (démo)')}>Réinitialiser</SoftBtn>}{sessions.length > 1 && <SoftBtn icon={<SignOut size={13} />} onClick={() => set({ revoked: allSessions.filter((x) => !x.current).map((x) => x.device) }, 'Autres sessions révoquées', 'a révoqué toutes ses autres sessions')}>Déconnecter les autres</SoftBtn>}</div>}>
         <AnimatePresence initial={false}>
           {sessions.map((x) => (
             <motion.div key={x.device} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.35, ease: EXPO }} className="overflow-hidden">

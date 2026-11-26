@@ -10,7 +10,7 @@ import { Modal, Field, Input, Select, Textarea, AsyncForm, toast, errText } from
 import { action } from '../../data/store'
 import { useConversations, useReminders, useTasks, useEvents, useNotes, useFiles, useAgents } from '../../data/collections'
 import { STAGES, agent } from '../../data/mock'
-import { useConvContext, eventDate, dayLabel, longDate, until, localInput, rel, isSnoozed, Menu, menuItem, eyebrow, me, type Conv, type Msg } from './shared'
+import { useConvContext, eventDate, dayLabel, longDate, until, localInput, rel, isSnoozed, Menu, menuItem, eyebrow, useSelf, type Conv, type Msg } from './shared'
 
 export function SnoozeMenu({ conv, onDone, className }: { conv: Conv; onDone: () => void; className?: string }) {
   const [, ops] = useConversations()
@@ -39,6 +39,7 @@ export default function Context({ conv, messages, onClose }: { conv: Conv; messa
   const [notes] = useNotes()
   const [files] = useFiles()
   const [agents] = useAgents()
+  const me = useSelf()
   const { contact, dossier, property, next } = useConvContext(conv)
   const [modal, setModal] = useState<null | 'task' | 'visit' | 'note'>(null)
   const [snooze, setSnooze] = useState(false)
@@ -50,7 +51,7 @@ export default function Context({ conv, messages, onClose }: { conv: Conv; messa
     ...messages.flatMap((m) => (m.attachments ?? []).map((a) => ({ ...a, at: m.at }))),
     ...files.filter((f) => dossier && f.dossierId === dossier.id).map((f) => ({ name: f.name, kind: (f.type.startsWith('image/') ? 'image' : 'pdf') as 'image' | 'pdf', ref: f.id, at: f.at })),
   ].filter((a, i, l) => l.findIndex((b) => b.name === a.name) === i)
-  const assign = async (id: string) => { try { await convOps.update(conv.id, { assignee: id || undefined }); toast(id ? `Assignée à ${agent(id).name}` : 'Assignation retirée') } catch (e) { toast(errText(e), 'error') } }
+  const assign = async (id: string) => { try { await convOps.update(conv.id, { assignee: id || undefined }); toast(id ? `Assignée à ${agents.find((a) => a.id === id)?.name ?? (id === me.id ? me.name : agent(id).name)}` : 'Assignation retirée') } catch (e) { toast(errText(e), 'error') } }
   const cancel = async (id: string) => { try { await action('reminder.cancel', { id }); toast('Rappel annulé') } catch (e) { toast(errText(e), 'error') } }
 
   return (
@@ -151,7 +152,7 @@ export default function Context({ conv, messages, onClose }: { conv: Conv; messa
                 <label className="col-span-2 flex items-center gap-2 rounded-xl bg-white/[0.03] px-3 py-2 text-[12px] ring-1 ring-white/[0.06]">
                   <UserSwitch size={15} className="text-mist" /><span className="text-mist">Assignée à</span>
                   <select value={conv.assignee ?? ''} onChange={(e) => assign(e.target.value)} className="ml-auto bg-transparent text-right text-bone outline-none [&>option]:bg-ink-800">
-                    <option value="">Personne</option>{agents.filter((a) => a.mandats > 0 || a.id === 'a5').map((a) => <option key={a.id} value={a.id}>{a.id === me.id ? `${a.name} (moi)` : a.name}</option>)}
+                    <option value="">Personne</option>{me.real && !agents.some((a) => a.id === me.id) && <option value={me.id}>{me.name} (moi)</option>}{agents.filter((a) => me.real || a.mandats > 0 || a.id === 'a5').map((a) => <option key={a.id} value={a.id}>{a.id === me.id ? `${a.name} (moi)` : a.name}</option>)}
                   </select>
                 </label>
                 <button onClick={async () => { try { await convOps.update(conv.id, { status: conv.status === 'done' ? 'open' : 'done', snoozedUntil: undefined }); toast(conv.status === 'done' ? 'Conversation rouverte' : 'Conversation terminée') } catch (e) { toast(errText(e), 'error') } }}
@@ -216,16 +217,17 @@ function TaskModal({ open, onClose, conv, dossierId }: { open: boolean; onClose:
 function VisitModal({ open, onClose, conv, dossierId, place, propertyTitle }: { open: boolean; onClose: () => void; conv: Conv; dossierId?: string; place?: string; propertyTitle?: string }) {
   const [, ops] = useEvents()
   const [, convOps] = useConversations()
+  const me = useSelf()
   const today = new Date()
   const iso = (d: Date) => localInput(d).slice(0, 10)
   return (
     <Modal open={open} onClose={onClose} title="Planifier une visite" kicker="Agenda · rappels WhatsApp J-1 et H-2">
       <AsyncForm submitLabel="Ajouter à l’agenda" onCancel={onClose} onSubmit={async (v) => {
         const d = new Date(`${v.date}T${v.start}`)
-        if (d.getFullYear() !== 2026 || d.getMonth() !== 9) throw new Error('L’agenda de démonstration couvre octobre 2026 : choisissez une date en octobre.')
+        if (!me.real && (d.getFullYear() !== 2026 || d.getMonth() !== 9)) throw new Error('L’agenda de démonstration couvre octobre 2026 : choisissez une date en octobre.')
         if (d.getTime() < Date.now()) throw new Error('Cette date est déjà passée.')
         if (v.end <= v.start) throw new Error('L’heure de fin doit suivre l’heure de début.')
-        const e = await ops.create({ day: d.getDate(), start: v.start, end: v.end, title: v.title.trim(), who: conv.title, place: v.place.trim() || '—', kind: 'visite', dossier: dossierId, source: 'nxt' })
+        const e = await ops.create({ day: Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(2026, 9, 0)) / 864e5), start: v.start, end: v.end, title: v.title.trim(), who: conv.title, place: v.place.trim() || '—', kind: 'visite', dossier: dossierId, source: 'nxt' })
         await convOps.update(conv.id, { eventIds: [...(conv.eventIds ?? []), e.id] })
         let msg = `Visite ajoutée ${longDate(d.toISOString())}`
         if (v.remind === 'on') { try { const r = await action<unknown[]>('reminders.scheduleEvent', { eventId: e.id }); msg += ` · ${r.length} rappel(s) programmé(s)` } catch (x) { msg += ` · rappels : ${errText(x)}` } }
@@ -233,7 +235,7 @@ function VisitModal({ open, onClose, conv, dossierId, place, propertyTitle }: { 
       }}>
         <Field label="Intitulé"><Input name="title" required defaultValue={`Visite — ${propertyTitle ?? conv.title}`} /></Field>
         <div className="grid grid-cols-3 gap-3">
-          <Field label="Date"><Input name="date" type="date" required min={iso(today)} max="2026-10-31" defaultValue={iso(new Date(today.getTime() + 864e5))} /></Field>
+          <Field label="Date"><Input name="date" type="date" required min={iso(today)} max={me.real ? undefined : '2026-10-31'} defaultValue={iso(new Date(today.getTime() + 864e5))} /></Field>
           <Field label="Début"><Input name="start" type="time" required defaultValue="10:00" /></Field>
           <Field label="Fin"><Input name="end" type="time" required defaultValue="10:45" /></Field>
         </div>
@@ -247,6 +249,7 @@ function VisitModal({ open, onClose, conv, dossierId, place, propertyTitle }: { 
 
 function NoteModal({ open, onClose, dossierId, contactId, title }: { open: boolean; onClose: () => void; dossierId?: string; contactId?: string; title: string }) {
   const [, ops] = useNotes()
+  const me = useSelf()
   return (
     <Modal open={open} onClose={onClose} title="Ajouter une note" kicker={title}>
       <AsyncForm submitLabel="Enregistrer la note" onCancel={onClose} success="Note ajoutée au dossier" onSubmit={async (v) => {

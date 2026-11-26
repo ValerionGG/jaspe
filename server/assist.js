@@ -1,3 +1,4 @@
+import { actor } from './actor.js'
 // Assistant mesurable : temps gagné (corrections comprises), conformité FR/PT, factures de commissions,
 // plan d'action depuis un brief libre, veille marché. Code pur (aucune API Node) : il tourne aussi dans le navigateur.
 
@@ -202,7 +203,7 @@ export function createAssist(db, deps = {}) {
       const samples = { ...cur.samples, [kind]: [...(cur.samples?.[kind] ?? []), Number(minutes)].slice(-20) }
       const values = { ...cur.values, [kind]: median(samples[kind]) }
       const s = put('settings', { id: 'time-baselines', values, samples })
-      activity('Claire Delmas', `a chronométré « ${KIND_LABELS[kind]} » fait à la main : ${minutes} min (référence ${values[kind]} min)`, 'neutral', '/app/temps')
+      activity(actor(), `a chronométré « ${KIND_LABELS[kind]} » fait à la main : ${minutes} min (référence ${values[kind]} min)`, 'neutral', '/app/temps')
       return s
     },
     'time.reset': ({ kind }) => {
@@ -218,11 +219,11 @@ export function createAssist(db, deps = {}) {
       const cur = db.get('compliance', `cmp-${dossierId}`) ?? evaluate(dossierId)
       if (!cur.items.some((i) => i.id === itemId)) throw new HttpError(404, 'Point de contrôle inconnu')
       if (state === 'ok' && !String(evidence).trim()) throw new HttpError(400, 'Indiquez la preuve ou la référence du document')
-      const items = cur.items.map((i) => (i.id === itemId ? { ...i, state, evidence, auto: false, by: 'Claire Delmas', updatedAt: new Date().toISOString() } : i))
+      const items = cur.items.map((i) => (i.id === itemId ? { ...i, state, evidence, auto: false, by: actor(), updatedAt: new Date().toISOString() } : i))
       put('compliance', { ...cur, items })
       // Journal horodaté en ajout seul (export de contrôle du Pack Preuves).
       const before = cur.items.find((i) => i.id === itemId)
-      put('cmplog', { dossierId, at: new Date().toISOString(), by: 'Claire Delmas', kind: 'checklist', itemId, from: before.state, to: state, what: `« ${before.label.split(' (')[0].slice(0, 80)} » : ${before.state} → ${state}${evidence ? ` — ${String(evidence).slice(0, 200)}` : ''}` })
+      put('cmplog', { dossierId, at: new Date().toISOString(), by: actor(), kind: 'checklist', itemId, from: before.state, to: state, what: `« ${before.label.split(' (')[0].slice(0, 80)} » : ${before.state} → ${state}${evidence ? ` — ${String(evidence).slice(0, 200)}` : ''}` })
       if (state === 'ok') logTime({ kind: 'conformite', dossierId, ref: `cmp-${dossierId}-${itemId}`, spent: 2, label: `Conformité : ${cur.items.find((i) => i.id === itemId).label.slice(0, 60)}` })
       return evaluate(dossierId)
     },
@@ -327,7 +328,7 @@ export function createAssist(db, deps = {}) {
       if (inv.status !== 'brouillon') return inv
       const number = nextNumber()
       addSpent(`inv-${id}`, REVIEW_MIN, false, { settle: true })
-      activity('Claire Delmas', `a validé la facture ${number} (${inv.ttc.toLocaleString('fr-FR')} € TTC)`, 'win', '/app/factures')
+      activity(actor(), `a validé la facture ${number} (${inv.ttc.toLocaleString('fr-FR')} € TTC)`, 'win', '/app/factures')
       return patch('invoices', id, { number, status: 'validée', validatedAt: new Date().toISOString() })
     },
     'invoice.send': ({ id }) => {
@@ -381,7 +382,7 @@ export function createAssist(db, deps = {}) {
           done.push({ ...it, result: 'checklist de conformité mise à jour' })
         }
       }
-      if (text && d) put('notes', { dossierId, text: `Brief : ${String(text).slice(0, 600)}`, at: new Date().toISOString(), by: 'Claire Delmas' }, { front: true })
+      if (text && d) put('notes', { dossierId, text: `Brief : ${String(text).slice(0, 600)}`, at: new Date().toISOString(), by: actor() }, { front: true })
       activity('Copilote', `a lancé ${done.length} action(s) depuis un brief — ${who}`, 'ai', d ? `/app/dossiers/${dossierId}` : '/app/taches')
       run('AUT-120', 'ok', `${done.length} action(s) créée(s) depuis un brief — ${who}`)
       return { done }
@@ -389,7 +390,7 @@ export function createAssist(db, deps = {}) {
 
     'feedback.send': ({ text, page, mood }) => {
       if (!String(text ?? '').trim()) throw new HttpError(400, 'Retour vide')
-      return put('feedback', { text: String(text).slice(0, 2000), page, mood, at: new Date().toISOString(), by: 'Claire Delmas' }, { front: true })
+      return put('feedback', { text: String(text).slice(0, 2000), page, mood, at: new Date().toISOString(), by: actor() }, { front: true })
     },
   }
 

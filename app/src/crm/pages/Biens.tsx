@@ -5,10 +5,12 @@ import clsx from 'clsx'
 import { Plus, SquaresFour, MapTrifold, Columns, Eye, ChatCircleDots, DoorOpen, X, MapPin, Ruler, Bed, Tree, CaretDown, CheckCircle, Warning, XCircle, Clock, Sparkle, ArrowsClockwise, Cube, ImageSquare, SlidersHorizontal, ArrowUpRight, Broadcast, PencilSimple, Trash, UploadSimple, Prohibit, Archive } from '@phosphor-icons/react'
 import { PageHeader, Card, Stat, Tabs, SoftBtn, IconBtn, Stagger, Empty } from '../ui'
 import { Pill, Ring, Avatar, EXPO } from '../../ui/kit'
-import { eur, fmt, agent, img, me } from '../../data/mock'
+import { eur, fmt, img, me as DEMO_ME } from '../../data/mock'
 import { PORTALS, QUALITY_CHECKS, DPE_C, ZONES, type Listing, type ListingStatus, type Portal, type PortalState, type CheckKey } from '../../data/geo'
 import { useProperties, useDossiers, useAgents, useActivity, useTasks } from '../../data/collections'
 import { uploadFile } from '../../data/store'
+import { useIdentity } from '../../data/identity'
+import { useAgentOf } from '../../data/people'
 import { Modal, Field, Input, Select, Textarea, AsyncForm, toast, errText } from '../forms'
 import { GeoMap, ANTIBES } from '../GeoMap'
 
@@ -128,6 +130,9 @@ function ListRow({ l, active, onHover, onOpen }: { l: Listing; active: boolean; 
 function BienForm({ initial, onClose, onSaved }: { initial?: Listing; onClose: () => void; onSaved: (id: string) => void }) {
   const [, ops] = useProperties()
   const [agents] = useAgents()
+  const who = useIdentity()
+  const me = who.real ? { id: who.userId } : DEMO_ME
+  const pickable = who.real ? [...agents.filter((a) => a.id !== who.userId), { id: who.userId, name: who.name, mandats: 1 }] : agents
   const [photo, setPhoto] = useState(initial?.photo ?? img('house-garden'))
   const [uploading, setUploading] = useState(false)
   const pickPhoto = async (f?: File) => {
@@ -182,7 +187,7 @@ function BienForm({ initial, onClose, onSaved }: { initial?: Listing; onClose: (
         <Field label="Type"><Select name="type" defaultValue={i?.type ?? 'Villa'}>{['Villa', 'Maison', 'Appartement'].map((t) => <option key={t}>{t}</option>)}</Select></Field>
         <Field label="Statut"><Select name="status" defaultValue={i?.status ?? 'Brouillon'}>{STATUSES.map((t) => <option key={t}>{t}</option>)}</Select></Field>
         <Field label="Adresse" className="sm:col-span-2"><Input name="address" required defaultValue={i?.address} placeholder="14 chemin des Nielles" /></Field>
-        <Field label="Ville"><Input name="city" required defaultValue={i?.city ?? 'Antibes'} /></Field>
+        <Field label="Ville"><Input name="city" required defaultValue={i?.city ?? (who.real ? '' : 'Antibes')} /></Field>
         <Field label="Quartier"><Input name="district" defaultValue={i?.district} placeholder="Cap d’Antibes" list="bien-zones" /><datalist id="bien-zones">{Object.keys(ZONES).map((z) => <option key={z} value={z} />)}</datalist></Field>
         <Field label="Prix honoraires inclus (€)"><Input name="price" type="number" min={0} step={1000} required defaultValue={i?.price} inputMode="numeric" /></Field>
         <Field label="Surface habitable (m²)"><Input name="surface" type="number" min={1} required defaultValue={i?.surface} inputMode="numeric" /></Field>
@@ -190,7 +195,7 @@ function BienForm({ initial, onClose, onSaved }: { initial?: Listing; onClose: (
         <Field label="Terrain (m²)"><Input name="land" type="number" min={0} defaultValue={i?.land} inputMode="numeric" /></Field>
         <Field label="DPE"><Select name="dpe" defaultValue={i?.dpe ?? 'C'}>{'ABCDEFG'.split('').map((t) => <option key={t}>{t}</option>)}</Select></Field>
         <Field label="Année de construction"><Input name="year" type="number" min={1500} max={2030} defaultValue={i?.year} inputMode="numeric" /></Field>
-        <Field label="Conseiller" className="sm:col-span-2"><Select name="agentId" defaultValue={i?.agentId ?? me.id}>{agents.filter((a) => a.mandats > 0).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
+        <Field label="Conseiller" className="sm:col-span-2"><Select name="agentId" defaultValue={i?.agentId ?? me.id}>{pickable.filter((a) => a.mandats > 0 || who.real).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
         <Field label="Atouts (séparés par des virgules)" className="sm:col-span-2"><Input name="features" defaultValue={i?.features?.join(', ')} placeholder="Piscine, Vue mer, Garage" /></Field>
       </div>
       <div className="rounded-2xl bg-white/[0.02] p-4 ring-1 ring-white/[0.06]">
@@ -220,7 +225,9 @@ function Drawer({ l, dossierId, onClose, onEdit }: { l: Listing; dossierId?: str
   const [photo, setPhoto] = useState(0)
   const [tab, setTab] = useState<'diffusion' | 'stats' | 'qualite'>('diffusion')
   const [confirmDel, setConfirmDel] = useState(false)
-  const a = agent(l.agentId)
+  const who = useIdentity()
+  const a = useAgentOf()(l.agentId)
+  const day = (back: number) => (who.real ? new Date(Date.now() - back * 864e5) : new Date(2026, 9, 12 - back)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
   const max = Math.max(...l.daily, 1)
   const missing = QUALITY_CHECKS.filter((c) => !l.checks[c.k])
   const legalMissing = missing.filter((c) => 'legal' in c)
@@ -231,7 +238,7 @@ function Drawer({ l, dossierId, onClose, onEdit }: { l: Listing; dossierId?: str
   const setPortal = async (p: Portal, state: PortalState, note: string | undefined, log: string) => {
     try {
       await ops.update(l.id, { portals: { ...l.portals, [p]: { ...l.portals[p], state, note, views: state === 'publiee' ? l.portals[p].views : 0 } } })
-      actOps.create({ t: hhmm(), at: new Date().toISOString(), who: me.name, what: `${log} — ${l.title} · ${p}`, tone: 'neutral', link: '/app/biens' }).catch(() => {})
+      actOps.create({ t: hhmm(), at: new Date().toISOString(), who: who.name, what: `${log} — ${l.title} · ${p}`, tone: 'neutral', link: '/app/biens' }).catch(() => {})
       toast(state === 'consigne' ? `${p} : ${NOT_WIRED.toLowerCase()}` : `${p} : ${PORTAL_STATE[state].l.toLowerCase()}`, state === 'consigne' ? 'info' : 'ok')
     } catch (e) { toast(errText(e), 'error') }
   }
@@ -286,7 +293,7 @@ function Drawer({ l, dossierId, onClose, onEdit }: { l: Listing; dossierId?: str
           </div>
           {l.features.length > 0 && <div className="mt-4 flex flex-wrap gap-1.5">{l.features.map((f) => <span key={f} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-[11.5px] text-bone/70 ring-1 ring-white/[0.06]">{f}</span>)}</div>}
           {l.description && <p className="mt-4 line-clamp-4 text-[13px] leading-relaxed text-bone/65">{l.description}</p>}
-          <div className="mt-5 flex items-center gap-3 rounded-2xl bg-white/[0.02] p-3 ring-1 ring-white/[0.05]"><Avatar src={a.photo} size={30} /><div className="min-w-0 flex-1 text-[12.5px]"><div>{a.name}</div><div className="text-[11px] text-mist">{a.role} · {a.agency}</div></div>{dossierId ? <Link to={`/app/dossiers/${dossierId}`}><SoftBtn icon={<ArrowUpRight size={13} />}>Dossier vendeur</SoftBtn></Link> : <span className="text-[11px] text-mist">Aucun dossier lié</span>}</div>
+          <div className="mt-5 flex items-center gap-3 rounded-2xl bg-white/[0.02] p-3 ring-1 ring-white/[0.05]"><Avatar src={a.photo} name={a.name} size={30} /><div className="min-w-0 flex-1 text-[12.5px]"><div>{a.name}</div><div className="text-[11px] text-mist">{a.role} · {a.agency}</div></div>{dossierId ? <Link to={`/app/dossiers/${dossierId}`}><SoftBtn icon={<ArrowUpRight size={13} />}>Dossier vendeur</SoftBtn></Link> : <span className="text-[11px] text-mist">Aucun dossier lié</span>}</div>
 
           <div className="mt-7"><Tabs id="bien-drawer" value={tab} onChange={setTab} items={[{ id: 'diffusion', label: 'Diffusion' }, { id: 'stats', label: 'Statistiques' }, { id: 'qualite', label: 'Qualité', count: l.quality }]} /></div>
           <AnimatePresence mode="wait">
@@ -323,7 +330,7 @@ function Drawer({ l, dossierId, onClose, onEdit }: { l: Listing; dossierId?: str
                     <div className="flex h-32 items-end gap-1.5">
                       {l.daily.map((v, i) => <motion.div key={i} title={`${v} vues`} initial={{ height: 0 }} animate={{ height: `${Math.max(4, (v / max) * 100)}%` }} transition={{ duration: 0.9, delay: i * 0.03, ease: EXPO }} className={clsx('flex-1 rounded-t-md', i === l.daily.length - 1 ? 'bg-champagne' : 'bg-champagne/30 hover:bg-champagne/60')} />)}
                     </div>
-                    <div className="num mt-1.5 flex justify-between text-[10px] text-mist"><span>29 sept.</span><span>12 oct.</span></div>
+                    <div className="num mt-1.5 flex justify-between text-[10px] text-mist"><span>{day(13)}</span><span>{day(0)}</span></div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {funnel.map(([k, v], i) => (
