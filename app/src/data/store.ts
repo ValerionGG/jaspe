@@ -166,11 +166,17 @@ export function useApiStatus(): Status {
 
 /* ——— Comptes (serveur lancé avec JASPE_AUTH=1) ——— */
 export type PlanId = 'decouverte' | 'solo' | 'agence' | 'beta'
+export type VerificationState = 'en_attente' | 'valide' | 'refuse' | 'suspendu'
 export type Me =
   | { mode: 'static' | 'demo' | 'offline' }
   | { mode: 'auth'; user: { id: string; name: string; email: string; role: 'owner' | 'conseiller' }; org: { id: string; name: string; country: string }
       plan: { id: PlanId; label: string; subscribed: string; status: string; period?: string; options: string[]; seats: number; periodEnd?: string; cancelAtPeriodEnd: boolean; customer: boolean }
-      limits: { dossiers: number | null; seats: number }; usage: { dossiers: number; seats: number }; billing: { configured: boolean; beta?: boolean } }
+      limits: { dossiers: number | null; seats: number }; usage: { dossiers: number; seats: number }; billing: { configured: boolean; beta?: boolean }
+      /** Administrateur de la plateforme Jaspe (back-office /admin). */
+      admin?: boolean
+      /** Modules effectifs de l’agence (clé → activé). */
+      modules?: Record<string, boolean>
+      verification?: { state: VerificationState; submitted: boolean; note: string | null; required: boolean } }
   | { mode: 'anonymous' }
 
 /** Appel brut vers l’API des comptes / de la facturation (erreurs → ApiError avec le message du serveur). */

@@ -4,7 +4,7 @@ import { useEffect, useState, lazy, Suspense, type ComponentType } from 'react'
 import clsx from 'clsx'
 import {
   House, Sparkle, CalendarBlank, CheckSquare, Kanban, Buildings, UsersThree, AddressBook, Handshake, PenNib, ChartLineUp, MapTrifold,
-  ChartBar, Lightning, Target, GearSix, MagnifyingGlass, CaretUpDown, SidebarSimple, ArrowLeft, Lightbulb, BookOpenText, ChatsCircle, GraduationCap, Timer, Scales, Receipt, UploadSimple,
+  ChartBar, Lightning, Target, GearSix, MagnifyingGlass, CaretUpDown, SidebarSimple, ArrowLeft, Lightbulb, BookOpenText, ChatsCircle, GraduationCap, Timer, Scales, Receipt, UploadSimple, ShieldCheck, WarningCircle,
 } from '@phosphor-icons/react'
 import { Logo } from '../landing/chrome'
 import { Avatar, EXPO } from '../ui/kit'
@@ -85,6 +85,9 @@ export const NAV = [
   ] },
 ]
 
+/** Entrées de navigation liées à un module de la plateforme (coupé par le back-office → entrée masquée). */
+const NAV_MODULE: Record<string, string> = { conformite: 'conformite', factures: 'factures', import: 'import', marche: 'marche' }
+
 /** Mode simple : navigation réduite à l’essentiel du conseiller (mémorisé localement). */
 // Premier jour en 3 écrans : Brief (Aujourd’hui), Débrief (Dossiers), Temps gagné ; plus la validation des brouillons, l’import et l’aide.
 const SIMPLE = new Set(['', 'taches', 'dossiers', 'temps', 'import', 'aide'])
@@ -109,6 +112,10 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const nav = useNavigate()
   const { t } = useT()
   const who = useIdentity()
+  const account = useMe()
+  const modules = account?.mode === 'auth' ? account.modules : undefined
+  const isAdmin = account?.mode === 'auth' && !!account.admin
+  const moduleOn = (to: string) => !modules || !NAV_MODULE[to] || modules[NAV_MODULE[to]] !== false
   const switchEdition = () => { setEdition(essentiel ? 'complet' : 'essentiel'); nav('/app'); location.reload() }
   const badges: Record<string, number> = {
     messages: convs.reduce((n, c) => n + (c.unread ?? 0), 0),
@@ -134,7 +141,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         </button>
       ))}
       <nav className="thin-scroll flex-1 overflow-y-auto px-3 pb-4">
-        {NAV.map((g) => ({ ...g, items: g.items.filter((it) => !simple || SIMPLE.has(it.to)) })).filter((g) => g.items.length).map((g) => (
+        {NAV.map((g) => ({ ...g, items: g.items.filter((it) => (!simple || SIMPLE.has(it.to)) && moduleOn(it.to)) })).filter((g) => g.items.length).map((g) => (
           <div key={g.group} className="mb-3">
             {!collapsed && <div className="mb-1.5 px-3 text-[10px] uppercase tracking-eyebrow text-mist-600">{t(g.k)}</div>}
             {g.items.map((it) => (
@@ -167,6 +174,11 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
             <span className={clsx('relative h-4 w-7 rounded-full transition-colors', simple ? 'bg-champagne' : 'bg-white/15')}><span className={clsx('absolute top-0.5 h-3 w-3 rounded-full bg-bone transition-all duration-300', simple ? 'left-3.5' : 'left-0.5')} /></span>
           </button>
         )}
+        {isAdmin && (
+          <Link to="/admin" title="Back-office" className={clsx('mb-1 flex items-center gap-3 rounded-xl px-3 py-2 text-[12.5px] text-bone/60 transition hover:bg-white/[0.04] hover:text-bone', collapsed && 'justify-center px-0')}>
+            <ShieldCheck size={16} className="text-champagne-300" />{!collapsed && 'Back-office'}
+          </Link>
+        )}
         <NavLink to="reglages" className={clsx('flex items-center gap-3 rounded-xl p-2 transition hover:bg-white/[0.04]', collapsed && 'justify-center')}>
           <Avatar src={who.photo} name={who.name} size={32} />
           {!collapsed && <span className="min-w-0 flex-1"><span className="block truncate text-[13px]">{who.name}</span><span className="block text-[11px] text-mist">{who.role}</span></span>}
@@ -176,6 +188,32 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       </div>
     </aside>
   )
+}
+
+/** Bandeau de vérification de l’agence (mode comptes). */
+function VerificationBanner() {
+  const account = useMe()
+  const v = account?.mode === 'auth' ? account.verification : undefined
+  if (!v) return null
+  if (v.state === 'refuse' || v.state === 'suspendu') {
+    return (
+      <div role="alert" className="mb-6 flex items-start gap-3 rounded-2xl bg-coral/10 px-4 py-3 text-[13px] text-coral ring-1 ring-coral/25">
+        <WarningCircle size={18} weight="fill" className="mt-0.5 shrink-0" />
+        <div>
+          <div className="font-medium">Agence {v.state === 'refuse' ? 'refusée' : 'suspendue'} par l’équipe Jaspe</div>
+          <div className="mt-0.5 text-coral/85">{v.note ? `Motif : ${v.note}. ` : ''}Contactez le support pour rétablir l’accès.</div>
+        </div>
+      </div>
+    )
+  }
+  if (v.state === 'en_attente' && !v.submitted) {
+    return (
+      <Link to="reglages" className="mb-6 flex items-center gap-2 rounded-full bg-white/[0.03] px-4 py-2 text-[12.5px] text-bone/65 ring-1 ring-white/[0.06] transition hover:text-bone">
+        <ShieldCheck size={15} className="text-champagne-300" />Faites vérifier votre agence (Réglages › Agence){v.required ? ' : les envois, WhatsApp, MCP et factures en dépendent.' : ''}
+      </Link>
+    )
+  }
+  return null
 }
 
 function Topbar({ onSearch, onCopilot, copilot }: { onSearch: () => void; onCopilot: () => void; copilot: boolean }) {
@@ -244,6 +282,7 @@ export default function CrmApp() {
       <div className={clsx('relative transition-[padding] duration-500 ease-silk', collapsed ? 'lg:pl-[76px]' : 'lg:pl-[256px]', copilot && 'xl:pr-[400px]')}>
         <Topbar onSearch={() => setPalette(true)} onCopilot={() => setCopilot(!copilot)} copilot={copilot} />
         <main className="mx-auto max-w-[1500px] px-4 pb-28 pt-8 md:px-8 lg:pb-16">
+          <VerificationBanner />
           <Suspense fallback={<div className="h-96 animate-pulse rounded-3xl bg-white/[0.02]" />}>
             <AnimatePresence mode="wait">
               <motion.div key={loc.pathname} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>

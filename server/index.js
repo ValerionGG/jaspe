@@ -7,7 +7,7 @@ import { randomUUID, createHash, createHmac } from 'node:crypto'
 import { openDb, COLLECTIONS } from './db.js'
 import { createEngine, HttpError } from './engine.js'
 import { createCopilot } from './copilot.js'
-import { createAccounts, createGate, demoRoute, orgPaths } from './auth.js'
+import { createAccounts, createGate, demoRoute, orgPaths, PLANS, OPTIONS } from './auth.js'
 import { createBilling } from './billing.js'
 import { createEvidence } from './evidence.js'
 import { createMailer, sendOutbox, sendDueOutbox, createMailActions } from './mailer.js'
@@ -15,6 +15,7 @@ import { mcpActions, handleMcpHttp } from './mcp.js'
 import { createContractReader } from './contract.js'
 import { createMarket } from './market.js'
 import { createWhatsApp, createWaRouter } from './whatsapp.js'
+import { createPlatform } from './admin.js'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { setActorSource } from './actor.js'
 import Anthropic from '@anthropic-ai/sdk'
@@ -29,7 +30,7 @@ const FILES = join(here, 'data', 'files')
 const MAX_BODY = 15 * 1024 * 1024
 const TICK_MS = Number(process.env.NXT_TICK_MS ?? 60_000)
 
-export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDir = FILES, delay, auth = process.env.JASPE_AUTH === '1', dataDir = join(here, 'data'), env = process.env, fetch: stripeFetch } = {}) {
+export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDir = FILES, delay, auth = process.env.JASPE_AUTH === '1', dataDir = join(here, 'data'), env = process.env, fetch: stripeFetch, kycFetch } = {}) {
   // SMTP (SMTP_HOST…) : sans configuration, les envois restent consignés comme avant.
   const mailer = createMailer({ env })
   // Client Claude partagé (lecture des compromis) ; sans clé, extraction par règles.
@@ -114,7 +115,10 @@ export function createApp({ dbPath = join(here, 'data', 'jaspe.sqlite'), filesDi
 
   const accounts = auth ? createAccounts(dataDir === ':memory:' ? ':memory:' : join(dataDir, 'accounts.sqlite')) : null
   const billing = auth ? createBilling({ accounts, env, ...(stripeFetch ? { fetch: stripeFetch } : {}) }) : null
-  const gate = auth ? createGate({ accounts, billing, openOrg, send, readBody, mailer, publicUrl: env.JASPE_PUBLIC_URL, beta: env.JASPE_BETA === '1' ? true : env.JASPE_BETA === '0' ? false : undefined }) : null
+  // Back-office plateforme : tarifs, modules, validation et KYC des agences (registre public coupé pendant les tests).
+  const platform = auth ? createPlatform(accounts, { env, plans: PLANS, options: OPTIONS, fetch: kycFetch ?? (process.env.NODE_TEST_CONTEXT || env.JASPE_KYC === 'off' ? null : globalThis.fetch) }) : null
+  if (platform) accounts.platform = platform
+  const gate = auth ? createGate({ platform, dataDir, accounts, billing, openOrg, send, readBody, mailer, publicUrl: env.JASPE_PUBLIC_URL, beta: env.JASPE_BETA === '1' ? true : env.JASPE_BETA === '0' ? false : undefined }) : null
   // Mode comptes : nom de l’utilisateur de la requête ; routines et webhooks hors requête → « Jaspe ».
   const actorStore = new AsyncLocalStorage()
   if (auth) setActorSource(() => actorStore.getStore()?.name ?? 'Jaspe')

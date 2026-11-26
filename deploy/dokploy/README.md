@@ -12,7 +12,7 @@ Le serveur est partagé avec d’autres projets : ne toucher qu’au projet Jasp
 | Port du conteneur | `5318` |
 | Domaine | `jaspe.217-160-124-232.nip.io`, HTTPS Let’s Encrypt (nip.io : pas de DNS à créer) |
 | Volume (obligatoire) | volume nommé `jaspe-data` monté sur `/app/server/data` : comptes, bases des agences, pièces déposées |
-| Environment | `JASPE_PUBLIC_URL=https://jaspe.217-160-124-232.nip.io` (+ clés facultatives ci-dessous) |
+| Environment | `JASPE_PUBLIC_URL=https://jaspe.217-160-124-232.nip.io`, `JASPE_ADMIN_EMAILS=<e-mails des administrateurs, séparés par des virgules>` (+ clés facultatives ci-dessous) |
 
 Sans le volume, chaque redéploiement efface les comptes. Ne jamais supprimer le volume sans sauvegarde.
 
@@ -29,6 +29,16 @@ Sans le volume, chaque redéploiement efface les comptes. Ne jamais supprimer le
 | Comparables Portugal | `CASAFARI_API_KEY`, `CASAFARI_COMPARABLES_URL` | « aucune source publique » affiché |
 
 Les ventes réelles en France (DVF) fonctionnent sans clé.
+
+## Back-office (administrateurs de la plateforme)
+
+Adresse : `https://<domaine>/admin`. Accès : comptes dont l’e-mail figure dans `JASPE_ADMIN_EMAILS` (puis d’autres administrateurs peuvent être ajoutés depuis le back-office).
+
+- **Tarifs & offres** : prix, limites de dossiers, sièges, visibilité. La page publique Tarifs et les quotas suivent immédiatement.
+- **Modules** : activer ou couper chaque fonction, globalement, par offre ou pour une agence. Le serveur refuse les actions d’un module coupé (403).
+- **Agences** : validation, refus ou suspension (motif obligatoire ; une agence suspendue est bloquée), changement d’offre, note interne, export JSON complet des données, journal.
+- **KYC** : l’agence dépose ses identifiants dans Réglages › Agence. Contrôles automatiques : SIREN vérifié dans le registre national (recherche-entreprises.api.gouv.fr), code NAF 68.31Z, raison sociale ; NIF portugais (clé de contrôle). Carte T et licence AMI : format contrôlé, confirmation à la main sur les registres CCI / IMPIC (liens fournis). `JASPE_KYC=off` coupe la consultation du registre.
+- Option « exiger la vérification » : sans validation, pas d’envois réels, de WhatsApp, de MCP ni de factures.
 
 ## Brancher Claude ou Codex (MCP)
 

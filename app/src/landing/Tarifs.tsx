@@ -1,25 +1,28 @@
 import { motion } from 'motion/react'
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 import { Check, Minus, Plus, ShieldCheck } from '@phosphor-icons/react'
 import { Eyebrow, EXPO } from '../ui/kit'
 import { PublicShell } from './public-shell'
 import { In, card, micro } from './essentiel-sections'
-import { PLANS, PLAN_OPTIONS, COMMITMENTS } from '../data/plans'
+import { PLANS, PLAN_OPTIONS, COMMITMENTS, subscribePlans, plansVersion } from '../data/plans'
 
-const AGENCE = PLANS.find((p) => p.id === 'agence')!
-const SEATS = 7 // conseillers inclus dans le forfait Agence (cf. AGENCE.seats)
-const perSeat = (Number(AGENCE.price.replace(',', '.')) / SEATS).toLocaleString('fr-FR', { maximumFractionDigits: 2 })
-
-const COMPARE: [string, string, string][] = [
+// Tarifs lus au rendu : ils peuvent venir du back-office (/api/public/plans).
+const compare = (): [string, string, string][] => {
+  const AGENCE = PLANS.find((p) => p.id === 'agence') ?? PLANS[PLANS.length - 1]
+  const SEATS = Number(AGENCE.seats.match(/\d+/)?.[0] ?? 7)
+  const seatPrice = AGENCE.seats.match(/puis ([\d,]+) €/)?.[1] ?? '6'
+  const perSeat = (Number(AGENCE.price.replace(',', '.')) / SEATS).toLocaleString('fr-FR', { maximumFractionDigits: 2 })
+  return [
   [`Prix pour ${SEATS} conseillers`, `${AGENCE.price} ${AGENCE.unit} au total`, '350 à 1 050 € / mois'],
-  ['Prix par conseiller', `${perSeat} € / mois, puis 6 € / siège au-delà de ${SEATS}`, '50 à 150 € / mois'],
+  ['Prix par conseiller', `${perSeat} € / mois, puis ${seatPrice} € / siège au-delà de ${SEATS}`, '50 à 150 € / mois'],
   ['Engagement', 'Aucun, résiliation en un clic', 'Variable, parfois annuel'],
   ['Rédaction des comptes rendus et livrables', 'Oui, à relire et valider', 'Variable selon l’éditeur'],
   ['Diffusion multiportail', 'Non : à garder dans votre outil actuel', 'Oui, en général'],
   ['Envoi réel des e-mails, SMS, signature', 'Pas encore : envois consignés', 'Oui, selon l’éditeur'],
-]
+  ]
+}
 
 const FAQ: [string, string][] = [
   ['Est-ce vraiment sans engagement ?', 'Oui. L’abonnement est mensuel (ou annuel pour Solo, si vous le choisissez). Vous résiliez vous-même depuis Réglages › Facturation, bouton « Gérer ou résilier » : un clic, sans appel ni courrier. L’accès payant reste ouvert jusqu’à la fin de la période réglée.'],
@@ -32,6 +35,8 @@ const FAQ: [string, string][] = [
 ]
 
 export default function Tarifs() {
+  useSyncExternalStore(subscribePlans, plansVersion)
+  const COMPARE = compare()
   const [yearly, setYearly] = useState(false)
   const [open, setOpen] = useState<number | null>(0)
   return (

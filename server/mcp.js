@@ -353,6 +353,13 @@ export async function handleMcpHttp(req, res, ctx = {}) {
     if (!base?.db || !base.engine) return deny()
     const tok = verifyApiToken(base.db, token)
     if (!tok) return deny()
+    // Back-office : agence suspendue ou refusée, ou module MCP coupé → accès refusé.
+    const platform = ctx.accounts?.platform
+    if (platform) {
+      const org = ctx.accounts.getOrg(orgId)
+      try { platform.guard(org, [], 'GET') } catch (e) { return rpcError(res, 403, e.message) }
+      if (!platform.modulesFor(org).mcp) return rpcError(res, 403, 'Module « Claude / Codex (MCP) » non activé pour cette agence')
+    }
     if (req.method !== 'POST') return rpcError(res, 405, 'Méthode non prise en charge : utilisez POST (mode sans état)', { allow: 'POST' })
     const body = await readJson(req)
     const server = createMcpServer({ engine: base.engine, db: base.db, emit: base.emit, user: { name: `MCP · ${tok.name}` } })

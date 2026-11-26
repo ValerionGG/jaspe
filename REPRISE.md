@@ -59,6 +59,7 @@ server/   Node 22 sans framework (node:http) + node:sqlite (magasin de documents
   assist.js        temps gagné, conformité FR/PT, brief → plan d’action, factures
   auth.js          comptes, sessions, équipes, offres (bêta gratuite si Stripe absent)
   mcp.js           serveur MCP (Claude, Codex, ChatGPT) — 12 outils
+  admin.js         back-office plateforme : tarifs, modules, validation/KYC des agences, export, journal
   importer.js      import CSV eGO / Hektor ; market.js : ventes réelles DVF ; whatsapp.js ; mailer.js ; invoicing.js ; evidence.js (Pack Preuves LCB-FT) ; contract.js (lecture de compromis PDF)
 deploy/dokploy/   Dockerfile et notice de production
 docs/             audit, panel, simulation, relecture juridique, sources (voir §8)
@@ -89,12 +90,14 @@ Conventions à respecter :
 | Débrief WhatsApp (multi-agences) | fait ; nécessite un compte WhatsApp Business |
 | Factures (FR) et InvoiceXpress (PT) | fait ; émission certifiée via InvoiceXpress |
 | MCP : Claude, Codex, ChatGPT | fait, testé en production (Réglages › Intégrations) |
+| Back-office plateforme (`/admin`) : tarifs, modules, validation et KYC des agences, données, journal | fait (`server/admin.js`, `app/src/admin/`) ; administrateurs via `JASPE_ADMIN_EMAILS` |
 | Portugais | écrans principaux et fiche dossier ; reste : mode complet, livrables L1–L9 |
 | Page Marché | estimation et carte encore **simulées** (étiquetées comme telles) |
 
 ## 6. Clés à fournir (Dokploy › Jaspe › app › Environment)
 
 Les clés sont saisies par le responsable du projet, jamais dans Git :
+- `JASPE_ADMIN_EMAILS` : e-mails des administrateurs du back-office (`/admin`).
 - `ANTHROPIC_API_KEY` : copilote et lecture des compromis.
 - `SMTP_*` : envois d’e-mails réels.
 - `WHATSAPP_*` et `JASPE_STT_*` : débrief WhatsApp et transcription des vocaux.

@@ -26,6 +26,7 @@ if (import.meta.env.VITE_STATIC === '1') {
 }
 
 const CrmApp = lazy(() => import('./crm/CrmApp'))
+const AdminApp = lazy(() => import('./admin/AdminApp'))
 const Essentiel = lazy(() => import('./landing/Essentiel'))
 const Portail = lazy(() => import('./landing/Portail'))
 const Tarifs = lazy(() => import('./landing/Tarifs'))
@@ -61,6 +62,7 @@ const w = window as unknown as { __nxtRoot?: ReturnType<typeof createRoot> }
         <Route path="/mot-de-passe-oublie" element={page(<MotDePasseOublie />)} />
         <Route path="/reinitialiser/:token" element={page(<Reinitialiser />)} />
         <Route path="/app/*" element={<Suspense fallback={<div className="h-screen bg-ink" />}><CrmApp /></Suspense>} />
+        <Route path="/admin/*" element={page(<AdminApp />)} />
       </Routes>
     </Router>
   </StrictMode>,

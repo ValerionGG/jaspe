@@ -187,7 +187,7 @@ export function demoRoute(req, res, parts, send) {
  * Passerelle du mode comptes : traite /api/auth, /api/me, /api/team, /api/billing ;
  * pour le reste, résout l’agence de la session et renvoie son contexte {db, engine, copilot, clients, emit, filesDir}.
  */
-export function createGate({ accounts, billing, openOrg, send, readBody, mailer = null, publicUrl, beta: betaOpt }) {
+export function createGate({ accounts, billing, openOrg, send, readBody, mailer = null, publicUrl, beta: betaOpt, platform = null, dataDir = ':memory:' }) {
   // Bêta : sans paiement configuré, les quotas ne s’appliquent pas (JASPE_BETA=0 pour les forcer).
   const beta = () => (betaOpt ?? !billing.configured())
   const planOf = (org) => (beta() ? 'beta' : effectivePlan(org))
@@ -230,6 +230,8 @@ export function createGate({ accounts, billing, openOrg, send, readBody, mailer 
       mode: 'auth', user: pub(user), org: { id: org.id, name: org.name, country: org.country },
       plan: { id: p, label: PLANS[p].label, subscribed: org.plan, status: org.status, period: org.period, options: org.options, seats: org.seats, periodEnd: org.periodEnd, cancelAtPeriodEnd: org.cancelAtPeriodEnd, customer: !!org.customerId },
       limits: limits(org), usage: usage(org), billing: { configured: billing.configured(), beta: beta() },
+      // Back-office : droits plateforme, modules actifs, état de vérification de l’agence.
+      ...(platform ? (() => { const ex = platform.orgExtra(org.id); return { admin: platform.isAdmin(user), modules: platform.modulesFor(org), verification: { state: ex.verification, submitted: !!ex.kyc?.submittedAt, note: ex.adminNote, required: !!platform.config().settings.requireVerification } } })() : {}),
     }
   }
   const start = (req, res, user, status = 200) => {
@@ -404,9 +406,17 @@ ${link}`, html: `<p>Bonjour,</p><p>${escHtml(s.user.name)} vous invite à rejoin
     if (head === 'health') { send(res, 200, { ok: true, auth: true, billing: billing.configured() }); return null }
     if (head === 'auth') { await authRoute(req, res, parts); return null }
     if (head === 'billing' && a === 'webhook') { await billing.webhook(req, res, send); return null }
+    // Tarifs publics (modifiables dans le back-office) : lisibles sans compte.
+    if (head === 'public' && a === 'plans' && req.method === 'GET' && platform) { send(res, 200, platform.publicPlans()); return null }
     const s = accounts.session(sid(req))
     if (!s) throw new HttpError(401, 'Connexion requise')
     if (head === 'me') { send(res, 200, me(s.user, s.org)); return null }
+    if (head === 'admin' && platform) { await platform.route(req, res, parts, s, { send, readBody, openOrg, dataDir }); return null }
+    if (head === 'kyc' && platform) {
+      if (req.method === 'GET') { const ex = platform.orgExtra(s.org.id); send(res, 200, { verification: ex.verification, note: ex.adminNote, kyc: ex.kyc }); return null }
+      if (req.method === 'POST') { ownerOnly(s); send(res, 200, await platform.submitKyc(s.org, s.user, await readBody(req))); return null }
+    }
+    platform?.guard(s.org, parts, req.method)
     if (head === 'team') { await teamRoute(req, res, s, parts); return null }
     if (head === 'billing') {
       ownerOnly(s)

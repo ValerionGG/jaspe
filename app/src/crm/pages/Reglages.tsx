@@ -213,6 +213,55 @@ function useAgencyDefaults(): typeof AGENCY {
   return who.real ? { ...AGENCY, agencyName: who.orgName, signature: `${who.name} — ${who.role}` } : AGENCY
 }
 
+type KycCheck = { id: string; label: string; status: 'ok' | 'ko' | 'manuel'; detail: string; source: string }
+type KycState = { verification: 'en_attente' | 'valide' | 'refuse' | 'suspendu'; note: string | null; kyc: { companyId?: string; legalName?: string; cardNumber?: string; managerName?: string; address?: string; submittedAt?: string; result?: { checks: KycCheck[] } } }
+const VERIF_LABEL = { en_attente: 'En attente', valide: 'Agence vérifiée', refuse: 'Refusée', suspendu: 'Suspendue' } as const
+const VERIF_TONE = { en_attente: 'bg-champagne/10 text-champagne-300 ring-champagne/25', valide: 'bg-sage/10 text-sage ring-sage/25', refuse: 'bg-coral/10 text-coral ring-coral/25', suspendu: 'bg-coral/10 text-coral ring-coral/25' } as const
+const CHECK_TONE = { ok: 'text-sage', ko: 'text-coral', manuel: 'text-champagne-300' } as const
+const CHECK_LABEL = { ok: 'Vérifié', ko: 'À corriger', manuel: 'Vérifié à la main par Jaspe' } as const
+
+/** Vérification de l’agence (KYC) : identifiants contrôlés automatiquement, puis validation par l’équipe Jaspe. */
+function Verification() {
+  const account = useMe()
+  const [st, setSt] = useState<KycState | null>(null)
+  const auth = account?.mode === 'auth'
+  const owner = auth && account.user.role === 'owner'
+  const pt = auth && account.org.country === 'PT'
+  useEffect(() => { if (auth) authCall<KycState>('GET', 'kyc').then(setSt, () => setSt(null)) }, [auth])
+  if (!auth) return null
+  const k = st?.kyc ?? {}
+  return (
+    <Card title="Vérification de l’agence" kicker={pt ? 'NIF, licença AMI et responsável' : 'SIREN, carte professionnelle T et responsable'}>
+      {st && <div className="mb-4 flex flex-wrap items-center gap-2"><span className={clsx('rounded-full px-2.5 py-1 text-[12px] ring-1', VERIF_TONE[st.verification])}>{VERIF_LABEL[st.verification]}</span>{st.note && <span className="text-[12px] text-bone/60">{st.note}</span>}{k.submittedAt && <span className="text-[11.5px] text-mist">Demande déposée le {new Date(k.submittedAt).toLocaleDateString('fr-FR')}</span>}</div>}
+      <p className="mb-4 text-[12.5px] leading-relaxed text-bone/60">Jaspe vérifie que l’agence existe et exerce légalement avant d’ouvrir les envois réels, WhatsApp, Claude/Codex et les factures. {pt ? 'Le NIF est contrôlé automatiquement ; la licence AMI est vérifiée sur le registre de l’IMPIC.' : 'Le SIREN est contrôlé dans le registre national des entreprises ; la carte T est vérifiée auprès de la CCI.'}</p>
+      {owner ? (
+        <AsyncForm key={k.submittedAt ?? 'new'} submitLabel={k.submittedAt ? 'Mettre à jour et revérifier' : 'Demander la vérification'} success="Demande envoyée : contrôles faits, l’équipe Jaspe valide sous 48 h" onSubmit={async (v) => {
+          if (!v.companyId?.trim() || !v.cardNumber?.trim() || !v.managerName?.trim()) throw new Error('Identifiant de l’entreprise, carte ou licence et responsable sont obligatoires')
+          setSt(await authCall<KycState>('POST', 'kyc', v)); await refreshMe()
+        }}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={pt ? 'NIF / NIPC de l’entreprise *' : 'SIREN ou SIRET *'}><Input name="companyId" defaultValue={k.companyId} placeholder={pt ? '501442600' : '552 100 554'} inputMode="numeric" /></Field>
+            <Field label="Raison sociale"><Input name="legalName" defaultValue={k.legalName} placeholder={pt ? 'Mediação Imobiliária, Lda' : 'Agence du Port SARL'} /></Field>
+            <Field label={pt ? 'Licença AMI *' : 'Carte professionnelle T *'} hint={pt ? 'Ex. AMI 12345' : 'Ex. CPI 0605 2024 000 041 872'}><Input name="cardNumber" defaultValue={k.cardNumber} /></Field>
+            <Field label="Responsable légal *"><Input name="managerName" defaultValue={k.managerName} /></Field>
+            <Field label="Adresse du siège" className="sm:col-span-2"><Input name="address" defaultValue={k.address} /></Field>
+          </div>
+        </AsyncForm>
+      ) : <p className="text-[12.5px] text-mist">Seul le responsable de l’agence peut demander la vérification.</p>}
+      {!!k.result?.checks?.length && (
+        <ul className="mt-4 divide-y divide-white/[0.05] rounded-xl ring-1 ring-white/[0.06]">
+          {k.result.checks.map((c) => (
+            <li key={c.id} className="flex items-start gap-3 p-3 text-[12.5px]">
+              <span className={clsx('mt-0.5 w-24 shrink-0 text-[11px]', CHECK_TONE[c.status])}>{CHECK_LABEL[c.status]}</span>
+              <span className="min-w-0 flex-1"><span className="block text-bone">{c.label}</span><span className="block text-bone/55">{c.detail}</span></span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
 function Reseau() {
   const who = useIdentity()
   const [ag, save] = useSetting('agency', useAgencyDefaults())
@@ -237,6 +286,7 @@ function Reseau() {
           <Field label="Nom commercial *"><Input name="agencyName" defaultValue={ag.agencyName} maxLength={80} /></Field>
         </AsyncForm>
       </Card>
+      <Verification />
       <Card title="Pays et mentions légales" kicker="Checklists de conformité, TVA et mentions des factures">
         <div className="space-y-4">
           <Field label="Pays d’exercice" hint="Change la checklist de conformité (France ou Portugal), le taux de TVA/IVA et les mentions des factures">
