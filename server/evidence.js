@@ -475,7 +475,8 @@ export function createEvidence(db, deps = {}) {
       const csv = '﻿' + [cols.join(';'), ...rows.map((r) => cols.map((k) => csvCell(r[k])).join(';'))].join('\r\n')
       return {
         period: `${y}-T${q}`, from: from.toISOString().slice(0, 10), to: new Date(to.getTime() - 864e5).toISOString().slice(0, 10), rows, fields: IMPIC_FIELDS, csv, filename: `impic-${y}-T${q}.csv`,
-        note: 'Campos e formato do anexo B a confirmar com o regulamento e o formulário IMPIC em vigor ; NIF, artigo matricial e descrição predial a completar. Prazo de envio a confirmar junto do IMPIC.',
+        deadline: { date: impicDeadline(y, q).deadlineIso, rule: IMPIC_DEADLINE.rule, status: IMPIC_DEADLINE.status, sources: IMPIC_DEADLINE.sources, reminders: IMPIC_DEADLINE.remindDays.map((j) => `J-${j}`) },
+        note: `Campos e formato do anexo B a confirmar com o regulamento e o formulário IMPIC em vigor ; NIF, artigo matricial e descrição predial a completar. Prazo : ${impicDeadline(y, q).deadlineIso} (${IMPIC_DEADLINE.rule.toLowerCase()}, a confirmar junto do IMPIC).`,
       }
     },
   }
@@ -556,21 +557,47 @@ export function createEvidence(db, deps = {}) {
         log(l.dossierId, 'link', `Lien ${PARTIES[l.party].toLowerCase()} expiré (…${l.tokenHint})`, { by: 'Jaspe (routine)' }); n++
       }
       if (country() === 'PT') {
-        // Fin du mois qui suit le trimestre écoulé : échéance indicative, à confirmer auprès de l'IMPIC.
-        const q = Math.floor(now.getMonth() / 3)
-        const deadline = new Date(now.getFullYear(), q * 3 + 1, 0)
-        const days = Math.round((deadline - now) / 864e5)
-        const key = `n-impic-${deadline.toISOString().slice(0, 10)}`
-        if (days >= 0 && days <= 15 && !db.get('notifications', key)) {
-          put('notifications', { id: key, at: iso(), title: 'Reporte trimestral IMPIC', body: `Prazo indicativo em ${days} dia(s) : exporte o anexo B pré-preenchido (Conformidade › IMPIC)`, tone: 'warn', read: false, link: '/app/conformite' }, { front: true }); n++
+        // Le trimestre écoulé se déclare au plus tard à la fin du trimestre en cours (IMPIC_DEADLINE, « a confirmar »).
+        const cq = Math.floor(now.getMonth() / 3) + 1
+        const ref = impicDeadline(cq === 1 ? now.getFullYear() - 1 : now.getFullYear(), cq === 1 ? 4 : cq - 1)
+        const day0 = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const days = Math.round((ref.deadline - day0) / 864e5)
+        const [jFar, jNear] = IMPIC_DEADLINE.remindDays // 15, 3
+        // Une seule notification par palier : J-15 dans la fenêtre ]3 ; 15], J-3 dans [0 ; 3].
+        const j = days < 0 ? null : days <= jNear ? jNear : days <= jFar ? jFar : null
+        const key = j && `n-impic-${ref.deadlineIso}-j${j}`
+        if (key && !db.get('notifications', key)) {
+          put('notifications', { id: key, at: iso(), title: `Reporte trimestral IMPIC — ${ref.period} (J-${j})`, body: `Prazo em ${days} dia(s), ${ref.deadlineIso} (${IMPIC_DEADLINE.status}) : exporte o anexo B pré-preenchido (Conformidade › IMPIC)`, tone: 'warn', read: false, link: '/app/conformite' }, { front: true }); n++
         }
       }
       return [n ? 'ok' : 'skip', n ? `${n} événement(s) Pack Preuves` : 'Aucun lien expiré, aucun rappel IMPIC']
     },
   }
-  if (!db.get('routines', 'AUT-123')) db.put('routines', { id: 'AUT-123', family: 'Conformité', name: 'Pack Preuves : liens client et rappel IMPIC', trigger: 'Chaque minute', conditions: 'Lien expiré ; agence au Portugal à J-15 du reporte', action: 'Consigner l’expiration ; rappeler l’export anexo B', autonomy: 'A', success: 'Journal complet, reporte à temps', fallback: 'Alerte manager', phase: 'P0', enabled: true })
+  if (!db.get('routines', 'AUT-123')) db.put('routines', { id: 'AUT-123', family: 'Conformité', name: 'Pack Preuves : liens client et rappel IMPIC', trigger: 'Chaque minute', conditions: 'Lien expiré ; agence au Portugal à J-15 et J-3 du reporte (fin du trimestre suivant, a confirmar)', action: 'Consigner l’expiration ; rappeler l’export anexo B', autonomy: 'A', success: 'Journal complet, reporte à temps', fallback: 'Alerte manager', phase: 'P0', enabled: true })
 
   return { actions, rules, publicHandlers }
+}
+
+/**
+ * Échéance du reporte trimestral IMPIC (transactions immobilières, Lei n.º 83/2017 modifiée par la Lei n.º 58/2020 : périodicité trimestrielle).
+ * Règle retenue : fin du trimestre qui suit le trimestre de référence (délai de 3 mois ; ex. T4 2022 → 31/03/2023).
+ * NON vérifiée sur le texte du Regulamento IMPIC n.º 603/2021 (art. sur les prazos) : sources secondaires seulement → « a confirmar ».
+ */
+export const IMPIC_DEADLINE = {
+  rule: 'Até ao fim do trimestre seguinte ao trimestre de referência',
+  status: 'a confirmar',
+  remindDays: [15, 3],
+  sources: [
+    'https://www.plmj.com/xms/files/03_Novidades_legislativas/2020/09_setembro/NI_Change_in_the_frequency_of_mandatory_communications_to_the_IMPIC.pdf',
+    'https://www.imovirtual.com/noticias/imobiliario/imobiliarias-obrigadas-comunicar-transacoes-impic',
+    'https://imojuris.vidaimobiliaria.com/actualidade/noticias/Reporte-de-transacoes-imobiliarias-ao-IMPIC-I-P-pa/',
+  ],
+  verifyAt: 'https://www.impic.pt · Regulamento n.º 603/2021 (Diário da República, 2.ª série, 2 de julho de 2021)',
+}
+export const impicDeadline = (year, quarter) => {
+  const deadline = new Date(year, quarter * 3 + 3, 0) // dernier jour du trimestre suivant
+  const deadlineIso = `${deadline.getFullYear()}-${String(deadline.getMonth() + 1).padStart(2, '0')}-${String(deadline.getDate()).padStart(2, '0')}`
+  return { period: `${year}-T${quarter}`, deadline, deadlineIso, rule: IMPIC_DEADLINE.rule, status: IMPIC_DEADLINE.status }
 }
 
 export const IMPIC_FIELDS = [

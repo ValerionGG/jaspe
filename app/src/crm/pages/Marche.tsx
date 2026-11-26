@@ -84,6 +84,46 @@ function Seg<T extends string>({ value, onChange, items }: { value: T; onChange:
   return <div className="flex flex-wrap gap-1">{items.map((i) => <button key={i} onClick={() => onChange(i)} className={clsx('rounded-full px-2.5 py-1 text-[11.5px] ring-1 transition-colors duration-300', value === i ? 'bg-champagne/15 text-champagne-300 ring-champagne/30' : 'bg-white/[0.03] text-bone/60 ring-white/[0.07] hover:text-bone')}>{i}</button>)}</div>
 }
 
+// Ventes réelles (server/market.js) : DVF données ouvertes en France, Casafari si le compte du client est branché au Portugal.
+type RealComp = { id: string; date: string; address: string; commune?: string; surface: number; price: number; ppm: number; type?: string; source: string; sourceUrl: string }
+type RealMarket = { status: string; source?: string; sourceUrl?: string; commune?: string; count: number; medianPpm?: number; lastDate?: string | null; period?: { from: string; to: string }; fetchedAt?: string; note?: string; comparables: RealComp[] }
+function RealSales({ propertyId }: { propertyId: string }) {
+  const [m, setM] = useState<RealMarket | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { setM(null); action<RealMarket>('market.comparables', { propertyId, cachedOnly: true }).then(setM).catch(() => setM(null)) }, [propertyId])
+  const load = async (refresh = false) => {
+    setBusy(true)
+    try { const r = await action<RealMarket>('market.comparables', { propertyId, refresh }); setM(r); if (r.status !== 'ok') toast(r.note ?? `Données de marché : ${r.status}`, 'info') } catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
+  }
+  const ok = m && m.comparables?.length > 0
+  return (
+    <Card title="Ventes réelles" kicker={ok ? `${m.count} vente(s) · ${m.commune ?? ''} · médiane ${fmt(m.medianPpm ?? 0)} €/m²` : 'DVF (données ouvertes) · Casafari si compte'} action={<SoftBtn icon={<ArrowsClockwise size={14} className={busy ? 'animate-spin' : ''} />} onClick={busy ? undefined : () => load(!!ok)}>{ok ? 'Relire la source' : 'Interroger DVF'}</SoftBtn>} pad={false}>
+      {ok ? (
+        <div className="thin-scroll max-h-[420px] overflow-auto">
+          <table className="w-full min-w-[640px] text-left text-[12.5px]">
+            <thead className="sticky top-0 z-10 bg-ink-800 text-[10px] uppercase tracking-eyebrow text-mist"><tr className="border-b border-white/[0.06]">{['Adresse', 'Date', 'Surface', 'Prix', '€/m²', 'Source'].map((h) => <th key={h} className="px-3 py-3 font-normal">{h}</th>)}</tr></thead>
+            <tbody>
+              {m.comparables.slice(0, 60).map((c) => (
+                <tr key={c.id} className="whitespace-nowrap border-b border-white/[0.04]">
+                  <td className="px-3 py-2.5"><div className="truncate">{c.address || '—'}</div><div className="text-[10.5px] text-mist">{c.commune}{c.type ? ` · ${c.type}` : ''}</div></td>
+                  <td className="num px-3 py-2.5 text-bone/70">{c.date}</td>
+                  <td className="num px-3 py-2.5">{c.surface} m²</td>
+                  <td className="num px-3 py-2.5">{eur(c.price)}</td>
+                  <td className="num px-3 py-2.5">{fmt(c.ppm)}</td>
+                  <td className="px-3 py-2.5"><a href={c.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-champagne-300 hover:underline">{c.source}<ArrowUpRight size={11} /></a></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="px-4 py-3 text-[11px] text-mist">{m.source} · ventes du {m.period?.from ?? '?'} au {m.lastDate ?? '?'} · lu le {String(m.fetchedAt ?? '').slice(0, 10)}{m.sourceUrl && <> · <a href={m.sourceUrl} target="_blank" rel="noreferrer" className="text-champagne-300 hover:underline">jeu de données</a></>}</p>
+        </div>
+      ) : (
+        <p className="p-5 text-[12px] text-bone/55">{m && m.status !== 'absent' ? m.note ?? `Aucune vente : ${m.status}` : 'Aucune lecture enregistrée pour ce bien. « Interroger DVF » lit les ventes officielles de la commune (même type, surface ± 30 %, 24 derniers mois).'}</p>
+      )}
+    </Card>
+  )
+}
+
 export default function Marche() {
   const [raw] = useProperties()
   const props = raw as Listing[]
@@ -288,6 +328,7 @@ function Estimation({ s, props, onPick }: { s: Listing; props: Listing[]; onPick
               </table>
             </div>
           </Card>
+          <div className="mt-6"><RealSales propertyId={s.id} /></div>
         </Stagger>
 
         <div className="min-w-0 space-y-6 lg:col-span-5">

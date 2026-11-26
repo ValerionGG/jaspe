@@ -10,25 +10,27 @@ import { NOW } from '../../data/ops'
 import { useTasks, useActivity, useDossiers, useEvents, useQueue, useReminders, useConversations, useTimelog } from '../../data/collections'
 import { openBrief } from '../BriefComposer'
 import { isSimpleMode, readDay1, markDay1 } from '../../ui/mode'
+import { useT } from '../../i18n'
 
 /** Premier jour en 3 écrans : brief, débrief, temps gagné. Chaque étape se coche d’elle-même quand elle est faite. */
 function FirstDay() {
   const [d1, setD1] = useState(readDay1)
+  const { t } = useT()
   const [dossiers] = useDossiers()
   useEffect(() => { const o = () => setD1(readDay1()); window.addEventListener('nxt:day1', o); return () => window.removeEventListener('nxt:day1', o) }, [])
   if (!isSimpleMode() || d1.dismissed) return null
   const rdv = dossiers.find((d) => d.stage === 'rdv') ?? dossiers.find((d) => d.stage === 'prep')
   const steps = [
-    { k: 'brief' as const, t: 'Dicter un brief', s: 'Une phrase suffit : « Je rappelle le vendeur vendredi après le diagnostic. »', go: () => openBrief() },
-    { k: 'debrief' as const, t: 'Faire le débrief d’un rendez-vous', s: 'Dictez ce qui a été dit ; Jaspe remplit la fiche et prépare les documents.', to: rdv ? `/app/dossiers/${rdv.id}` : '/app/dossiers' },
-    { k: 'temps' as const, t: 'Voir le temps gagné', s: 'Net de la relecture et des corrections, en heures et en euros.', to: '/app/temps' },
+    { k: 'brief' as const, t: t('day1.brief'), s: t('day1.briefSub'), go: () => openBrief() },
+    { k: 'debrief' as const, t: t('day1.debrief'), s: t('day1.debriefSub'), to: rdv ? `/app/dossiers/${rdv.id}` : '/app/dossiers' },
+    { k: 'temps' as const, t: t('day1.temps'), s: t('day1.tempsSub'), to: '/app/temps' },
   ]
   const done = steps.filter((x) => d1[x.k]).length
   return (
     <div className="mt-4 rounded-2xl bg-champagne/[0.06] p-4 ring-1 ring-champagne/20">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[13px] font-medium">Premier jour · {done}/3</div>
-        <button onClick={() => markDay1('dismissed')} className="text-[11.5px] text-mist hover:text-bone">Masquer</button>
+        <div className="text-[13px] font-medium">{t('day1.title', { done })}</div>
+        <button onClick={() => markDay1('dismissed')} className="text-[11.5px] text-mist hover:text-bone">{t('common.hide')}</button>
       </div>
       <ol className="mt-3 space-y-2">
         {steps.map((x, i) => {
@@ -64,6 +66,7 @@ export default function Today() {
   const [convs] = useConversations()
   const [tuts] = useCollection<TutDoc>('tutorials')
   const [timelog] = useTimelog()
+  const { t, locale } = useT()
   const week = timelog.filter((e) => Date.now() - Date.parse(e.at) < 7 * 864e5)
   const weekNet = week.reduce((n, e) => n + e.net, 0), weekCorr = week.filter((e) => e.corrections > 0).length
   const todayStr = new Date().toDateString()
@@ -72,7 +75,7 @@ export default function Today() {
   const unreadMsgs = unread.reduce((n, c) => n + c.unread, 0)
   // ponytail: « terminée » = doc tutorials `onboarding` / `tour-onboarding` (ou kind tour + tour: 'onboarding') marqué done.
   const onboarded = tuts.some((t) => (t.id === 'onboarding' || t.id === 'tour-onboarding' || t.tour === 'onboarding' || t.tourId === 'onboarding') && t.done)
-  const dateLabel = new Date(2026, 9, NOW.day).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, (c) => c.toUpperCase())
+  const dateLabel = new Date(2026, 9, NOW.day).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, (c) => c.toUpperCase())
   const TODAY = events.filter((e) => e.day === NOW.day).sort((a, b) => a.start.localeCompare(b.start)).map((e) => ({ ...e, time: e.start, ready: e.prep && Object.values(e.prep).every((v) => v >= 100) ? 100 : undefined }))
   const TASKS = [...tasks].sort((a, b) => Number(!!a.done) - Number(!!b.done))
   const done = tasks.filter((t) => t.done).map((t) => t.id)
@@ -88,53 +91,53 @@ export default function Today() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
         <Stagger className="lg:col-span-7">
           <div className="text-[11px] uppercase tracking-eyebrow text-mist">{dateLabel} · {NOW.label} · Antibes 19°</div>
-          <h1 className="display mt-2 text-5xl md:text-6xl">Bonjour {me.name.split(' ')[0]}<span className="text-champagne">.</span></h1>
+          <h1 className="display mt-2 text-5xl md:text-6xl">{t('today.hello', { name: me.name.split(' ')[0] })}<span className="text-champagne">.</span></h1>
           <div className="relative mt-6 overflow-hidden rounded-[1.6rem] p-px">
             <div className="absolute inset-0 rounded-[1.6rem] bg-[conic-gradient(from_180deg_at_50%_50%,rgb(var(--acc-500)_/_.5),rgb(var(--acc-500)_/_.05),rgb(var(--sea)_/_.35),rgb(var(--acc-500)_/_.05),rgb(var(--acc-500)_/_.5))]" />
             <div className="relative rounded-[calc(1.6rem-1px)] bg-ink-800 p-6">
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-[12px] text-champagne-300"><Sparkle size={14} weight="fill" /> Brief du copilote · généré à 07:30</span>
-                <span className="text-[11px] text-mist">Sources : agenda, 8 dossiers, 2 routines</span>
+                <span className="flex items-center gap-2 text-[12px] text-champagne-300"><Sparkle size={14} weight="fill" /> {t('today.briefBy', { time: '07:30' })}</span>
+                <span className="text-[11px] text-mist">{t('today.briefSources')}</span>
               </div>
               <p className="mt-4 text-[17px] leading-relaxed text-bone/90 md:text-lg">
-                Journée dense mais maîtrisée. <span className="text-champagne-300">{queue.length} décision{queue.length > 1 ? 's' : ''} en attente</span>, dont trois comptent avant 14 h : valider l’estimation de la Villa Martin, relire le débrief de M. Haddad, envoyer la contre-offre Dubreuil avant son expiration à 18 h. Votre rendez-vous de 11 h est <span className="text-sage">prêt à 100 %</span>.
+                {t('today.brief1')} <span className="text-champagne-300">{t('today.pending', { n: queue.length })}</span>{t('today.brief2')} <span className="text-sage">{t('today.ready100')}</span>.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Link to="/app/studio"><SoftBtn tone="gold" icon={<CheckCircle size={14} />}>Tout valider dans l’ordre</SoftBtn></Link>
-                <Link to="/app/dossiers/d5"><SoftBtn icon={<FileText size={14} />}>Ouvrir le brief de 11 h</SoftBtn></Link>
-                <SoftBtn icon={<Lightning size={14} />} onClick={openBrief}>Dicter un brief</SoftBtn>
+                <Link to="/app/studio"><SoftBtn tone="gold" icon={<CheckCircle size={14} />}>{t('today.validateAll')}</SoftBtn></Link>
+                <Link to="/app/dossiers/d5"><SoftBtn icon={<FileText size={14} />}>{t('today.openBrief11')}</SoftBtn></Link>
+                <SoftBtn icon={<Lightning size={14} />} onClick={openBrief}>{t('day1.brief')}</SoftBtn>
               </div>
             </div>
           </div>
           {!onboarded && (
             <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-sea/[0.07] p-3 pr-4 ring-1 ring-sea/20">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sea/15 text-sea"><Compass size={17} weight="light" /></span>
-              <div className="min-w-0 flex-1"><div className="text-[13px] font-medium">Prise en main · 3 min</div><div className="text-[11.5px] text-bone/55">Le cockpit en dix arrêts : brief, recherche, copilote, file de validation.</div></div>
-              <SoftBtn icon={<ArrowRight size={14} />} onClick={() => startTour('onboarding')}>Lancer la visite</SoftBtn>
+              <div className="min-w-0 flex-1"><div className="text-[13px] font-medium">{t('today.onboard')}</div><div className="text-[11.5px] text-bone/55">{t('today.onboardSub')}</div></div>
+              <SoftBtn icon={<ArrowRight size={14} />} onClick={() => startTour('onboarding')}>{t('today.startTour')}</SoftBtn>
             </div>
           )}
           <FirstDay />
           <Link to="/app/temps" className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-sage/[0.07] p-3 pr-4 ring-1 ring-sage/20 transition hover:bg-sage/[0.1]">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage/15 text-sage"><Clock size={17} weight="light" /></span>
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium"><span className="num">{Math.floor(weekNet / 60)} h {String(Math.round(weekNet % 60)).padStart(2, '0')}</span> gagnées sur 7 jours, corrections comprises</div>
-              <div className="text-[11.5px] text-bone/55">{week.length} travaux préparés par l’assistant · {weekCorr} corrigé{weekCorr > 1 ? 's' : ''} · détail et méthode</div>
+              <div className="text-[13px] font-medium"><span className="num">{Math.floor(weekNet / 60)} h {String(Math.round(weekNet % 60)).padStart(2, '0')}</span> {t('today.gained7')}</div>
+              <div className="text-[11.5px] text-bone/55">{t('today.works', { n: week.length })} · {t('today.corrected', { n: weekCorr })} · {t('today.method')}</div>
             </div>
             <ArrowRight size={14} className="text-mist" />
           </Link>
         </Stagger>
         <Stagger i={1} className="grid min-w-0 grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:col-span-5">
-          <Stat label="CA signé · octobre" value="168 k€" delta="+22 %" hint="Objectif 240 k€"><Ring value={70} size={46}><span className="num text-[10px]">70%</span></Ring></Stat>
-          <Stat label="Mandats actifs" value={String(mandats)} delta="+3" hint={`dont ${DOSSIERS.filter((d) => d.mandate === 'Exclusif').length} exclusifs`}><Spark data={[8, 9, 9, 11, 12, 12, 14]} w={70} h={30} /></Stat>
-          <Stat label="Temps gagné · semaine" value="7 h 40" hint="Saisie, mises en page, relances" />
-          <Stat label="Taux de transformation" value="38 %" delta="+5 pts" hint="Estimation → mandat, 90 j" />
+          <Stat label={t('today.kpiCa')} value="168 k€" delta="+22 %" hint={t('today.kpiCaHint')}><Ring value={70} size={46}><span className="num text-[10px]">70%</span></Ring></Stat>
+          <Stat label={t('today.kpiMandates')} value={String(mandats)} delta="+3" hint={t('today.kpiExclusive', { n: DOSSIERS.filter((d) => d.mandate === 'Exclusif').length })}><Spark data={[8, 9, 9, 11, 12, 12, 14]} w={70} h={30} /></Stat>
+          <Stat label={t('today.kpiTime')} value="7 h 40" hint={t('today.kpiTimeHint')} />
+          <Stat label={t('today.kpiConv')} value="38 %" delta="+5 pts" hint={t('today.kpiConvHint')} />
         </Stagger>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
         {/* Agenda timeline */}
         <Stagger i={2} className="lg:col-span-5">
-          <Card title="Agenda du jour" kicker={`${TODAY.length} événements`} action={<Link to="/app/agenda" className="text-[12px] text-mist hover:text-bone">Semaine →</Link>} className="h-full">
+          <Card title={t('today.agenda')} kicker={t('today.events', { n: TODAY.length })} action={<Link to="/app/agenda" className="text-[12px] text-mist hover:text-bone">{t('today.week')}</Link>} className="h-full">
             <div className="relative">
               {TODAY.map((e, i) => {
                 const past = toH(e.end) < now, live = toH(e.time) <= now && toH(e.end) >= now
@@ -151,9 +154,9 @@ export default function Today() {
                     <div className={`min-w-0 flex-1 rounded-2xl p-3 ${e.ready ? 'bg-champagne/[0.07] ring-1 ring-champagne/20' : 'bg-white/[0.02] ring-1 ring-white/[0.05]'}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0"><div className="truncate text-[13.5px] font-medium">{e.title}</div><div className="truncate text-[12px] text-bone/50">{e.who}</div></div>
-                        {e.ready && <span className="shrink-0 rounded-full bg-sage/15 px-2 py-0.5 text-[10.5px] text-sage ring-1 ring-sage/25">Prêt 100 %</span>}
+                        {e.ready && <span className="shrink-0 rounded-full bg-sage/15 px-2 py-0.5 text-[10.5px] text-sage ring-1 ring-sage/25">{t('today.ready100short')}</span>}
                       </div>
-                      <div className="mt-2 flex items-center gap-3 text-[11px] text-mist"><span className="flex items-center gap-1"><MapPin size={11} />{e.place}</span>{e.dossier && <Link to={`/app/dossiers/${e.dossier}`} className="text-champagne-300 hover:underline">Dossier →</Link>}</div>
+                      <div className="mt-2 flex items-center gap-3 text-[11px] text-mist"><span className="flex items-center gap-1"><MapPin size={11} />{e.place}</span>{e.dossier && <Link to={`/app/dossiers/${e.dossier}`} className="text-champagne-300 hover:underline">{t('today.dossierLink')}</Link>}</div>
                     </div>
                   </div>
                   </div>
@@ -165,24 +168,24 @@ export default function Today() {
 
         {/* Priorités */}
         <Stagger i={3} className="lg:col-span-7">
-          <Card title="Priorités" kicker={`${TASKS.length - done.length} restantes · triées par impact`} action={<Link to="/app/taches" className="text-[12px] text-mist hover:text-bone">Tout voir →</Link>} className="h-full">
+          <Card title={t('today.priorities')} kicker={t('today.remaining', { n: TASKS.length - done.length })} action={<Link to="/app/taches" className="text-[12px] text-mist hover:text-bone">{t('today.seeAll')}</Link>} className="h-full">
             <div className="space-y-1.5">
-              {TASKS.map((t) => {
-                const Ic = TASK_ICON[t.kind], ok = done.includes(t.id)
-                const d = DOSSIERS.find((x) => x.id === t.dossier)
+              {TASKS.map((tk) => {
+                const Ic = TASK_ICON[tk.kind], ok = done.includes(tk.id)
+                const d = DOSSIERS.find((x) => x.id === tk.dossier)
                 return (
-                  <motion.div layout key={t.id} className={`group flex items-center gap-3 rounded-2xl p-3 ring-1 transition-colors duration-300 ${ok ? 'bg-transparent ring-transparent' : 'bg-white/[0.02] ring-white/[0.05] hover:bg-white/[0.04]'}`}>
-                    <button disabled={busy === t.id} onClick={() => toggle(t.id)} aria-label={ok ? 'Rouvrir' : 'Terminer'} className="shrink-0 text-bone/40 transition hover:text-champagne">
+                  <motion.div layout key={tk.id} className={`group flex items-center gap-3 rounded-2xl p-3 ring-1 transition-colors duration-300 ${ok ? 'bg-transparent ring-transparent' : 'bg-white/[0.02] ring-white/[0.05] hover:bg-white/[0.04]'}`}>
+                    <button disabled={busy === tk.id} onClick={() => toggle(tk.id)} aria-label={ok ? t('common.reopen') : t('common.finish')} className="shrink-0 text-bone/40 transition hover:text-champagne">
                       {ok ? <CheckCircle size={22} weight="fill" className="text-sage" /> : <Circle size={22} weight="light" />}
                     </button>
                     {d && <img src={prop(d.propertyId).photo} alt="" className="h-10 w-10 shrink-0 rounded-xl object-cover" />}
                     <div className="min-w-0 flex-1">
-                      <div className={`text-[13.5px] ${ok ? 'text-bone/35 line-through' : ''}`}>{t.title}</div>
+                      <div className={`text-[13.5px] ${ok ? 'text-bone/35 line-through' : ''}`}>{tk.title}</div>
                       <div className="mt-0.5 flex items-center gap-2 text-[11px] text-mist">
-                        <Ic size={11} />{d?.seller}{t.ai && <span className="flex items-center gap-1 text-champagne-300"><Sparkle size={10} weight="fill" />préparé par le copilote</span>}
+                        <Ic size={11} />{d?.seller}{tk.ai && <span className="flex items-center gap-1 text-champagne-300"><Sparkle size={10} weight="fill" />{t('today.byCopilot')}</span>}
                       </div>
                     </div>
-                    <span className={`num shrink-0 text-[11.5px] ${t.prio === 'haute' ? 'text-coral' : 'text-mist'}`}><Clock size={11} className="mr-1 inline" />{t.due}</span>
+                    <span className={`num shrink-0 text-[11.5px] ${tk.prio === 'haute' ? 'text-coral' : 'text-mist'}`}><Clock size={11} className="mr-1 inline" />{tk.due}</span>
                     <ArrowRight size={14} className="shrink-0 text-mist opacity-0 transition group-hover:opacity-100" />
                   </motion.div>
                 )
@@ -194,25 +197,25 @@ export default function Today() {
 
       {/* Rappels WhatsApp du jour & conversations non lues */}
       <Stagger i={4}>
-        <Card title="Rappels & messages" kicker={`${remToday.length} rappel${remToday.length > 1 ? 's' : ''} aujourd’hui · ${unread.length} conversation${unread.length > 1 ? 's' : ''} non lue${unread.length > 1 ? 's' : ''}`} action={<Link to="/app/messages" className="text-[12px] text-mist hover:text-bone">Messagerie →</Link>}>
+        <Card title={t('today.reminders')} kicker={`${t('today.remToday', { n: remToday.length })} · ${t('today.unreadConv', { n: unread.length })}`} action={<Link to="/app/messages" className="text-[12px] text-mist hover:text-bone">{t('today.messagesLink')}</Link>}>
           <div className="grid gap-6 md:grid-cols-2">
             <div className="min-w-0">
-              <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[10.5px] uppercase tracking-eyebrow text-mist"><BellRinging size={13} weight="light" />Rappels du jour à venir</span><Link to="/app/messages?tab=rappels" className="text-[11.5px] text-mist hover:text-bone">Tous →</Link></div>
+              <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[10.5px] uppercase tracking-eyebrow text-mist"><BellRinging size={13} weight="light" />{t('today.upcomingRem')}</span><Link to="/app/messages?tab=rappels" className="text-[11.5px] text-mist hover:text-bone">{t('today.all')}</Link></div>
               {remToday.length ? (
                 <div className="space-y-1.5">
                   {remToday.slice(0, 4).map((r) => (
                     <Link key={r.id} to={r.conversationId ? `/app/messages?c=${r.conversationId}` : '/app/messages?tab=rappels'} className="flex items-center gap-3 rounded-2xl bg-white/[0.02] p-3 ring-1 ring-white/[0.05] transition hover:bg-white/[0.04]">
-                      <div className="w-12 shrink-0 text-right"><div className="num text-[13px]">{new Date(r.dueAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div><div className="num text-[10px] text-mist">{r.rule}</div></div>
+                      <div className="w-12 shrink-0 text-right"><div className="num text-[13px]">{new Date(r.dueAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</div><div className="num text-[10px] text-mist">{r.rule}</div></div>
                       <div className="min-w-0 flex-1"><div className="truncate text-[13px]">{r.target}</div><div className="truncate text-[11.5px] text-bone/50">{r.text}</div></div>
                       <span className="num shrink-0 rounded-full bg-sea/10 px-2 py-0.5 text-[10.5px] text-sea ring-1 ring-sea/25">{until(r.dueAt)}</span>
                     </Link>
                   ))}
-                  {remToday.length > 4 && <div className="pl-3 text-[11px] text-mist">+ {remToday.length - 4} autre{remToday.length > 5 ? 's' : ''} aujourd’hui</div>}
+                  {remToday.length > 4 && <div className="pl-3 text-[11px] text-mist">{t('today.moreToday', { n: remToday.length - 4 })}</div>}
                 </div>
-              ) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-[12px] text-mist">Aucun rappel programmé pour la suite de la journée. Les rappels J-1 et H-2 se programment depuis l’agenda.</div>}
+              ) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-[12px] text-mist">{t('today.noRem')}</div>}
             </div>
             <div className="min-w-0">
-              <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[10.5px] uppercase tracking-eyebrow text-mist"><ChatsCircle size={13} weight="light" />Conversations non lues</span><span className="num text-[11px] text-mist">{unreadMsgs} message{unreadMsgs > 1 ? 's' : ''}</span></div>
+              <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-1.5 text-[10.5px] uppercase tracking-eyebrow text-mist"><ChatsCircle size={13} weight="light" />{t('today.unreadTitle')}</span><span className="num text-[11px] text-mist">{t('today.msgs', { n: unreadMsgs })}</span></div>
               {unread.length ? (
                 <div className="space-y-1.5">
                   {unread.slice(0, 4).map((c) => {
@@ -228,9 +231,9 @@ export default function Today() {
                       </Link>
                     )
                   })}
-                  {unread.length > 4 && <div className="pl-3 text-[11px] text-mist">+ {unread.length - 4} autre{unread.length > 5 ? 's' : ''} conversation{unread.length > 5 ? 's' : ''}</div>}
+                  {unread.length > 4 && <div className="pl-3 text-[11px] text-mist">{t('today.moreConv', { n: unread.length - 4 })}</div>}
                 </div>
-              ) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-[12px] text-mist">Boîte de réception à jour : aucune conversation en attente.</div>}
+              ) : <div className="rounded-2xl border border-dashed border-white/10 p-4 text-[12px] text-mist">{t('today.inboxZero')}</div>}
             </div>
           </div>
         </Card>
@@ -239,13 +242,13 @@ export default function Today() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
         {/* Livrables à valider */}
         <Stagger i={5} className="lg:col-span-8">
-          <Card title="Livrables en attente de vous" kicker="Centre de validation" action={<Link to="/app/studio" className="text-[12px] text-mist hover:text-bone">Studio →</Link>}>
+          <Card title={t('today.delivWaiting')} kicker={t('today.validationCenter')} action={<Link to="/app/studio" className="text-[12px] text-mist hover:text-bone">{t('today.studioLink')}</Link>}>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {review.slice(0, 6).map(({ d, c, s }, i) => (
                 <motion.div key={d.id + c} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.05, ease: EXPO, duration: 0.6 }}>
                   <Link to={`/app/dossiers/${d.id}`} className="group block overflow-hidden rounded-2xl bg-white/[0.02] ring-1 ring-white/[0.06] transition hover:ring-champagne/30">
                     <div className="relative h-24 overflow-hidden"><img src={prop(d.propertyId).photo} alt="" className="h-full w-full object-cover transition-transform duration-700 ease-silk group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-ink-800 to-transparent" /><span className="num absolute left-3 top-3 rounded-full bg-ink/70 px-2 py-0.5 text-[11px] backdrop-blur">{c}</span></div>
-                    <div className="p-3"><div className="truncate text-[13px]">{d.seller}</div><div className="mt-1.5 flex items-center justify-between"><span className={`rounded-full px-2 py-0.5 text-[10.5px] ring-1 ${DELIV_TONE[s as 'review'].c}`}>{DELIV_TONE[s as 'review'].l}</span><span className="text-[11px] text-mist">{eur(prop(d.propertyId).price)}</span></div></div>
+                    <div className="p-3"><div className="truncate text-[13px]">{d.seller}</div><div className="mt-1.5 flex items-center justify-between"><span className={`rounded-full px-2 py-0.5 text-[10.5px] ring-1 ${DELIV_TONE[s as 'review'].c}`}>{t(`deliv.${s as 'review'}` as const)}</span><span className="text-[11px] text-mist">{eur(prop(d.propertyId).price)}</span></div></div>
                   </Link>
                 </motion.div>
               ))}
@@ -255,7 +258,7 @@ export default function Today() {
 
         {/* Fil d'activité */}
         <Stagger i={6} className="lg:col-span-4">
-          <Card title="Fil de l’agence" kicker="En direct" className="h-full">
+          <Card title={t('today.feed')} kicker={t('today.live')} className="h-full">
             <div className="space-y-3.5">
               {ACTIVITY.map((a, i) => {
                 const Ic = a.tone === 'ai' ? Sparkle : a.tone === 'win' ? Trophy : a.tone === 'warn' ? Warning : Lightning
@@ -268,7 +271,7 @@ export default function Today() {
                 )
               })}
             </div>
-            <div className="mt-5 flex items-center gap-2 border-t border-white/[0.06] pt-4 text-[11.5px] text-mist"><div className="flex -space-x-2">{['p-sofia', 'p-marc', 'p-paul'].map((p) => <Avatar key={p} src={`/img/${p}.webp`} size={22} />)}</div>3 collègues en ligne</div>
+            <div className="mt-5 flex items-center gap-2 border-t border-white/[0.06] pt-4 text-[11.5px] text-mist"><div className="flex -space-x-2">{['p-sofia', 'p-marc', 'p-paul'].map((p) => <Avatar key={p} src={`/img/${p}.webp`} size={22} />)}</div>{t('today.online', { n: 3 })}</div>
           </Card>
         </Stagger>
       </div>

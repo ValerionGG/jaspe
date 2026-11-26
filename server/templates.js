@@ -2,11 +2,22 @@
 const eur = (n) => (n >= 1e6 ? `${(n / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} M€` : `${Math.round(n / 1000).toLocaleString('fr-FR')} k€`)
 const fmt = (n) => Number(n).toLocaleString('fr-FR')
 const today = () => new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+// Portugais européen (pt-PT) : « 2,8 M€ », « 850 mil € », « 15 000 €/m² », « 26 de novembro de 2026 ».
+const eurPt = (n) => (n >= 1e6 ? `${(n / 1e6).toLocaleString('pt-PT', { maximumFractionDigits: 2 })} M€` : `${Math.round(n / 1000).toLocaleString('pt-PT')} mil €`)
+const fmtPt = (n) => Number(n).toLocaleString('pt-PT')
+const todayPt = () => new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })
+/** Langue des livrables : portugais si l’agence l’a choisi ou exerce au Portugal. */
+export const docLang = (settings = {}) => (settings?.lang === 'pt' || settings?.country === 'PT' ? 'pt' : 'fr')
 
 export const NAMES = {
   D1: 'Brief relationnel', D2: 'Marché & comparables', D3: 'Radar quartier', D4: 'Simulation coaching', D5: 'Découverte vendeur',
   L1: 'Mail de remerciement', L2: 'Synthèse équipe', L3: 'Avant-première acquéreurs', L4: 'Kit réseaux sociaux', L5: 'Courrier voisinage',
   L6: 'Book de services', L7: 'Analyse & estimation', L8: 'Avant / après', L9: 'Dossier copro & diagnostics',
+}
+export const NAMES_PT = {
+  D1: 'Briefing relacional', D2: 'Mercado e comparáveis', D3: 'Radar do bairro', D4: 'Simulação de coaching', D5: 'Relatório de descoberta',
+  L1: 'Email de agradecimento', L2: 'Síntese para a equipa', L3: 'Seleção de compradores', L4: 'Kit redes sociais', L5: 'Carta à vizinhança',
+  L6: 'Book de serviços', L7: 'Avaliação e estudo de mercado', L8: 'Antes / depois', L9: 'Dossier condomínio e certificados',
 }
 /** Livrables qui sortent de l’agence : validation humaine obligatoire puis file d’envoi. */
 export const EXTERNAL = new Set(['L1', 'L3', 'L4', 'L5', 'L6', 'L7'])
@@ -123,57 +134,147 @@ function draft(code, { dossier: d, property: p, agent: a, buyers = [], settings 
 }
 
 const has = (v) => v !== undefined && v !== null && v !== '' && !(typeof v === 'number' && !Number.isFinite(v))
-const dayOf = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : undefined)
+const dayOf = (iso, loc = 'fr-FR') => (iso ? new Date(iso).toLocaleDateString(loc, { day: 'numeric', month: 'long', year: 'numeric' }) : undefined)
 /** Un chiffre cité : valeur affichée, source réelle, date de la source ; `verified:false` si rien ne l’atteste. */
-const fig = (label, value, source, { date, verified = true } = {}) => (has(value)
+const figWith = (missing) => (label, value, source, { date, verified = true } = {}) => (has(value)
   ? { label, value: String(value), source, ...(date ? { date } : {}), verified }
-  : { label, value: '—', source: 'Non renseigné au dossier', verified: false })
+  : { label, value: '—', source: missing, verified: false })
+/** Libellés des chiffres et de leurs sources, par langue. */
+const FIG = {
+  fr: { missing: 'Non renseigné au dossier', fiche: 'Fiche du bien', comps: (n) => `${n} comparable(s) DVF · ventes datées`, estNone: 'Estimation de la fiche — comparables non joints, non datée',
+    mandate: (m) => `Mandat ${m.toLowerCase()} · prix de présentation`, priceWish: (f) => `${f} · prix souhaité (saisie conseiller)`, surface: 'Surface', rooms: 'Pièces', land: 'Terrain', cadastre: 'cadastre',
+    price: 'Prix de présentation', ppm: 'Prix au m²', ppmCalc: 'Calcul : prix ÷ surface (fiche du bien)', range: 'Fourchette d’estimation', rangePpm: 'Fourchette au m²', rangeCalc: (l) => `Calcul : fourchette ÷ surface — ${l}`,
+    compsLabel: 'Comparables retenus', compsSrc: 'DVF · Etalab (ventes datées)', dpe: 'DPE', diag: 'diagnostic', timeline: 'Horizon vendeur', timelineSrc: 'Découverte vendeur · saisie conseiller',
+    buyers: 'Acquéreurs compatibles', buyersSrc: 'Recherches acquéreurs du CRM · critères déclarés', missingDocs: 'Pièces manquantes', docsSrc: 'Pièces déposées au dossier' },
+  pt: { missing: 'Não indicado no dossier', fiche: 'Ficha do imóvel', comps: (n) => `${n} comparável(eis) · vendas datadas`, estNone: 'Estimativa da ficha — sem comparáveis anexados, sem data',
+    mandate: (m) => `Contrato de mediação ${MANDATE_PT[m] ?? m.toLowerCase()} · preço de apresentação`, priceWish: (f) => `${f} · preço pretendido (indicado pelo consultor)`, surface: 'Área', rooms: 'Assoalhadas', land: 'Terreno', cadastre: 'caderneta predial',
+    price: 'Preço de apresentação', ppm: 'Preço por m²', ppmCalc: 'Cálculo: preço ÷ área (ficha do imóvel)', range: 'Intervalo de valor', rangePpm: 'Intervalo por m²', rangeCalc: (l) => `Cálculo: intervalo ÷ área — ${l}`,
+    compsLabel: 'Comparáveis utilizados', compsSrc: 'Vendas comparáveis datadas', dpe: 'Certificado energético', diag: 'certificado', timeline: 'Prazo do vendedor', timelineSrc: 'Descoberta do vendedor · indicado pelo consultor',
+    buyers: 'Compradores compatíveis', buyersSrc: 'Pesquisas de compradores do CRM · critérios declarados', missingDocs: 'Documentos em falta', docsSrc: 'Documentos entregues no dossier' },
+}
 
 /**
  * Chiffres utilisés par le livrable, avec leur provenance.
  * Faits de la fiche (surface, pièces, prix demandé) : sourcés. Fourchette d’estimation : sourcée seulement si
  * des comparables datés sont joints (`ctx.comparables`) ou si la fiche porte la source et la date de l’estimation.
  */
-export function figuresOf(code, ctx, doc = {}) {
+export function figuresOf(code, ctx, doc = {}, lang = 'fr') {
   const { dossier: d, property: p } = ctx
-  const fiche = 'Fiche du bien'
-  const ficheDate = dayOf(p.updatedAt ?? p.createdAt)
+  const T = FIG[lang] ?? FIG.fr
+  const pt = lang === 'pt'
+  const money = pt ? eurPt : eur
+  const num = pt ? fmtPt : fmt
+  const loc = pt ? 'pt-PT' : 'fr-FR'
+  const now = pt ? todayPt : today
+  const fig = figWith(T.missing)
+  const fiche = T.fiche
+  const ficheDate = dayOf(p.updatedAt ?? p.createdAt, loc)
   const comps = (ctx.comparables ?? []).filter((c) => c?.date)
-  const estSource = comps.length ? `${comps.length} comparable(s) DVF · ventes datées` : p.estimateSource
-  const estDate = comps.length ? dayOf(comps.map((c) => c.date).sort().at(-1)) : dayOf(p.estimateDate)
+  const estSource = comps.length ? T.comps(comps.length) : p.estimateSource
+  const estDate = comps.length ? dayOf(comps.map((c) => c.date).sort().at(-1), loc) : dayOf(p.estimateDate, loc)
   const estOk = !!(estSource && estDate)
-  const estLabel = estSource ?? 'Estimation de la fiche — comparables non joints, non datée'
-  const range = has(p.estimateLow) && has(p.estimateHigh) ? `${eur(p.estimateLow)} – ${eur(p.estimateHigh)}` : undefined
+  const estLabel = estSource ?? T.estNone
+  const range = has(p.estimateLow) && has(p.estimateHigh) ? `${money(p.estimateLow)} – ${money(p.estimateHigh)}` : undefined
   const ppmOk = has(p.price) && has(p.surface) && p.surface > 0
-  const priceSrc = d.mandate ? `Mandat ${d.mandate.toLowerCase()} · prix de présentation` : `${fiche} · prix souhaité (saisie conseiller)`
+  const priceSrc = d.mandate ? T.mandate(d.mandate) : T.priceWish(fiche)
   const F = {
-    surface: () => fig('Surface', has(p.surface) ? `${fmt(p.surface)} m²` : undefined, fiche, { date: ficheDate }),
-    rooms: () => fig('Pièces', p.rooms, fiche, { date: ficheDate }),
-    land: () => (has(p.land) ? [fig('Terrain', `${fmt(p.land)} m²`, `${fiche} · cadastre`, { date: ficheDate })] : []),
-    price: () => fig('Prix de présentation', has(p.price) ? eur(p.price) : undefined, priceSrc, { date: ficheDate }),
-    ppm: () => fig('Prix au m²', ppmOk ? `${fmt(Math.round(p.price / p.surface))} €/m²` : undefined, 'Calcul : prix ÷ surface (fiche du bien)', { date: ficheDate }),
-    range: () => fig('Fourchette d’estimation', range, estLabel, { date: estDate, verified: estOk }),
-    rangePpm: () => fig('Fourchette au m²', range && ppmOk ? `${fmt(Math.round(p.estimateLow / p.surface))} – ${fmt(Math.round(p.estimateHigh / p.surface))} €/m²` : undefined, `Calcul : fourchette ÷ surface — ${estLabel}`, { date: estDate, verified: estOk }),
-    comps: () => (comps.length ? [fig('Comparables retenus', comps.length, 'DVF · Etalab (ventes datées)', { date: estDate })] : []),
-    dpe: () => fig('DPE', p.dpe, `${fiche} · diagnostic`, { date: ficheDate }),
-    timeline: () => fig('Horizon vendeur', d.timeline, 'Découverte vendeur · saisie conseiller'),
+    surface: () => fig(T.surface, has(p.surface) ? `${num(p.surface)} m²` : undefined, fiche, { date: ficheDate }),
+    rooms: () => fig(T.rooms, p.rooms, fiche, { date: ficheDate }),
+    land: () => (has(p.land) ? [fig(T.land, `${num(p.land)} m²`, `${fiche} · ${T.cadastre}`, { date: ficheDate })] : []),
+    price: () => fig(T.price, has(p.price) ? money(p.price) : undefined, priceSrc, { date: ficheDate }),
+    ppm: () => fig(T.ppm, ppmOk ? `${num(Math.round(p.price / p.surface))} €/m²` : undefined, T.ppmCalc, { date: ficheDate }),
+    range: () => fig(T.range, range, estLabel, { date: estDate, verified: estOk }),
+    rangePpm: () => fig(T.rangePpm, range && ppmOk ? `${num(Math.round(p.estimateLow / p.surface))} – ${num(Math.round(p.estimateHigh / p.surface))} €/m²` : undefined, T.rangeCalc(estLabel), { date: estDate, verified: estOk }),
+    comps: () => (comps.length ? [fig(T.compsLabel, comps.length, T.compsSrc, { date: estDate })] : []),
+    dpe: () => fig(T.dpe, p.dpe, `${fiche} · ${T.diag}`, { date: ficheDate }),
+    timeline: () => fig(T.timeline, d.timeline, T.timelineSrc),
   }
   switch (code) {
     case 'D1': return [F.surface(), F.rooms(), ...F.land(), F.timeline()]
     case 'D2': return [F.price(), F.ppm(), F.range(), ...F.comps()]
     case 'D4': return [F.timeline()]
     case 'L2': return [F.surface(), F.rooms(), ...F.land(), F.dpe(), F.range(), F.timeline()]
-    case 'L3': return [F.surface(), F.rooms(), F.price(), fig('Acquéreurs compatibles', doc.matches?.length ?? 0, 'Recherches acquéreurs du CRM · critères déclarés', { date: today() })]
+    case 'L3': return [F.surface(), F.rooms(), F.price(), fig(T.buyers, doc.matches?.length ?? 0, T.buyersSrc, { date: now() })]
     case 'L4': return [F.surface(), F.rooms(), F.dpe()]
     case 'L7': return [F.range(), F.rangePpm(), F.price(), F.surface(), ...F.comps()]
-    case 'L9': return [fig('Pièces manquantes', (doc.items ?? []).filter((i) => i.state === 'missing').length, 'Pièces déposées au dossier', { date: today() })]
+    case 'L9': return [fig(T.missingDocs, (doc.items ?? []).filter((i) => i.state === 'missing').length, T.docsSrc, { date: now() })]
     default: return []
   }
 }
 
 export function buildDocument(code, ctx) {
+  if (docLang(ctx.settings) === 'pt') {
+    if (PT_CODES.has(code)) { const doc = draftPt(code, ctx); return { ...doc, figures: figuresOf(code, ctx, doc, 'pt') } }
+    // Repli signalé : pas encore de gabarit portugais pour ce livrable.
+    const doc = draft(code, ctx)
+    return { ...doc, lang: 'fr', langFallback: true, langNote: 'Versão em português ainda não disponível: documento gerado em francês, a traduzir antes do envio.', figures: figuresOf(code, ctx, doc) }
+  }
   const doc = draft(code, ctx)
   return { ...doc, figures: figuresOf(code, ctx, doc) }
+}
+
+/* ——— Gabarits en portugais européen (pt-PT) ——— */
+const PT_CODES = new Set(['D1', 'D5', 'L1', 'L2', 'L3', 'L7'])
+const MANDATE_PT = { Exclusif: 'exclusivo', Simple: 'simples (não exclusivo)', 'Semi-exclusif': 'semi-exclusivo' }
+
+function draftPt(code, { dossier: d, property: p, agent: a, buyers = [], settings = {} }) {
+  const agency = settings.agencyName ?? 'Maison Riviera · Antibes'
+  const sign = `${a?.name ?? 'O seu consultor'}\n${a?.role ? `${a.role} · ` : 'Consultor imobiliário · '}${agency}`
+  const seller = d.seller
+  const fam = /^(Famille|Família) /.exec(seller)
+  const civil = fam ? `Cara família ${seller.slice(fam[0].length)},` : 'Exmo.(a) Senhor(a),'
+  const base = { id: `${d.id}-${code}`, dossierId: d.id, code, title: NAMES_PT[code], lang: 'pt', createdAt: new Date().toISOString(), status: 'review', version: 1 }
+  const src = (label, date = todayPt()) => ({ label, date })
+  const tags = (d.tags ?? []).join(', ')
+  const motive = String(d.motivation ?? '').toLowerCase()
+  switch (code) {
+    case 'D1': return { ...base, kind: 'report', body: [
+      `Briefing antes da reunião — ${seller}`,
+      `Projeto declarado: ${d.motivation}. Prazo: ${d.timeline}.`,
+      `Imóvel: ${p.title}, ${p.address}, ${p.city} — ${fmtPt(p.surface)} m², ${p.rooms} assoalhadas${p.land ? `, terreno de ${fmtPt(p.land)} m²` : ''}.`,
+      `A confirmar durante a reunião: decisores e acordo entre eles, preço pretendido, calendário de saída, documentos disponíveis (certificado energético, caderneta predial, certidão permanente, licença de utilização).`,
+      `Pontos de atenção: ${tags || 'nenhum assinalado'}.`,
+    ], sources: [src('Ficha do dossier'), src('Agenda')] }
+    case 'D5': return { ...base, kind: 'report', body: [
+      `Relatório de descoberta — ${seller}`,
+      `Motivação da venda: ${d.motivation}. Prazo pretendido: ${d.timeline}.`,
+      `Imóvel: ${p.title}, ${p.city} — ${fmtPt(p.surface)} m², ${p.rooms} assoalhadas${p.price ? `. Preço pretendido pelo vendedor: ${eurPt(p.price)}` : ''}.`,
+      `Contrato de mediação: ${d.mandate ? `angariação em regime ${MANDATE_PT[d.mandate] ?? d.mandate.toLowerCase()}` : 'regime a definir com o vendedor'}.`,
+      d.clientNextStep ? `Próximo passo combinado: ${d.clientNextStep}.` : `Próximo passo: enviar o estudo de mercado (L7) e agendar a assinatura do contrato de mediação.`,
+      `Documentos a reunir para o contrato-promessa e a escritura: caderneta predial, certidão permanente do registo predial, certificado energético, licença de utilização, ficha técnica da habitação.`,
+      `Este relatório resume apenas o que o vendedor declarou; nada é deduzido automaticamente.`,
+    ], sources: [src('Entrevista de descoberta'), src('Ficha do imóvel')] }
+    case 'L1': return { ...base, kind: 'email', to: seller, subject: `Obrigado pela receção — ${p.title}`, body: [
+      civil,
+      `Obrigado pelo tempo que me dedicou e pela visita ao seu imóvel na ${p.address}. O seu projeto — ${motive} — é claro, e vamos construir um calendário que o respeite.`,
+      d.clientNextStep ? `Próximo passo combinado: ${d.clientNextStep}.` : `Como combinado, volto a contactá-lo muito em breve com o estudo de mercado fundamentado do seu imóvel, e definiremos juntos os passos seguintes.`,
+      `Fico ao dispor para qualquer questão.`,
+      `Com os melhores cumprimentos,\n${sign}`,
+    ], sources: [src('Relatório de descoberta D5 validado'), src('Agenda — próximo passo')] }
+    case 'L2': return { ...base, kind: 'message', to: 'Equipa da agência', body: [
+      `🏡 Nova angariação — ${p.title}`,
+      `${p.district} · ${fmtPt(p.surface)} m² · ${p.rooms} assoalhadas${p.land ? ` · terreno ${fmtPt(p.land)} m²` : ''} · CE ${p.dpe}`,
+      `Valor estimado ${eurPt(p.estimateLow)} – ${eurPt(p.estimateHigh)}. Vendedor: ${motive}, prazo ${d.timeline}.`,
+      `Têm um comprador? Respondam com o nome, eu centralizo. — ${a?.name?.split(' ')[0] ?? ''}`,
+    ], sources: [src('Ficha do imóvel')] }
+    case 'L3': {
+      const m = matchBuyers(p, buyers)
+      return { ...base, kind: 'email', to: m.map((x) => x.b.name).join(', ') || 'Nenhum comprador compatível', subject: `Em pré-lançamento: ${p.title}`, matches: m.map((x) => ({ id: x.b.id, name: x.b.name, score: x.score })), body: [
+        `Bom dia,`,
+        `Procura um imóvel na zona de ${p.district}: estamos a preparar a comercialização de um imóvel que corresponde aos critérios que nos indicou.`,
+        `${p.title} — ${fmtPt(p.surface)} m², ${p.rooms} assoalhadas${p.features?.length ? `, ${p.features.slice(0, 3).join(', ').toLowerCase()}` : ''}. Preço de apresentação: ${eurPt(p.price)}.`,
+        `Gostaria de o visitar antes da divulgação pública?`,
+        `Com os melhores cumprimentos,\n${sign}`,
+      ], sources: [src(`${m.length} pesquisa(s) compatível(eis) · critérios declarados`)] }
+    }
+    case 'L7': return { ...base, kind: 'report', range: [p.estimateLow, p.estimateHigh], body: [
+      `Estudo de mercado e avaliação — ${p.title}`,
+      `Intervalo de valor: ${eurPt(p.estimateLow)} – ${eurPt(p.estimateHigh)}, ou seja ${fmtPt(Math.round(p.estimateLow / p.surface))} a ${fmtPt(Math.round(p.estimateHigh / p.surface))} €/m².`,
+      `Preço de apresentação previsto: ${eurPt(p.price)}.`,
+      `Método: vendas comparáveis ajustadas (vista, estado de conservação, terreno, piso); os anúncios ativos servem apenas de referência da concorrência.`,
+      `Este estudo é uma opinião de valor profissional, não uma avaliação bancária nem pericial; requer a validação do consultor.`,
+    ], sources: [src('Vendas comparáveis'), src('Relatório de descoberta D5'), src('Caderneta predial')] }
+  }
 }
 
 /** Chiffres sans source datée. */

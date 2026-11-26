@@ -122,7 +122,8 @@ export function planFromBrief(text, now = new Date()) {
 /* ——— Veille de démonstration ——— */
 const median = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0 }
 
-export function createAssist(db, { put, patch, activity, notify, run, generate, HttpError }) {
+export function createAssist(db, deps = {}) {
+  const { put, patch, activity, notify, run, generate, HttpError } = deps
   const settings = () => db.get('settings', 'agency') ?? {}
   const country = () => (settings().country === 'PT' ? 'PT' : 'FR')
   const baselines = () => ({ ...BASELINES, ...(db.get('settings', 'time-baselines')?.values ?? {}) })
@@ -393,21 +394,44 @@ export function createAssist(db, { put, patch, activity, notify, run, generate, 
   }
 
   const rules = {
-    'AUT-121': () => { // veille marché sur les dossiers suivis (données de démonstration : annonces du secteur)
+    'AUT-121': () => { // veille marché : ventes réelles (deps.market : DVF / Casafari) si branché, sinon biens de démonstration du secteur
       const day = new Date().toISOString().slice(0, 10)
+      const market = deps.market
+      const fr = (v) => v.toLocaleString('fr-FR')
+      // Repli historique : biens de démonstration de la même ville.
+      const demo = (w, d, p) => {
+        const comps = db.list('properties').filter((x) => x.id !== p.id && x.city === p.city && x.surface && x.price)
+        const ppm = Math.round(p.price / p.surface), med = Math.round(median(comps.map((x) => x.price / x.surface)))
+        const gap = med ? Math.round(((ppm - med) / med) * 100) : 0
+        patch('watches', w.id, { lastDay: day, last: { comps: comps.length, ppm, med, gap, source: 'Biens de démonstration du secteur' } })
+        notify('Veille marché', `${d.seller} : ${comps.length} comparable(s) à ${p.city}, ${fr(ppm)} €/m² contre ${fr(med)} €/m² médian (${gap > 0 ? '+' : ''}${gap} %) — source : biens de démonstration`, Math.abs(gap) > 10 ? 'warn' : 'info', `/app/dossiers/${d.id}`)
+        logTime({ kind: 'veille', dossierId: d.id, ref: `w-${d.id}-${day}` })
+      }
+      // Ventes réelles : asynchrone (le moteur attend un résultat synchrone), le signal arrive à la fin de la requête.
+      const real = async (w, d, p) => {
+        const r = await market.comparables(p)
+        if (r.status !== 'ok') { if (['non configuré', 'à configurer', 'erreur'].includes(r.status)) demo(w, d, p); else patch('watches', w.id, { lastDay: day, last: { comps: 0, source: r.source, note: r.note } }); return }
+        if (r.count < 2) { patch('watches', w.id, { lastDay: day, last: { comps: r.count, source: r.source, note: 'Moins de 2 comparables : pas de signal' } }); return }
+        const ppm = Math.round(p.price / p.surface), med = r.medianPpm
+        const gap = med ? Math.round(((ppm - med) / med) * 100) : 0
+        patch('watches', w.id, { lastDay: day, last: { comps: r.count, ppm, med, gap, source: r.source, sourceUrl: r.sourceUrl, lastDate: r.lastDate, period: r.period, fetchedAt: r.fetchedAt } })
+        notify('Veille marché', `${d.seller} : ${r.count} vente(s) comparable(s) à ${r.commune ?? p.city}, ${fr(ppm)} €/m² contre ${fr(med)} €/m² médian (${gap > 0 ? '+' : ''}${gap} %) — source : ${r.source}, ventes du ${r.period?.from ?? '?'} au ${r.lastDate ?? '?'}, données lues le ${String(r.fetchedAt ?? '').slice(0, 10)}`, Math.abs(gap) > 10 ? 'warn' : 'info', `/app/dossiers/${d.id}`)
+        logTime({ kind: 'veille', dossierId: d.id, ref: `w-${d.id}-${day}` })
+      }
       let n = 0
+      const jobs = []
       for (const w of db.list('watches').filter((x) => x.active && x.dossierId)) {
         if (w.lastDay === day) continue
         const d = db.get('dossiers', w.dossierId); const p = d && db.get('properties', d.propertyId)
         if (!p?.price || !p.surface) continue
-        const comps = db.list('properties').filter((x) => x.id !== p.id && x.city === p.city && x.surface && x.price)
-        const ppm = Math.round(p.price / p.surface), med = Math.round(median(comps.map((x) => x.price / x.surface)))
-        const gap = med ? Math.round(((ppm - med) / med) * 100) : 0
-        patch('watches', w.id, { lastDay: day, last: { comps: comps.length, ppm, med, gap } })
-        notify('Veille marché', `${d.seller} : ${comps.length} comparable(s) à ${p.city}, ${ppm.toLocaleString('fr-FR')} €/m² contre ${med.toLocaleString('fr-FR')} €/m² médian (${gap > 0 ? '+' : ''}${gap} %)`, Math.abs(gap) > 10 ? 'warn' : 'info', `/app/dossiers/${d.id}`)
-        logTime({ kind: 'veille', dossierId: d.id, ref: `w-${d.id}-${day}` }); n++
+        if (market?.comparables) {
+          patch('watches', w.id, { lastDay: day }) // une requête par jour et par dossier
+          jobs.push(real(w, d, p).catch((e) => patch('watches', w.id, { last: { error: String(e.message ?? e) } })))
+        } else demo(w, d, p)
+        n++
       }
-      return [n ? 'ok' : 'skip', n ? `${n} signal(aux) de veille` : 'Aucune veille à rafraîchir']
+      rules['AUT-121'].pending = Promise.all(jobs) // pour les tests et l'appelant qui veut attendre les signaux
+      return [n ? 'ok' : 'skip', n ? (jobs.length ? `${n} veille(s) lancée(s) sur les ventes réelles` : `${n} signal(aux) de veille`) : 'Aucune veille à rafraîchir']
     },
     'AUT-122': () => { // conformité : points bloquants des dossiers en offre / compromis / acte
       const hot = db.list('dossiers').filter((d) => ['offre', 'compromis', 'acte'].includes(d.stage))

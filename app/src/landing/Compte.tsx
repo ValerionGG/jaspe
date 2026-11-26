@@ -81,7 +81,7 @@ export function Connexion() {
           <ErrorLine error={error} />
           <Submit busy={busy}>Se connecter</Submit>
         </form>
-        <p className="mt-4 text-[12px] text-mist">Mot de passe oublié : la réinitialisation par e-mail n’est pas encore disponible. Le responsable de votre agence peut vous renvoyer une invitation.</p>
+        <p className="mt-4 text-[12px] text-mist"><Link to="/mot-de-passe-oublie" className="text-champagne-300 hover:underline">Mot de passe oublié ?</Link></p>
       </Panel>
     </PublicShell>
   )
@@ -146,6 +146,66 @@ export function Invitation() {
             <Field label="Mot de passe" hint="10 caractères minimum"><Input name="password" type="password" autoComplete="new-password" minLength={10} required /></Field>
             <ErrorLine error={error} />
             <Submit busy={busy}>Rejoindre l’agence</Submit>
+          </form>
+        )}
+      </Panel>
+    </PublicShell>
+  )
+}
+
+export function MotDePasseOublie() {
+  const [done, setDone] = useState<{ message: string; mail: boolean } | null>(null)
+  const { busy, error, onSubmit } = useSubmit(async (v) => {
+    setDone(await authCall<{ message: string; mail: boolean }>('POST', 'auth/forgot', { email: v.email }))
+  })
+  return (
+    <PublicShell title="Mot de passe oublié">
+      <Panel kicker="Mot de passe oublié" title="Un nouveau" accent="mot de passe." sub="Indiquez l’adresse de votre compte : nous vous envoyons un lien valable 1 heure, utilisable une seule fois.">
+        <NoAccounts />
+        {done ? (
+          <div className="space-y-4">
+            <p role="status" className="flex items-start gap-2.5 rounded-xl bg-sea/10 p-3.5 text-[13px] text-bone/80 ring-1 ring-sea/20"><Info size={16} className="mt-0.5 shrink-0 text-sea" />{done.message}</p>
+            {!done.mail && <p className="text-[12px] text-mist">L’envoi d’e-mails n’est pas configuré sur ce serveur : demandez au responsable de votre agence de vous renvoyer une invitation.</p>}
+            <p className="text-[12px] text-mist"><Link to="/connexion" className="text-champagne-300 hover:underline">Retour à la connexion</Link></p>
+          </div>
+        ) : (
+          <form onSubmit={onSubmit} className="space-y-4">
+            <Field label="Adresse e-mail"><Input name="email" type="email" autoComplete="email" required autoFocus /></Field>
+            <ErrorLine error={error} />
+            <Submit busy={busy}>Recevoir le lien</Submit>
+            <p className="text-[12px] text-mist"><Link to="/connexion" className="text-champagne-300 hover:underline">Retour à la connexion</Link></p>
+          </form>
+        )}
+      </Panel>
+    </PublicShell>
+  )
+}
+
+export function Reinitialiser() {
+  const { token = '' } = useParams()
+  const go = useNavigate()
+  const [ok, setOk] = useState(false)
+  const { busy, error, onSubmit } = useSubmit(async (v) => {
+    if ((v.password ?? '').length < 10) throw new Error('Mot de passe trop court : 10 caractères minimum')
+    if (v.password !== v.confirm) throw new Error('Les deux mots de passe ne correspondent pas')
+    await authCall('POST', 'auth/reset', { token, password: v.password })
+    resetLocalData()
+    setOk(true)
+    setTimeout(() => go('/connexion', { replace: true }), 2500)
+  })
+  return (
+    <PublicShell title="Réinitialiser le mot de passe">
+      <Panel kicker="Réinitialisation" title="Choisissez" accent="un nouveau mot de passe." sub="Toutes les sessions ouvertes sur ce compte seront fermées.">
+        <NoAccounts />
+        {ok ? (
+          <p role="status" className="flex items-start gap-2.5 rounded-xl bg-sea/10 p-3.5 text-[13px] text-bone/80 ring-1 ring-sea/20"><Info size={16} className="mt-0.5 shrink-0 text-sea" /><span>Mot de passe modifié. <Link to="/connexion" className="text-champagne-300 hover:underline">Connectez-vous</Link> avec le nouveau mot de passe.</span></p>
+        ) : (
+          <form onSubmit={onSubmit} className="space-y-4">
+            <Field label="Nouveau mot de passe" hint="10 caractères minimum"><Input name="password" type="password" autoComplete="new-password" minLength={10} required autoFocus /></Field>
+            <Field label="Confirmer le mot de passe"><Input name="confirm" type="password" autoComplete="new-password" minLength={10} required /></Field>
+            <ErrorLine error={error} />
+            <Submit busy={busy}>Enregistrer le mot de passe</Submit>
+            <p className="text-[12px] text-mist">Lien expiré ? <Link to="/mot-de-passe-oublie" className="text-champagne-300 hover:underline">Refaire une demande</Link></p>
           </form>
         )}
       </Panel>

@@ -15,6 +15,9 @@ import { uploadFile, action, type Doc, useMe, authCall, refreshMe, resetLocalDat
 import { PLANS, PLAN_OPTIONS } from '../../data/plans'
 import { useTheme } from '../../ui/theme'
 import { Modal, Field, Input, Select, AsyncForm, toast, errText } from '../forms'
+import { MailSettings } from '../MailSettings'
+import { WhatsAppSettings } from '../WhatsAppSettings'
+import { LangPanel } from '../../i18n/LangSwitch'
 import {
   NETWORK, INHERITED, ROLES, PERMS, PERM_MATRIX, RETENTION, SESSIONS, download, csv,
   type Integration,
@@ -179,6 +182,7 @@ function Profil() {
           ))}
         </div>
       </Card>
+      <LangPanel />
       <Card title="Préférences du copilote" kicker="Comment il travaille pour vous">
         <Row title="Ton des livrables" desc="Appliqué aux mails L1, avant-premières L3 et courriers L5">
           <Tabs id="rg-tone" value={TONES[p.copilotTone as keyof typeof TONES] ?? 'Sobre'} onChange={(v) => save({ copilotTone: v.toLowerCase() }, `Ton « ${v} » enregistré`)} items={Object.values(TONES).map((t) => ({ id: t, label: t }))} />
@@ -515,6 +519,8 @@ function Integrations() {
   return (
     <div className="space-y-5">
       <div className="flex items-start gap-3 rounded-[1.3rem] bg-sea/[0.06] p-4 text-[12.5px] text-bone/70 ring-1 ring-sea/20"><Info size={18} weight="light" className="mt-0.5 shrink-0 text-sea" /><span>Aucun jeton d’API n’est configuré sur ce serveur : les connexions et synchronisations sont <span className="text-bone">simulées et consignées</span> (statut, journal d’audit). Aucune donnée n’est échangée avec les services tiers.</span></div>
+      <MailSettings />
+      <WhatsAppSettings />
       <div className="grid grid-cols-3 gap-3">
         {([['connecte', 'Connectées', 'text-sage'], ['erreur', 'À réparer', 'text-coral'], ['a_connecter', 'Disponibles', 'text-bone']] as const).map(([s, l, c]) => (
           <Card key={s}><div className="text-[11.5px] text-mist">{l}</div><div className={clsx('display mt-1 text-[2.2rem] leading-none', c)}>{count(s)}</div></Card>
@@ -550,7 +556,89 @@ function Integrations() {
           ))}
         </AnimatePresence>
       </motion.div>
+      <McpAccess />
     </div>
+  )
+}
+
+/* ——— Jaspe dans Claude ou ChatGPT (MCP) ——— */
+type ApiToken = { id: string; name: string; hint: string; createdAt: string; lastUsedAt?: string | null; revokedAt?: string | null }
+function McpAccess() {
+  const account = useMe()
+  const audit = useAudit()
+  const [tokens, setTokens] = useState<ApiToken[] | null>(null)
+  const [fresh, setFresh] = useState<string | null>(null)
+  const [name, setName] = useState('Claude Desktop')
+  const [busy, setBusy] = useState(false)
+  const [unavailable, setUnavailable] = useState(false)
+  const load = () => action<{ tokens: ApiToken[] }>('apitoken.list').then((r) => { setTokens(r.tokens); setUnavailable(false) }, () => { setTokens([]); setUnavailable(true) })
+  useEffect(() => { load() }, [])
+  const url = `${window.location.origin}/mcp`
+  const orgId = account?.mode === 'auth' ? account.org.id : null
+  const token = fresh ?? 'jsp.…'
+  const stdioCfg = JSON.stringify({ mcpServers: { jaspe: { command: 'node', args: ['C:\\chemin\\vers\\Jaspe\\server\\mcp-stdio.js'], ...(orgId ? { env: { JASPE_ORG: orgId } } : {}) } } }, null, 2)
+  const httpCfg = JSON.stringify({ mcpServers: { jaspe: { command: 'npx', args: ['-y', 'mcp-remote', url, '--header', 'Authorization:${JASPE_AUTH}'], env: { JASPE_AUTH: `Bearer ${token}` } } } }, null, 2)
+  const cliCmd = `claude mcp add --transport http jaspe ${url} --header "Authorization: Bearer ${token}"`
+  const copy = (t: string, what: string) => navigator.clipboard.writeText(t).then(() => toast(`${what} copié`), () => toast('Copie impossible : sélectionnez le texte', 'error'))
+  const create = async () => {
+    setBusy(true)
+    try { const r = await action<{ token: string; name: string }>('apitoken.create', { name }); setFresh(r.token); audit(`a créé le jeton d’API « ${r.name} » (MCP)`, 'warn'); await load() }
+    catch (e) { toast(errText(e), 'error') } finally { setBusy(false) }
+  }
+  const revoke = async (t: ApiToken) => {
+    try { await action('apitoken.revoke', { id: t.id }); audit(`a révoqué le jeton d’API « ${t.name} »`, 'warn'); toast(`Jeton « ${t.name} » révoqué`); await load() }
+    catch (e) { toast(errText(e), 'error') }
+  }
+  const active = (tokens ?? []).filter((t) => !t.revokedAt)
+  const Code = ({ label, value }: { label: string; value: string }) => (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2"><span className="text-[11.5px] text-mist">{label}</span><SoftBtn onClick={() => copy(value, label)}>Copier</SoftBtn></div>
+      <pre className="thin-scroll overflow-x-auto rounded-xl bg-ink-900/60 p-3 text-[11.5px] leading-relaxed text-bone/80 ring-1 ring-white/[0.06]">{value}</pre>
+    </div>
+  )
+  return (
+    <Card>
+      <div className="flex items-start gap-3">
+        <PlugsConnected size={20} weight="light" className="mt-0.5 shrink-0 text-champagne" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-medium">Jaspe dans Claude ou ChatGPT (MCP)</div>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-bone/60">9 outils : lire vos dossiers, tâches du jour, temps gagné et conformité ; préparer un plan depuis un brief, une relance, un livrable ou une facture. <span className="text-bone">Rien n’est écrit sans vous</span> : chaque préparation arrive dans Tâches &amp; validations, à valider ou refuser.</p>
+        </div>
+      </div>
+      {unavailable && <div className="mt-4 flex items-start gap-2 rounded-xl bg-champagne/[0.06] p-3 text-[12px] text-champagne-300 ring-1 ring-champagne/20"><Info size={14} className="mt-0.5 shrink-0" />Serveur MCP non disponible sur cette version (hors ligne ou démo statique) : lancez le serveur Jaspe pour créer un jeton.</div>}
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="space-y-3">
+          <div className="text-[11.5px] text-mist">Adresse du serveur (Streamable HTTP)</div>
+          <div className="flex items-center gap-2"><code className="num min-w-0 flex-1 truncate rounded-xl bg-white/[0.03] px-3 py-2 text-[12.5px] ring-1 ring-white/[0.06]">{url}</code><SoftBtn onClick={() => copy(url, 'Adresse')}>Copier</SoftBtn></div>
+          <div className="text-[11.5px] text-mist">Jetons d’API de l’agence</div>
+          <div className="flex gap-2">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom du jeton (ex. Claude Desktop)" aria-label="Nom du jeton" />
+            <SoftBtn tone="gold" icon={<Key size={13} />} onClick={() => !busy && create()}>{busy ? 'Création…' : 'Créer un jeton'}</SoftBtn>
+          </div>
+          {fresh && (
+            <div className="rounded-xl bg-sage/[0.07] p-3 ring-1 ring-sage/25">
+              <div className="flex items-center gap-1.5 text-[12px] text-sage"><Warning size={13} />Copiez ce jeton maintenant : il ne sera plus affiché.</div>
+              <div className="mt-2 flex items-center gap-2"><code className="num min-w-0 flex-1 break-all text-[12px] text-bone">{fresh}</code><SoftBtn onClick={() => copy(fresh, 'Jeton')}>Copier</SoftBtn><IconBtn label="Masquer le jeton" onClick={() => setFresh(null)}><X size={13} /></IconBtn></div>
+            </div>
+          )}
+          <div className="divide-y divide-white/[0.05] rounded-xl ring-1 ring-white/[0.06]">
+            {active.length === 0 ? <div className="p-3 text-[12px] text-mist">Aucun jeton actif.</div> : active.map((t) => (
+              <div key={t.id} className="flex items-center gap-3 p-3 text-[12.5px]">
+                <Key size={14} className="shrink-0 text-mist" />
+                <div className="min-w-0 flex-1"><div className="truncate">{t.name} <span className="num text-mist">{t.hint}</span></div><div className="text-[11px] text-mist">Créé le {new Date(t.createdAt).toLocaleDateString('fr-FR')} · {t.lastUsedAt ? `utilisé le ${new Date(t.lastUsedAt).toLocaleString('fr-FR')}` : 'jamais utilisé'}</div></div>
+                <IconBtn label={`Révoquer ${t.name}`} onClick={() => revoke(t)}><Trash size={14} /></IconBtn>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-3">
+          <Code label="Claude Desktop · local (stdio)" value={stdioCfg} />
+          <Code label="Claude Desktop · serveur (HTTP + jeton)" value={httpCfg} />
+          <Code label="Claude Code" value={cliCmd} />
+          <p className="text-[11px] leading-relaxed text-mist">ChatGPT : ajoutez un connecteur MCP personnalisé avec l’adresse ci-dessus et l’en-tête Authorization: Bearer &lt;jeton&gt;. L’adresse doit être joignable depuis Internet (HTTPS).</p>
+        </div>
+      </div>
+    </Card>
   )
 }
 

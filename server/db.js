@@ -10,7 +10,7 @@ export const COLLECTIONS = new Set([
   'notifications', 'files', 'outbox', 'notes', 'agents', 'coaching',
   'conversations', 'messages', 'reminders', 'templates', 'tutorials',
   'timelog', 'compliance', 'regwatch', 'invoices', 'watches', 'feedback', 'aicalls',
-  'risks', 'depotlinks', 'proofs', 'cmplog', 'exports',
+  'risks', 'depotlinks', 'proofs', 'cmplog', 'exports', 'extractions', 'mcplog', 'waplans',
 ])
 
 export function openDb(path) {

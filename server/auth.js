@@ -11,6 +11,8 @@ const scryptAsync = promisify(scrypt)
 export const AUTH_COOKIE = 'jaspe_sid'
 const SESSION_DAYS = 30
 const INVITE_DAYS = 7
+const RESET_MS = 3600e3
+const FORGOT = { perKey: 3, perIp: 10, windowMs: 15 * 60_000 }
 const ATTEMPTS = { max: 5, windowMs: 15 * 60_000 }
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 /** Collections gardées à l’amorçage d’une base vide : routines, modèles, tutoriels et veille légale restent utiles. */
@@ -34,6 +36,7 @@ export function limitsFor(org) {
 }
 export const isActiveDossier = (d) => !INACTIVE.has(String(d.stage ?? '').toLowerCase()) && !d.archived && !d.afterSale?.archive
 
+const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 const hashToken = (t) => createHash('sha256').update(t).digest('hex')
 const token = () => randomBytes(32).toString('base64url')
 const iso = (ms = Date.now()) => new Date(ms).toISOString()
@@ -61,7 +64,8 @@ export function createAccounts(path) {
     CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, pass TEXT NOT NULL, orgId TEXT NOT NULL, role TEXT NOT NULL, createdAt TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS sessions (tokenHash TEXT PRIMARY KEY, userId TEXT NOT NULL, expiresAt TEXT NOT NULL, createdAt TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS invites (id TEXT PRIMARY KEY, tokenHash TEXT NOT NULL UNIQUE, orgId TEXT NOT NULL, role TEXT NOT NULL, createdBy TEXT NOT NULL, expiresAt TEXT NOT NULL, usedAt TEXT, createdAt TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, type TEXT NOT NULL, at TEXT NOT NULL);`)
+    CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, type TEXT NOT NULL, at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS resets (tokenHash TEXT PRIMARY KEY, userId TEXT NOT NULL, expiresAt TEXT NOT NULL, usedAt TEXT, createdAt TEXT NOT NULL);`)
   const orgRow = (r) => (r ? { ...r, options: JSON.parse(r.options || '[]'), cancelAtPeriodEnd: !!r.cancelAtPeriodEnd } : null)
   const q = (sql) => db.prepare(sql)
   const ORG_FIELDS = ['name', 'country', 'plan', 'status', 'period', 'options', 'seats', 'customerId', 'subscriptionId', 'periodEnd', 'cancelAtPeriodEnd']
@@ -119,6 +123,20 @@ export function createAccounts(path) {
     pendingInvites: (orgId) => q('SELECT id, role, expiresAt, createdAt FROM invites WHERE orgId = ? AND usedAt IS NULL AND expiresAt > ? ORDER BY createdAt').all(orgId, iso()),
     useInvite: (id) => q('UPDATE invites SET usedAt = ? WHERE id = ? AND usedAt IS NULL').run(iso(), id).changes > 0,
     revokeInvite: (orgId, id) => q('DELETE FROM invites WHERE orgId = ? AND id = ? AND usedAt IS NULL').run(orgId, id).changes > 0,
+    /** Réinitialisation du mot de passe : un seul jeton actif par compte (haché, 1 h, usage unique). */
+    createReset(userId) {
+      const t = token()
+      q('DELETE FROM resets WHERE userId = ? AND usedAt IS NULL').run(userId)
+      q('INSERT INTO resets (tokenHash, userId, expiresAt, createdAt) VALUES (?, ?, ?, ?)').run(hashToken(t), userId, iso(Date.now() + RESET_MS), iso())
+      return t
+    },
+    reset: (t) => q('SELECT * FROM resets WHERE tokenHash = ?').get(hashToken(String(t ?? ''))) ?? null,
+    useReset: (tokenHash) => q('UPDATE resets SET usedAt = ? WHERE tokenHash = ? AND usedAt IS NULL').run(iso(), tokenHash).changes > 0,
+    setPassword(userId, pass) {
+      q('UPDATE users SET pass = ? WHERE id = ?').run(pass, userId)
+      q('DELETE FROM sessions WHERE userId = ?').run(userId)
+      q('DELETE FROM resets WHERE userId = ? AND usedAt IS NULL').run(userId)
+    },
     /** Idempotence des webhooks : vrai si l’événement est nouveau. */
     markEvent: (id, type) => q('INSERT OR IGNORE INTO events (id, type, at) VALUES (?, ?, ?)').run(id, type, iso()).changes > 0,
   }
@@ -148,8 +166,18 @@ export function demoRoute(req, res, parts, send) {
  * Passerelle du mode comptes : traite /api/auth, /api/me, /api/team, /api/billing ;
  * pour le reste, résout l’agence de la session et renvoie son contexte {db, engine, copilot, clients, emit, filesDir}.
  */
-export function createGate({ accounts, billing, openOrg, send, readBody }) {
+export function createGate({ accounts, billing, openOrg, send, readBody, mailer = null, publicUrl }) {
   const attempts = new Map()
+  const forgotHits = new Map()
+  const base = String(publicUrl ?? mailer?.publicUrl ?? process.env.JASPE_PUBLIC_URL ?? 'http://127.0.0.1:5318').replace(/\/+$/, '')
+  const mailOn = () => !!mailer?.configured
+  /** Fenêtre glissante : vrai si la clé a dépassé `max` demandes. */
+  const tooMany = (key, max) => {
+    const now = Date.now()
+    const list = (forgotHits.get(key) ?? []).filter((t) => now - t < FORGOT.windowMs)
+    list.push(now); forgotHits.set(key, list)
+    return list.length > max
+  }
   const ipOf = (req) => req.socket?.remoteAddress ?? '?'
   const sid = (req) => parseCookies(req.headers.cookie)[AUTH_COOKIE]
   const pub = (u) => ({ id: u.id, name: u.name, email: u.email, role: u.role })
@@ -227,6 +255,37 @@ export function createGate({ accounts, billing, openOrg, send, readBody }) {
       accounts.endSession(sid(req))
       return send(res, 200, { ok: true }, { 'set-cookie': cookie(req, '', 0) })
     }
+    if (a === 'forgot' && m === 'POST') {
+      const body = await readBody(req)
+      const email = String(body.email ?? '').trim().toLowerCase().slice(0, 160)
+      // Limite par adresse et par IP, appliquée que le compte existe ou non.
+      if (tooMany(`f|${email}|${ipOf(req)}`, FORGOT.perKey) || tooMany(`ip|${ipOf(req)}`, FORGOT.perIp)) throw new HttpError(429, 'Trop de demandes de réinitialisation. Réessayez dans 15 min.')
+      const user = EMAIL.test(email) ? accounts.userByEmail(email) : null
+      if (user && mailOn()) {
+        const t = accounts.createReset(user.id)
+        const link = `${base}/reinitialiser/${t}`
+        // Envoi non attendu : même délai de réponse que l’adresse existe ou non.
+        mailer.send({ to: user.email, subject: 'Jaspe — réinitialisation de votre mot de passe', text: `Bonjour ${user.name},
+
+Pour choisir un nouveau mot de passe, ouvrez ce lien (valable 1 heure, utilisable une seule fois) :
+${link}
+
+Si vous n’êtes pas à l’origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.`, html: `<p>Bonjour ${escHtml(user.name)},</p><p>Pour choisir un nouveau mot de passe, ouvrez ce lien (valable 1 heure, utilisable une seule fois) :</p><p><a href="${escHtml(link)}">${escHtml(link)}</a></p><p>Si vous n’êtes pas à l’origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.</p>` }).catch((e) => console.error('Réinitialisation : échec de l’envoi', e?.message ?? e))
+      }
+      return send(res, 200, { ok: true, mail: mailOn(), message: 'Si un compte existe avec cette adresse, un e-mail de réinitialisation vient d’être envoyé (lien valable 1 heure).' })
+    }
+    if (a === 'reset' && m === 'POST') {
+      const body = await readBody(req)
+      const r = accounts.reset(body.token)
+      if (!r || r.usedAt) throw new HttpError(404, 'Lien de réinitialisation invalide ou déjà utilisé')
+      if (Date.parse(r.expiresAt) <= Date.now()) throw new HttpError(410, 'Lien de réinitialisation expiré : refaites une demande')
+      const password = String(body.password ?? '')
+      if (password.length < 10) throw new HttpError(400, 'Mot de passe trop court : 10 caractères minimum')
+      if (password.length > 200) throw new HttpError(400, 'Mot de passe trop long')
+      if (!accounts.useReset(r.tokenHash)) throw new HttpError(404, 'Lien de réinitialisation déjà utilisé')
+      accounts.setPassword(r.userId, await hashPassword(password))
+      return send(res, 200, { ok: true }, { 'set-cookie': cookie(req, '', 0) })
+    }
     if (a === 'invite' && b && m === 'GET') {
       const inv = accounts.invite(b)
       if (!inv || inv.usedAt) throw new HttpError(404, 'Invitation introuvable ou déjà utilisée')
@@ -260,8 +319,24 @@ export function createGate({ accounts, billing, openOrg, send, readBody }) {
       if (used >= lim) throw new HttpError(402, lim <= 1
         ? `L’offre ${PLANS[effectivePlan(s.org)].label} comprend un seul siège. Passez à l’offre Agence pour inviter des conseillers.`
         : `Les ${lim} sièges de votre offre sont occupés ou réservés. Ajoutez des sièges dans Réglages › Facturation.`)
+      // Avec SMTP : l’invitation part aussi par e-mail si une adresse est fournie ; sinon lien à copier.
+      const to = String((await readBody(req))?.email ?? '').trim().toLowerCase()
+      if (to && !EMAIL.test(to)) throw new HttpError(400, 'Adresse e-mail invalide')
       const inv = accounts.createInvite({ orgId: s.org.id, role: 'conseiller', createdBy: s.user.id })
-      return send(res, 201, { ...inv, path: `/invitation/${inv.token}` })
+      const path = `/invitation/${inv.token}`
+      let emailed = false, mailError
+      if (to && mailOn()) {
+        const link = `${base}${path}`
+        try {
+          await mailer.send({ to, replyTo: s.user.email, subject: `${s.user.name} vous invite sur Jaspe — ${s.org.name}`, text: `Bonjour,
+
+${s.user.name} vous invite à rejoindre l’agence ${s.org.name} sur Jaspe.
+Créez votre compte avec ce lien (usage unique, valable ${INVITE_DAYS} jours) :
+${link}`, html: `<p>Bonjour,</p><p>${escHtml(s.user.name)} vous invite à rejoindre l’agence ${escHtml(s.org.name)} sur Jaspe.</p><p>Créez votre compte avec ce lien (usage unique, valable ${INVITE_DAYS} jours) :<br><a href="${escHtml(link)}">${escHtml(link)}</a></p>` })
+          emailed = true
+        } catch (e) { mailError = `Invitation créée mais e-mail non envoyé : ${e?.message ?? e}` }
+      }
+      return send(res, 201, { ...inv, path, emailed, ...(mailError ? { mailError } : {}) })
     }
     if (a === 'invites' && b && m === 'DELETE') return send(res, 200, { ok: accounts.revokeInvite(s.org.id, b) })
     if (a === 'members' && b && m === 'DELETE') {

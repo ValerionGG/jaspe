@@ -33,6 +33,8 @@ const Connexion = lazy(() => import('./landing/Compte').then((m) => ({ default: 
 const Inscription = lazy(() => import('./landing/Compte').then((m) => ({ default: m.Inscription })))
 const Invitation = lazy(() => import('./landing/Compte').then((m) => ({ default: m.Invitation })))
 const DepotClient = lazy(() => import('./landing/DepotClient'))
+const MotDePasseOublie = lazy(() => import('./landing/Compte').then((m) => ({ default: m.MotDePasseOublie })))
+const Reinitialiser = lazy(() => import('./landing/Compte').then((m) => ({ default: m.Reinitialiser })))
 const page = (el: ReactNode) => <Suspense fallback={<div className="h-screen bg-ink" />}>{el}</Suspense>
 
 /** Entrée de l’édition Essentiel du CRM : mémorise l’édition puis ouvre le CRM. */
@@ -56,6 +58,8 @@ const w = window as unknown as { __nxtRoot?: ReturnType<typeof createRoot> }
         <Route path="/inscription" element={page(<Inscription />)} />
         <Route path="/invitation/:token" element={page(<Invitation />)} />
         <Route path="/depot/:token" element={page(<DepotClient />)} />
+        <Route path="/mot-de-passe-oublie" element={page(<MotDePasseOublie />)} />
+        <Route path="/reinitialiser/:token" element={page(<Reinitialiser />)} />
         <Route path="/app/*" element={<Suspense fallback={<div className="h-screen bg-ink" />}><CrmApp /></Suspense>} />
       </Routes>
     </Router>

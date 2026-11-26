@@ -8,7 +8,7 @@ import { createInvoicing } from './invoicing.js'
 const L_CODES = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9']
 const hhmm = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
-export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setTimeout(r, ms)), market } = {}) {
   const put = (col, doc, opts) => { const d = db.put(col, doc, opts); emit(col, d.id); return d }
   const patch = (col, id, p) => { const d = db.patch(col, id, p); if (d) emit(col, id); return d }
   const activity = (who, what, tone = 'neutral', link) => put('activity', { t: hhmm(), at: new Date().toISOString(), who, what, tone, link }, { front: true })
@@ -23,7 +23,8 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
     if (!dossier) throw new HttpError(404, 'Dossier introuvable')
     const property = db.get('properties', dossier.propertyId)
     if (!property) throw new HttpError(409, 'Bien du dossier introuvable — ouvrez la page Biens pour l’initialiser')
-    return { dossier, property, agent: db.get('agents', dossier.agentId), buyers: db.list('buyers'), settings: db.get('settings', 'agency') ?? {} }
+    // Comparables réels (DVF) déjà en cache : lecture synchrone, sans réseau.
+    return { dossier, property, agent: db.get('agents', dossier.agentId), buyers: db.list('buyers'), settings: db.get('settings', 'agency') ?? {}, comparables: market?.cached(property)?.comparables ?? [] }
   }
   const setDeliv = (dossierId, code, state) => {
     const d = db.get('dossiers', dossierId)
@@ -69,7 +70,7 @@ export function createEngine(db, emit, { delay = (ms) => new Promise((r) => setT
   }
 
   const messaging = createMessaging(db, { put, patch, activity, notify, run })
-  const assist = createAssist(db, { put, patch, activity, notify, run, generate: (...a) => generate(...a), HttpError })
+  const assist = createAssist(db, { put, patch, activity, notify, run, generate: (...a) => generate(...a), HttpError, market })
 
   const actions = {
     ...messaging.actions,
